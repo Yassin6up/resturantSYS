@@ -1,0 +1,11 @@
+
+RewriteEngine on
+
+RewriteOptions inherit
+# DO NOT REMOVE. CLOUDLINUX PASSENGER CONFIGURATION BEGIN
+PassengerAppRoot "/home/sakanwrd/backend.sakanijo.com"
+PassengerBaseURI "/"
+PassengerNodejs "/home/sakanwrd/nodevenv/backend.sakanijo.com/20/bin/node"
+PassengerAppType node
+PassengerStartupFile index.js
+# DO NOT REMOVE. CLOUDLINUX PASSENGER CONFIGURATION END
