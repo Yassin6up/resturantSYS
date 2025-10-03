@@ -1,0 +1,40 @@
+# Development Dockerfile
+FROM node:18-alpine
+
+# Install system dependencies
+RUN apk add --no-cache \
+    sqlite \
+    curl \
+    python3 \
+    make \
+    g++
+
+WORKDIR /app
+
+# Install root dependencies
+COPY package*.json ./
+RUN npm install
+
+# Install server dependencies
+COPY server/package*.json ./server/
+WORKDIR /app/server
+RUN npm install
+
+# Install frontend dependencies
+WORKDIR /app/frontend
+COPY frontend/package*.json ./
+RUN npm install
+
+WORKDIR /app
+
+# Copy source code
+COPY . .
+
+# Create data directory
+RUN mkdir -p /app/server/data /app/backups
+
+# Expose ports
+EXPOSE 3001 5173
+
+# Start development servers
+CMD ["npm", "run", "dev"]
