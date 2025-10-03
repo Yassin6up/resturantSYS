@@ -64,30 +64,24 @@ function CheckoutPage() {
       const totals = calculateTotals()
       
       const orderData = {
-        table_number: tableNumber,
-        customer_name: customerName,
+        branchId: 1,
+        tableId: parseInt(tableNumber) || 1,
+        customerName: customerName,
         items: cartItems.map(item => ({
-          menu_item_id: item.menuItemId,
+          menuItemId: item.menuItemId,
           quantity: item.quantity,
-          unit_price: item.unitPrice,
-          modifiers: item.modifiers || [],
+          modifiers: item.modifiers?.map(m => m.id) || [],
           note: item.note || ''
         })),
-        subtotal: totals.subtotal,
-        tax: totals.tax,
-        service_charge: totals.serviceCharge,
-        total: totals.grandTotal,
-        payment_method: paymentMethod,
-        status: paymentMethod === 'cash' ? 'PENDING' : 'PAID'
+        paymentMethod: paymentMethod
       }
 
       const response = await ordersAPI.createOrder(orderData)
       
-      if (response.data.success) {
-        const order = response.data.order
-        setOrderData(order)
-        setOrderCode(order.order_code)
-        setPinCode(order.pin_code)
+      if (response.data.orderId) {
+        setOrderData(response.data)
+        setOrderCode(response.data.orderCode)
+        setPinCode(response.data.pin)
         setShowQRCode(true)
         
         // Clear cart after successful order

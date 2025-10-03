@@ -38,6 +38,7 @@ function App() {
               <Route path="cart" element={<CartPage />} />
               <Route path="checkout" element={<CheckoutPage />} />
               <Route path="order/:orderId" element={<OrderStatusPage />} />
+              <Route path="order-status" element={<OrderStatusPage />} />
             </Route>
 
             {/* Admin Authentication */}

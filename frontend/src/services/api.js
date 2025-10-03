@@ -67,6 +67,7 @@ export const ordersAPI = {
   createOrder: (data) => api.post('/api/orders', data),
   getOrders: (params) => api.get('/api/orders', { params }),
   getOrder: (id) => api.get(`/api/orders/${id}`),
+  getOrderByPin: (pin) => api.get(`/api/orders/pin/${pin}`),
   updateOrderStatus: (id, status) => api.patch(`/api/orders/${id}/status`, { status }),
   confirmOrder: (id) => api.post(`/api/orders/${id}/confirm`),
   cancelOrder: (id, reason) => api.post(`/api/orders/${id}/cancel`, { reason }),
