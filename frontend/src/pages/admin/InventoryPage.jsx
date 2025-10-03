@@ -5,8 +5,8 @@ import {
   PencilIcon, 
   TrashIcon,
   ExclamationTriangleIcon,
-  TrendingUpIcon,
-  TrendingDownIcon
+  
+  
 } from '@heroicons/react/24/outline'
 import StockItemForm from '../../components/StockItemForm'
 import toast from 'react-hot-toast'
@@ -277,10 +277,10 @@ function InventoryPage() {
                                 {item.current_stock} {item.unit}
                               </span>
                               {stockStatus.status === 'low' && (
-                                <TrendingDownIcon className="h-4 w-4 text-red-500 ml-1" />
+                                <PlusIcon className="h-4 w-4 text-red-500 ml-1" />
                               )}
                               {stockStatus.status === 'high' && (
-                                <TrendingUpIcon className="h-4 w-4 text-green-500 ml-1" />
+                                <PlusIcon className="h-4 w-4 text-green-500 ml-1" />
                               )}
                             </div>
                           </td>

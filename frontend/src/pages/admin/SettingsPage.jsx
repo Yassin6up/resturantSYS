@@ -3,7 +3,6 @@ import { settingsAPI } from '../../services/api'
 import { 
   CogIcon, 
   PaintBrushIcon, 
-  DatabaseIcon, 
   CloudIcon, 
   ComputerDesktopIcon,
   CheckIcon,
@@ -147,7 +146,7 @@ function SettingsPage() {
   const tabs = [
     { id: 'general', name: 'General', icon: CogIcon },
     { id: 'theme', name: 'Theme', icon: PaintBrushIcon },
-    { id: 'database', name: 'Database', icon: DatabaseIcon },
+    { id: 'database', name: 'Database', icon: CloudIcon },
     { id: 'payment', name: 'Payment', icon: CloudIcon },
     { id: 'printer', name: 'Printer', icon: ComputerDesktopIcon },
     { id: 'sync', name: 'Sync', icon: CloudIcon }

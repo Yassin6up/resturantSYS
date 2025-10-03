@@ -13,7 +13,7 @@ import QRCode from 'qrcode.react'
 import toast from 'react-hot-toast'
 
 function CheckoutPage() {
-  const { cartItems, total, clearCart } = useCart()
+  const { items, total, clearCart } = useCart()
   const navigate = useNavigate()
   const [loading, setLoading] = useState(false)
   const [orderData, setOrderData] = useState(null)
@@ -23,12 +23,14 @@ function CheckoutPage() {
   const [showQRCode, setShowQRCode] = useState(false)
   const [orderCode, setOrderCode] = useState('')
   const [pinCode, setPinCode] = useState('')
+  const [qr, setQrCode] = useState('')
+
 
   useEffect(() => {
-    if (cartItems.length === 0) {
-      navigate('/menu')
-    }
-  }, [cartItems, navigate])
+    // if (items?.length === 0) {
+    //   navigate('/menu')
+    // }
+  }, [items, navigate])
 
   const calculateTotals = () => {
     const subtotal = total
@@ -62,12 +64,13 @@ function CheckoutPage() {
       setLoading(true)
       
       const totals = calculateTotals()
-      
+      console.log(items)
       const orderData = {
-        table_number: tableNumber,
+        tableId:  Number(tableNumber),
+        branchId:1,
         customer_name: customerName,
-        items: cartItems.map(item => ({
-          menu_item_id: item.menuItemId,
+        items: items?.map(item => ({
+          menuItemId: item.menuItemId,
           quantity: item.quantity,
           unit_price: item.unitPrice,
           modifiers: item.modifiers || [],
@@ -82,12 +85,15 @@ function CheckoutPage() {
       }
 
       const response = await ordersAPI.createOrder(orderData)
-      
-      if (response.data.success) {
-        const order = response.data.order
-        setOrderData(order)
-        setOrderCode(order.order_code)
-        setPinCode(order.pin_code)
+      console.log(response.data)
+      if (response.data.message == "Order created successfully") {
+        const order = response.data
+
+        setOrderData(order.orderId)
+        setQrCode(order.qrCode)
+
+        setOrderCode(order.orderCode)
+        setPinCode(order.orderId)
         setShowQRCode(true)
         
         // Clear cart after successful order
@@ -104,12 +110,13 @@ function CheckoutPage() {
   }
 
   const handlePaymentComplete = () => {
-    navigate('/order/' + orderData.id)
+    console.log(orderData)
+    navigate('/order/' + orderData)
   }
 
   const totals = calculateTotals()
 
-  if (showQRCode && orderData) {
+  if (showQRCode && qr) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center p-4">
         <div className="max-w-md w-full">
@@ -150,12 +157,13 @@ function CheckoutPage() {
               <div className="bg-white border-2 border-gray-200 rounded-xl p-6">
                 <h3 className="font-semibold text-gray-900 mb-4">Payment QR Code</h3>
                 <div className="flex justify-center mb-4">
-                  <QRCode 
+                  <img  src={qr} style={{width: 200 , hieght:200}} />
+                  {/* <QRCode 
                     value={`${window.location.origin}/order/${orderData.id}`}
                     size={200}
                     level="H"
-                    includeMargin={true}
-                  />
+                    inclueMargin={true}
+                  /> */}
                 </div>
                 <p className="text-sm text-gray-600 mb-2">Show this QR code to the cashier</p>
                 <p className="text-xs text-gray-500">Or scan to view order details</p>
@@ -225,7 +233,7 @@ function CheckoutPage() {
             <div>
               <label className="form-label">Table Number</label>
               <input
-                type="text"
+                type="number"
                 value={tableNumber}
                 onChange={(e) => setTableNumber(e.target.value)}
                 className="form-input"
@@ -243,7 +251,7 @@ function CheckoutPage() {
           </div>
           <div className="card-body">
             <div className="space-y-3">
-              {cartItems.map((item, index) => (
+              {items?.map((item, index) => (
                 <div key={index} className="flex items-center justify-between py-2 border-b border-gray-100">
                   <div className="flex items-center space-x-3">
                     <img

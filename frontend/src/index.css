@@ -393,7 +393,7 @@ body {
 }
 
 .table-modern tbody tr:nth-child(even) {
-  @apply bg-gray-25;
+  @apply bg-gray-50;
 }
 
 /* Modal styles */

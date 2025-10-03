@@ -102,7 +102,6 @@ export function CartProvider({ children }) {
     const modifierTotal = modifiers.reduce((sum, modifier) => sum + modifier.extra_price, 0)
     const unitPrice = menuItem.price + modifierTotal
     const total = unitPrice * quantity
-
     dispatch({
       type: 'ADD_ITEM',
       payload: {

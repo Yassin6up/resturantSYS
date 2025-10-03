@@ -12,7 +12,7 @@ import {
   ArrowRightOnRectangleIcon,
   BellIcon,
   WifiIcon,
-  WifiSlashIcon
+  
 } from '@heroicons/react/24/outline'
 import { useState } from 'react'
 
@@ -138,7 +138,7 @@ function AdminLayout() {
                   </>
                 ) : (
                   <>
-                    <WifiSlashIcon className="h-4 w-4 text-red-500 mr-1" />
+                    <WifiIcon className="h-4 w-4 text-red-500 mr-1" />
                     <span className="text-red-600">Disconnected</span>
                   </>
                 )}

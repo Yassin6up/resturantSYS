@@ -39,6 +39,7 @@ function MenuPage() {
   const handleAddToCart = () => {
     if (!selectedItem) return
 
+    console.log("item : " , selectedItem)
     addItem(selectedItem, quantity, selectedModifiers, note)
     
     toast.success(`${quantity}x ${selectedItem.name} added to cart`)
@@ -60,8 +61,10 @@ function MenuPage() {
   }
 
   const calculateItemTotal = (item) => {
-    const modifierTotal = selectedModifiers.reduce((sum, modifier) => sum + modifier.extra_price, 0)
-    return (item.price + modifierTotal) * quantity
+    const modifierTotal = selectedModifiers.reduce((sum, modifier) => {
+      return sum + parseFloat(modifier.extra_price || 0)
+    }, 0)
+    return (parseFloat(item.price || 0) + modifierTotal) * quantity
   }
 
   if (loading) {
@@ -116,7 +119,7 @@ function MenuPage() {
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                       <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm rounded-full px-3 py-1 text-sm font-semibold text-gray-800 shadow-lg">
-                        {item.price.toFixed(2)} MAD
+                        {parseFloat(item?.price || 0).toFixed(2)} MAD
                       </div>
                     </div>
                     
@@ -159,7 +162,7 @@ function MenuPage() {
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent"></div>
               <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm rounded-full px-4 py-2 text-lg font-bold text-gray-800 shadow-lg">
-                {selectedItem.price.toFixed(2)} MAD
+                {parseFloat(selectedItem.price || 0).toFixed(2)} MAD
               </div>
             </div>
             
@@ -196,9 +199,9 @@ function MenuPage() {
                         />
                         <span className="ml-2 text-sm text-gray-700">
                           {modifier.name}
-                          {modifier.extra_price > 0 && (
+                          {parseFloat(modifier.extra_price || 0) > 0 && (
                             <span className="text-primary-600 ml-1">
-                              (+{modifier.extra_price.toFixed(2)} MAD)
+                              (+{parseFloat(modifier.extra_price || 0).toFixed(2)} MAD)
                             </span>
                           )}
                         </span>
