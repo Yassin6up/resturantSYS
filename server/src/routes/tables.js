@@ -26,9 +26,9 @@ router.get('/', authenticateToken, authorize('admin', 'manager', 'cashier'), asy
     for (const table of tables) {
       const activeOrder = await db('orders')
         .where({ 
-          table_id: table.id,
-          status: ['PENDING', 'CONFIRMED', 'PREPARING', 'READY', 'SERVED']
+          table_id: table.id
         })
+        .whereIn('status', ['PENDING', 'CONFIRMED', 'PREPARING', 'READY', 'SERVED'])
         .orderBy('created_at', 'desc')
         .first();
 

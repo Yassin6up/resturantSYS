@@ -12,16 +12,16 @@ function CustomerLayout() {
   const isOrderPage = location.pathname.startsWith('/order/')
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
       {/* Header */}
-      <header className="bg-white/80 backdrop-blur-md shadow-xl border-b border-gray-100 sticky top-0 z-40">
+      <header className="bg-black/80 backdrop-blur-md shadow-xl border-b border-yellow-400/30 sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-20">
             <div className="flex items-center space-x-3">
-              <div className="w-12 h-12 bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
+              <div className="w-12 h-12 bg-gradient-to-r from-red-600 to-orange-500 rounded-xl flex items-center justify-center shadow-lg border border-yellow-400">
                 <span className="text-white font-bold text-xl">P</span>
               </div>
-              <h1 className="text-2xl font-bold gradient-text">POSQ Restaurant</h1>
+              <h1 className="text-2xl font-bold text-white">POSQ Restaurant</h1>
             </div>
             
             {/* Cart Button */}
@@ -53,18 +53,18 @@ function CustomerLayout() {
       </main>
 
       {/* Footer */}
-      <footer className="bg-white/80 backdrop-blur-md border-t border-gray-100 mt-20">
+      <footer className="bg-black/80 backdrop-blur-md border-t border-yellow-400/30 mt-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <div className="text-center">
             <div className="flex justify-center items-center space-x-3 mb-6">
-              <div className="w-10 h-10 bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
+              <div className="w-10 h-10 bg-gradient-to-r from-red-600 to-orange-500 rounded-xl flex items-center justify-center shadow-lg border border-yellow-400">
                 <span className="text-white font-bold text-lg">P</span>
               </div>
-              <span className="text-xl font-bold gradient-text">POSQ Restaurant</span>
+              <span className="text-xl font-bold text-white">POSQ Restaurant</span>
             </div>
-            <p className="text-gray-600 mb-2">&copy; 2024 POSQ Restaurant. All rights reserved.</p>
-            <p className="text-sm text-gray-500">Scan QR code to order • Pay at cashier</p>
-            <p className="text-xs text-gray-400 mt-2">Powered by modern technology</p>
+            <p className="text-gray-300 mb-2">&copy; 2024 POSQ Restaurant. All rights reserved.</p>
+            <p className="text-sm text-gray-400">Scan QR code to order • Pay at cashier</p>
+            <p className="text-xs text-gray-500 mt-2">Powered by modern technology</p>
           </div>
         </div>
       </footer>

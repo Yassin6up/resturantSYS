@@ -35,13 +35,13 @@ router.get('/sales/daily', authenticateToken, authorize('admin', 'manager'), asy
       .where(db.raw('DATE(created_at) = ?', [targetDate]))
       .groupBy('status');
 
-    // Get hourly breakdown
+    // Get hourly breakdown (SQLite compatible)
     const hourlyBreakdown = await db('orders')
-      .select(db.raw('HOUR(created_at) as hour'))
+      .select(db.raw('CAST(strftime("%H", created_at) AS INTEGER) as hour'))
       .count('id as count')
       .sum('total as revenue')
       .where(db.raw('DATE(created_at) = ?', [targetDate]))
-      .groupBy(db.raw('HOUR(created_at)'))
+      .groupBy(db.raw('strftime("%H", created_at)'))
       .orderBy('hour');
 
     res.json({
@@ -161,7 +161,7 @@ router.get('/tables/turnover', authenticateToken, authorize('admin', 'manager'),
         db.raw('COUNT(*) as total_orders'),
         db.raw('SUM(total) as total_revenue'),
         db.raw('AVG(total) as average_order_value'),
-        db.raw('AVG(TIMESTAMPDIFF(MINUTE, created_at, updated_at)) as average_service_time')
+        db.raw('AVG((julianday(updated_at) - julianday(created_at)) * 24 * 60) as average_service_time')
       )
       .leftJoin('tables', 'orders.table_id', 'tables.id')
       .where('orders.status', '!=', 'CANCELLED')

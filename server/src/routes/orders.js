@@ -167,7 +167,11 @@ router.get('/', authenticateToken, authorize('admin', 'manager', 'cashier'), asy
     }
 
     if (status) {
-      query = query.where({ 'orders.status': status });
+      if (Array.isArray(status)) {
+        query = query.whereIn('orders.status', status);
+      } else {
+        query = query.where({ 'orders.status': status });
+      }
     }
 
     if (tableId) {

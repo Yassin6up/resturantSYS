@@ -22,14 +22,14 @@ function CartBottomBar() {
   return (
     <>
       {/* Cart Bottom Bar */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-2xl z-50 md:hidden">
+      <div className="fixed bottom-0 left-0 right-0 bg-black/90 backdrop-blur-md border-t border-yellow-400/30 shadow-2xl z-50 md:hidden">
         <div className="flex items-center justify-between p-4">
           <button
             onClick={() => setShowCart(true)}
             className="flex items-center space-x-3 flex-1"
           >
             <div className="relative">
-              <ShoppingCartIcon className="h-8 w-8 text-blue-600" />
+              <ShoppingCartIcon className="h-8 w-8 text-yellow-400" />
               {itemCount > 0 && (
                 <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-semibold">
                   {itemCount}
@@ -37,8 +37,8 @@ function CartBottomBar() {
               )}
             </div>
             <div className="text-left">
-              <p className="text-sm font-medium text-gray-900">{itemCount} items</p>
-              <p className="text-lg font-bold text-blue-600">{total.toFixed(2)} MAD</p>
+              <p className="text-sm font-medium text-white">{itemCount} items</p>
+              <p className="text-lg font-bold text-yellow-400">{total.toFixed(2)} MAD</p>
             </div>
           </button>
           
@@ -54,11 +54,11 @@ function CartBottomBar() {
 
       {/* Cart Modal */}
       {showCart && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end z-50 md:hidden">
-          <div className="bg-white rounded-t-2xl w-full max-h-[80vh] overflow-hidden">
-            <div className="p-4 border-b border-gray-200">
+        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-end z-50 md:hidden">
+          <div className="bg-black/90 backdrop-blur-md rounded-t-2xl w-full max-h-[80vh] overflow-hidden border-t border-yellow-400/30">
+            <div className="p-4 border-b border-yellow-400/30">
               <div className="flex items-center justify-between">
-                <h2 className="text-xl font-bold text-gray-900">Your Order</h2>
+                <h2 className="text-xl font-bold text-white">Your Order</h2>
                 <button
                   onClick={() => setShowCart(false)}
                   className="text-gray-400 hover:text-gray-600"
@@ -72,7 +72,7 @@ function CartBottomBar() {
             
             <div className="overflow-y-auto max-h-96">
               {cartItems.map((item, index) => (
-                <div key={index} className="p-4 border-b border-gray-100">
+                <div key={index} className="p-4 border-b border-yellow-400/20">
                   <div className="flex items-center space-x-3">
                     <img
                       src={item.image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=100&h=100&fit=crop'}
@@ -80,9 +80,9 @@ function CartBottomBar() {
                       className="w-16 h-16 rounded-lg object-cover"
                     />
                     <div className="flex-1">
-                      <h3 className="font-medium text-gray-900">{item.name}</h3>
-                      <p className="text-sm text-gray-600">Qty: {item.quantity}</p>
-                      <p className="text-sm font-semibold text-blue-600">
+                      <h3 className="font-medium text-white">{item.name}</h3>
+                      <p className="text-sm text-gray-300">Qty: {item.quantity}</p>
+                      <p className="text-sm font-semibold text-yellow-400">
                         {(item.price * item.quantity).toFixed(2)} MAD
                       </p>
                     </div>
@@ -91,10 +91,10 @@ function CartBottomBar() {
               ))}
             </div>
             
-            <div className="p-4 border-t border-gray-200">
+            <div className="p-4 border-t border-yellow-400/30">
               <div className="flex items-center justify-between mb-4">
-                <span className="text-lg font-semibold text-gray-900">Total:</span>
-                <span className="text-2xl font-bold text-blue-600">{total.toFixed(2)} MAD</span>
+                <span className="text-lg font-semibold text-white">Total:</span>
+                <span className="text-2xl font-bold text-yellow-400">{total.toFixed(2)} MAD</span>
               </div>
               
               <div className="space-y-3">

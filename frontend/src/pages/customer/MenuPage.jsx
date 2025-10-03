@@ -125,7 +125,13 @@ function MenuPage() {
                       {item.description && (
                         <p className="text-gray-600 mb-4 line-clamp-2">{item.description}</p>
                       )}
-                      <button className="btn-primary w-full group-hover:animate-bounce">
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          addItem(item);
+                        }}
+                        className="btn-primary w-full group-hover:animate-bounce"
+                      >
                         Add to Cart
                       </button>
                     </div>
