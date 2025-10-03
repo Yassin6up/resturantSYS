@@ -1,0 +1,108 @@
+version: '3.8'
+
+services:
+  # Main application (includes both frontend and backend)
+  app:
+    build: .
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+      - OPERATING_MODE=LOCAL
+      - PORT=3001
+      - JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
+      - JWT_REFRESH_SECRET=your-refresh-secret-key
+      - FRONTEND_URL=http://localhost:3001
+      - DB_PATH=/app/data/posq.db
+    volumes:
+      - ./data:/app/data
+      - ./backups:/app/backups
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Development services (only used with docker-compose.dev.yml)
+  app-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    ports:
+      - "3001:3001"
+      - "5173:5173"
+    environment:
+      - NODE_ENV=development
+      - OPERATING_MODE=LOCAL
+      - PORT=3001
+      - JWT_SECRET=dev-secret-key
+      - JWT_REFRESH_SECRET=dev-refresh-secret
+      - FRONTEND_URL=http://localhost:5173
+      - DB_PATH=/app/server/data/posq.db
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/server/node_modules
+      - /app/frontend/node_modules
+    profiles:
+      - dev
+
+  # MySQL for cloud mode (optional)
+  mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: posq_db
+      MYSQL_USER: posq_user
+      MYSQL_PASSWORD: posq_password
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    profiles:
+      - cloud
+
+  # PostgreSQL for cloud mode (alternative to MySQL)
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: posq_db
+      POSTGRES_USER: posq_user
+      POSTGRES_PASSWORD: posq_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    profiles:
+      - cloud-pg
+
+  # Nginx reverse proxy (for production)
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+      - ./ssl:/etc/nginx/ssl
+    depends_on:
+      - app
+    profiles:
+      - production
+
+  # Printer service (optional)
+  printer-service:
+    build:
+      context: ./printer-service
+    ports:
+      - "4000:4000"
+    environment:
+      - NODE_ENV=production
+    restart: unless-stopped
+    profiles:
+      - printer
+
+volumes:
+  mysql_data:
+  postgres_data:

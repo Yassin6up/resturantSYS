@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    ports:
+      - "3001:3001"  # Backend
+      - "5173:5173"  # Frontend dev server
+    environment:
+      - NODE_ENV=development
+      - OPERATING_MODE=LOCAL
+      - PORT=3001
+      - JWT_SECRET=dev-secret-key
+      - JWT_REFRESH_SECRET=dev-refresh-secret
+      - FRONTEND_URL=http://localhost:5173
+      - DB_PATH=/app/server/data/posq.db
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/server/node_modules
+      - /app/frontend/node_modules
+    command: npm run dev
