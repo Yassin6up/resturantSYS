@@ -1,0 +1,292 @@
+const express = require('express');
+const QRCode = require('qrcode');
+const { db } = require('../database/init');
+const { authenticateToken, authorize } = require('../middleware/auth');
+const { validateTable } = require('../middleware/validation');
+const { logger } = require('../middleware/errorHandler');
+
+const router = express.Router();
+
+// Get all tables (admin/cashier)
+router.get('/', authenticateToken, authorize('admin', 'manager', 'cashier'), async (req, res) => {
+  try {
+    const { branchId } = req.query;
+
+    let query = db('tables')
+      .select('tables.*', 'branches.name as branch_name')
+      .leftJoin('branches', 'tables.branch_id', 'branches.id');
+
+    if (branchId) {
+      query = query.where({ 'tables.branch_id': branchId });
+    }
+
+    const tables = await query.orderBy('tables.table_number');
+
+    // Get current order status for each table
+    for (const table of tables) {
+      const activeOrder = await db('orders')
+        .where({ 
+          table_id: table.id,
+          status: ['PENDING', 'CONFIRMED', 'PREPARING', 'READY', 'SERVED']
+        })
+        .orderBy('created_at', 'desc')
+        .first();
+
+      table.activeOrder = activeOrder;
+    }
+
+    res.json({ tables });
+  } catch (error) {
+    logger.error('Tables fetch error:', error);
+    res.status(500).json({ error: 'Failed to fetch tables' });
+  }
+});
+
+// Get single table
+router.get('/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const table = await db('tables')
+      .select('tables.*', 'branches.name as branch_name')
+      .leftJoin('branches', 'tables.branch_id', 'branches.id')
+      .where({ 'tables.id': id })
+      .first();
+
+    if (!table) {
+      return res.status(404).json({ error: 'Table not found' });
+    }
+
+    // Get current order
+    const activeOrder = await db('orders')
+      .where({ 
+        table_id: id,
+        status: ['PENDING', 'CONFIRMED', 'PREPARING', 'READY', 'SERVED']
+      })
+      .orderBy('created_at', 'desc')
+      .first();
+
+    table.activeOrder = activeOrder;
+
+    res.json({ table });
+  } catch (error) {
+    logger.error('Table fetch error:', error);
+    res.status(500).json({ error: 'Failed to fetch table' });
+  }
+});
+
+// Create table (admin)
+router.post('/', authenticateToken, authorize('admin', 'manager'), validateTable, async (req, res) => {
+  try {
+    const { tableNumber, branchId, description } = req.body;
+
+    // Check if table number already exists in branch
+    const existingTable = await db('tables')
+      .where({ table_number: tableNumber, branch_id: branchId })
+      .first();
+
+    if (existingTable) {
+      return res.status(400).json({ error: 'Table number already exists in this branch' });
+    }
+
+    // Generate QR code URL
+    const branch = await db('branches').where({ id: branchId }).first();
+    const qrCodeUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/menu?table=${tableNumber}&branch=${branch.code}`;
+
+    const [tableId] = await db('tables').insert({
+      table_number: tableNumber,
+      branch_id: branchId,
+      qr_code: qrCodeUrl,
+      description
+    });
+
+    const table = await db('tables')
+      .select('tables.*', 'branches.name as branch_name')
+      .leftJoin('branches', 'tables.branch_id', 'branches.id')
+      .where({ 'tables.id': tableId })
+      .first();
+
+    // Log table creation
+    await db('audit_logs').insert({
+      user_id: req.user.id,
+      action: 'TABLE_CREATE',
+      meta: JSON.stringify({ tableId, tableNumber, branchId })
+    });
+
+    res.status(201).json({ table });
+  } catch (error) {
+    logger.error('Table creation error:', error);
+    res.status(500).json({ error: 'Failed to create table' });
+  }
+});
+
+// Update table (admin)
+router.put('/:id', authenticateToken, authorize('admin', 'manager'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { tableNumber, description } = req.body;
+
+    const table = await db('tables').where({ id }).first();
+    if (!table) {
+      return res.status(404).json({ error: 'Table not found' });
+    }
+
+    // Check if new table number conflicts with existing tables
+    if (tableNumber && tableNumber !== table.table_number) {
+      const existingTable = await db('tables')
+        .where({ table_number: tableNumber, branch_id: table.branch_id })
+        .where('id', '!=', id)
+        .first();
+
+      if (existingTable) {
+        return res.status(400).json({ error: 'Table number already exists in this branch' });
+      }
+    }
+
+    // Update QR code if table number changed
+    let qrCodeUrl = table.qr_code;
+    if (tableNumber && tableNumber !== table.table_number) {
+      const branch = await db('branches').where({ id: table.branch_id }).first();
+      qrCodeUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/menu?table=${tableNumber}&branch=${branch.code}`;
+    }
+
+    await db('tables')
+      .where({ id })
+      .update({
+        table_number: tableNumber,
+        description,
+        qr_code: qrCodeUrl,
+        updated_at: db.raw('CURRENT_TIMESTAMP')
+      });
+
+    const updatedTable = await db('tables')
+      .select('tables.*', 'branches.name as branch_name')
+      .leftJoin('branches', 'tables.branch_id', 'branches.id')
+      .where({ 'tables.id': id })
+      .first();
+
+    // Log table update
+    await db('audit_logs').insert({
+      user_id: req.user.id,
+      action: 'TABLE_UPDATE',
+      meta: JSON.stringify({ tableId: id, tableNumber, description })
+    });
+
+    res.json({ table: updatedTable });
+  } catch (error) {
+    logger.error('Table update error:', error);
+    res.status(500).json({ error: 'Failed to update table' });
+  }
+});
+
+// Delete table (admin)
+router.delete('/:id', authenticateToken, authorize('admin', 'manager'), async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Check if table has active orders
+    const activeOrder = await db('orders')
+      .where({ 
+        table_id: id,
+        status: ['PENDING', 'CONFIRMED', 'PREPARING', 'READY', 'SERVED']
+      })
+      .first();
+
+    if (activeOrder) {
+      return res.status(400).json({ error: 'Cannot delete table with active orders' });
+    }
+
+    await db('tables').where({ id }).del();
+
+    // Log table deletion
+    await db('audit_logs').insert({
+      user_id: req.user.id,
+      action: 'TABLE_DELETE',
+      meta: JSON.stringify({ tableId: id })
+    });
+
+    res.json({ message: 'Table deleted successfully' });
+  } catch (error) {
+    logger.error('Table deletion error:', error);
+    res.status(500).json({ error: 'Failed to delete table' });
+  }
+});
+
+// Generate QR code for table
+router.get('/:id/qr', authenticateToken, authorize('admin', 'manager', 'cashier'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { format = 'png' } = req.query;
+
+    const table = await db('tables')
+      .select('tables.*', 'branches.name as branch_name', 'branches.code as branch_code')
+      .leftJoin('branches', 'tables.branch_id', 'branches.id')
+      .where({ 'tables.id': id })
+      .first();
+
+    if (!table) {
+      return res.status(404).json({ error: 'Table not found' });
+    }
+
+    if (format === 'dataurl') {
+      const qrCodeDataURL = await QRCode.toDataURL(table.qr_code);
+      res.json({ qrCode: qrCodeDataURL, table });
+    } else {
+      const qrCodeBuffer = await QRCode.toBuffer(table.qr_code);
+      res.setHeader('Content-Type', 'image/png');
+      res.send(qrCodeBuffer);
+    }
+  } catch (error) {
+    logger.error('QR code generation error:', error);
+    res.status(500).json({ error: 'Failed to generate QR code' });
+  }
+});
+
+// Generate QR codes for all tables in a branch
+router.get('/branch/:branchId/qr-sheet', authenticateToken, authorize('admin', 'manager'), async (req, res) => {
+  try {
+    const { branchId } = req.params;
+
+    const tables = await db('tables')
+      .select('tables.*', 'branches.name as branch_name', 'branches.code as branch_code')
+      .leftJoin('branches', 'tables.branch_id', 'branches.id')
+      .where({ 'tables.branch_id': branchId })
+      .orderBy('tables.table_number');
+
+    const qrCodes = [];
+    for (const table of tables) {
+      const qrCodeDataURL = await QRCode.toDataURL(table.qr_code);
+      qrCodes.push({
+        table,
+        qrCode: qrCodeDataURL
+      });
+    }
+
+    res.json({ qrCodes });
+  } catch (error) {
+    logger.error('QR sheet generation error:', error);
+    res.status(500).json({ error: 'Failed to generate QR sheet' });
+  }
+});
+
+// Get table orders history
+router.get('/:id/orders', authenticateToken, authorize('admin', 'manager', 'cashier'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { limit = 20, offset = 0 } = req.query;
+
+    const orders = await db('orders')
+      .select('orders.*')
+      .where({ 'orders.table_id': id })
+      .orderBy('orders.created_at', 'desc')
+      .limit(parseInt(limit))
+      .offset(parseInt(offset));
+
+    res.json({ orders });
+  } catch (error) {
+    logger.error('Table orders fetch error:', error);
+    res.status(500).json({ error: 'Failed to fetch table orders' });
+  }
+});
+
+module.exports = router;
