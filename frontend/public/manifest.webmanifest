@@ -1,0 +1,9 @@
+{
+  "short_name": "POSQ",
+  "name": "POSQ — Restaurant POS & QR",
+  "icons": [],
+  "start_url": "/menu",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#111827"
+}

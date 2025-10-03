@@ -1,0 +1,1 @@
+FROM node:20-alpine\nWORKDIR /app\nCOPY package.json package-lock.json* ./\nRUN npm install --no-audit --no-fund\nCOPY . .\nEXPOSE 5173\nCMD ["npm","run","dev","--","--host","0.0.0.0"]\n

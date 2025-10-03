@@ -1,0 +1,1 @@
+# POSQ — Restaurant POS & QR Ordering\n\nMonorepo workspace. See README in root and per service.\n
