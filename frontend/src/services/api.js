@@ -145,4 +145,20 @@ export const reportsAPI = {
   exportReport: (reportType, params) => api.get(`/api/reports/export/${reportType}`, { params }),
 }
 
+// Upload API
+export const uploadAPI = {
+  uploadImage: (formData) => api.post('/api/upload/image', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  }),
+  uploadImages: (formData) => api.post('/api/upload/images', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  }),
+  deleteImage: (filename) => api.delete(`/api/upload/image/${filename}`),
+  getImages: () => api.get('/api/upload/images'),
+}
+
 export default api

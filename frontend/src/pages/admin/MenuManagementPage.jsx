@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { menuAPI } from '../../services/api'
 import { PlusIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/outline'
+import MenuItemForm from '../../components/MenuItemForm'
 import toast from 'react-hot-toast'
 
 function MenuManagementPage() {
@@ -8,6 +9,8 @@ function MenuManagementPage() {
   const [menuItems, setMenuItems] = useState([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('categories')
+  const [showItemForm, setShowItemForm] = useState(false)
+  const [editingItem, setEditingItem] = useState(null)
 
   useEffect(() => {
     loadData()
@@ -31,6 +34,35 @@ function MenuManagementPage() {
     }
   }
 
+  const handleAddItem = () => {
+    setEditingItem(null)
+    setShowItemForm(true)
+  }
+
+  const handleEditItem = (item) => {
+    setEditingItem(item)
+    setShowItemForm(true)
+  }
+
+  const handleSaveItem = (savedItem) => {
+    if (editingItem) {
+      // Update existing item
+      setMenuItems(prev => prev.map(item => 
+        item.id === savedItem.id ? savedItem : item
+      ))
+    } else {
+      // Add new item
+      setMenuItems(prev => [savedItem, ...prev])
+    }
+    setShowItemForm(false)
+    setEditingItem(null)
+  }
+
+  const handleCancelForm = () => {
+    setShowItemForm(false)
+    setEditingItem(null)
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -50,7 +82,10 @@ function MenuManagementPage() {
           <h1 className="text-2xl font-bold text-gray-900">Menu Management</h1>
           <p className="text-gray-600">Manage categories, items, and modifiers</p>
         </div>
-        <button className="btn-primary">
+        <button 
+          onClick={handleAddItem}
+          className="btn-primary"
+        >
           <PlusIcon className="h-5 w-5 mr-2" />
           Add Item
         </button>
@@ -132,7 +167,10 @@ function MenuManagementPage() {
           <div className="card-header">
             <div className="flex justify-between items-center">
               <h2 className="text-lg font-semibold text-gray-900">Menu Items</h2>
-              <button className="btn-primary btn-sm">
+              <button 
+                onClick={handleAddItem}
+                className="btn-primary btn-sm"
+              >
                 <PlusIcon className="h-4 w-4 mr-1" />
                 Add Item
               </button>
@@ -187,7 +225,10 @@ function MenuManagementPage() {
                           </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
-                          <button className="text-blue-600 hover:text-blue-900">
+                          <button 
+                            onClick={() => handleEditItem(item)}
+                            className="text-blue-600 hover:text-blue-900"
+                          >
                             <PencilIcon className="h-4 w-4" />
                           </button>
                           <button className="text-red-600 hover:text-red-900">
@@ -200,6 +241,38 @@ function MenuManagementPage() {
                 </table>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Menu Item Form Modal */}
+      {showItemForm && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-xl font-semibold text-gray-900">
+                  {editingItem ? 'Edit Menu Item' : 'Add New Menu Item'}
+                </h2>
+                <button
+                  onClick={handleCancelForm}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <span className="sr-only">Close</span>
+                  <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              <MenuItemForm
+                item={editingItem}
+                categories={categories}
+                onSave={handleSaveItem}
+                onCancel={handleCancelForm}
+                branchId={1}
+              />
+            </div>
           </div>
         </div>
       )}
