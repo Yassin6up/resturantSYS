@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { menuAPI } from '../../services/api'
 import { PlusIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/outline'
 import MenuItemForm from '../../components/MenuItemForm'
+import CategoryForm from '../../components/CategoryForm'
 import toast from 'react-hot-toast'
 
 function MenuManagementPage() {
@@ -10,7 +11,9 @@ function MenuManagementPage() {
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('categories')
   const [showItemForm, setShowItemForm] = useState(false)
+  const [showCategoryForm, setShowCategoryForm] = useState(false)
   const [editingItem, setEditingItem] = useState(null)
+  const [editingCategory, setEditingCategory] = useState(null)
 
   useEffect(() => {
     loadData()
@@ -61,6 +64,50 @@ function MenuManagementPage() {
   const handleCancelForm = () => {
     setShowItemForm(false)
     setEditingItem(null)
+  }
+
+  const handleAddCategory = () => {
+    setEditingCategory(null)
+    setShowCategoryForm(true)
+  }
+
+  const handleEditCategory = (category) => {
+    setEditingCategory(category)
+    setShowCategoryForm(true)
+  }
+
+  const handleSaveCategory = (savedCategory) => {
+    if (editingCategory) {
+      // Update existing category
+      setCategories(prev => prev.map(category => 
+        category.id === savedCategory.id ? savedCategory : category
+      ))
+    } else {
+      // Add new category
+      setCategories(prev => [savedCategory, ...prev])
+    }
+    setShowCategoryForm(false)
+    setEditingCategory(null)
+  }
+
+  const handleCancelCategoryForm = () => {
+    setShowCategoryForm(false)
+    setEditingCategory(null)
+  }
+
+  const handleDeleteCategory = async (categoryId) => {
+    if (!window.confirm('Are you sure you want to delete this category? This action cannot be undone.')) {
+      return
+    }
+
+    try {
+      await menuAPI.deleteCategory(categoryId)
+      setCategories(prev => prev.filter(category => category.id !== categoryId))
+      toast.success('Category deleted successfully')
+    } catch (error) {
+      console.error('Category deletion error:', error)
+      toast.error(error.response?.data?.error || 'Failed to delete category')
+    }
   }
 
   if (loading) {
@@ -123,7 +170,10 @@ function MenuManagementPage() {
           <div className="card-header">
             <div className="flex justify-between items-center">
               <h2 className="text-lg font-semibold text-gray-900">Categories</h2>
-              <button className="btn-primary btn-sm">
+              <button 
+                onClick={handleAddCategory}
+                className="btn-primary btn-sm"
+              >
                 <PlusIcon className="h-4 w-4 mr-1" />
                 Add Category
               </button>
@@ -133,7 +183,12 @@ function MenuManagementPage() {
             {categories.length === 0 ? (
               <div className="text-center py-8">
                 <p className="text-gray-500">No categories found</p>
-                <button className="btn-primary mt-4">Create First Category</button>
+                <button 
+                  onClick={handleAddCategory}
+                  className="btn-primary mt-4"
+                >
+                  Create First Category
+                </button>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -145,10 +200,16 @@ function MenuManagementPage() {
                         <p className="text-sm text-gray-500">Position: {category.position}</p>
                       </div>
                       <div className="flex space-x-2">
-                        <button className="text-blue-600 hover:text-blue-900">
+                        <button 
+                          onClick={() => handleEditCategory(category)}
+                          className="text-blue-600 hover:text-blue-900"
+                        >
                           <PencilIcon className="h-4 w-4" />
                         </button>
-                        <button className="text-red-600 hover:text-red-900">
+                        <button 
+                          onClick={() => handleDeleteCategory(category.id)}
+                          className="text-red-600 hover:text-red-900"
+                        >
                           <TrashIcon className="h-4 w-4" />
                         </button>
                       </div>
@@ -270,6 +331,37 @@ function MenuManagementPage() {
                 categories={categories}
                 onSave={handleSaveItem}
                 onCancel={handleCancelForm}
+                branchId={1}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Category Form Modal */}
+      {showCategoryForm && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-xl font-semibold text-gray-900">
+                  {editingCategory ? 'Edit Category' : 'Add New Category'}
+                </h2>
+                <button
+                  onClick={handleCancelCategoryForm}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <span className="sr-only">Close</span>
+                  <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              <CategoryForm
+                category={editingCategory}
+                onSave={handleSaveCategory}
+                onCancel={handleCancelCategoryForm}
                 branchId={1}
               />
             </div>

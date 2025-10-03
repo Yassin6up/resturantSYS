@@ -68,7 +68,7 @@ router.put('/', authenticateToken, authorize('admin', 'manager'), async (req, re
 
       logger.info(`Settings updated by ${req.user.username}: ${Object.keys(settings).join(', ')}`);
 
-      res.json({ message: 'Settings updated successfully' });
+      res.json({ success: true, message: 'Settings updated successfully' });
     } catch (error) {
       await trx.rollback();
       throw error;
@@ -165,7 +165,7 @@ router.put('/mode/operating', authenticateToken, authorize('admin'), async (req,
     const currentMode = await db('settings').where({ key: 'operating_mode' }).first();
     
     if (currentMode && currentMode.value === mode) {
-      return res.json({ message: 'Operating mode is already set to ' + mode });
+      return res.json({ success: true, message: 'Operating mode is already set to ' + mode });
     }
 
     await db('settings')
@@ -189,6 +189,53 @@ router.put('/mode/operating', authenticateToken, authorize('admin'), async (req,
     logger.info(`Operating mode changed from ${currentMode ? currentMode.value : 'LOCAL'} to ${mode} by ${req.user.username}`);
 
     res.json({ 
+      success: true,
+      message: `Operating mode changed to ${mode}`,
+      mode 
+    });
+  } catch (error) {
+    logger.error('Operating mode update error:', error);
+    res.status(500).json({ error: 'Failed to update operating mode' });
+  }
+});
+
+// Change operating mode (admin only)
+router.post('/change-operating-mode', authenticateToken, authorize('admin'), async (req, res) => {
+  try {
+    const { mode } = req.body;
+
+    if (!['LOCAL', 'CLOUD'].includes(mode)) {
+      return res.status(400).json({ error: 'Invalid operating mode. Must be LOCAL or CLOUD' });
+    }
+
+    const currentMode = await db('settings').where({ key: 'operating_mode' }).first();
+    
+    if (currentMode && currentMode.value === mode) {
+      return res.json({ success: true, message: 'Operating mode is already set to ' + mode });
+    }
+
+    await db('settings')
+      .where({ key: 'operating_mode' })
+      .update({ 
+        value: mode,
+        updated_at: db.raw('CURRENT_TIMESTAMP')
+      });
+
+    // Log mode change
+    await db('audit_logs').insert({
+      user_id: req.user.id,
+      action: 'OPERATING_MODE_CHANGE',
+      meta: JSON.stringify({ 
+        oldMode: currentMode ? currentMode.value : 'LOCAL',
+        newMode: mode,
+        userId: req.user.id
+      })
+    });
+
+    logger.info(`Operating mode changed from ${currentMode ? currentMode.value : 'LOCAL'} to ${mode} by ${req.user.username}`);
+
+    res.json({ 
+      success: true,
       message: `Operating mode changed to ${mode}`,
       mode 
     });

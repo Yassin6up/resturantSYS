@@ -25,7 +25,7 @@ router.get('/stock', authenticateToken, authorize('admin', 'manager'), async (re
       item.isLowStock = item.quantity <= item.min_threshold;
     }
 
-    res.json({ stockItems });
+    res.json({ success: true, items: stockItems });
   } catch (error) {
     logger.error('Stock items fetch error:', error);
     res.status(500).json({ error: 'Failed to fetch stock items' });
@@ -35,7 +35,7 @@ router.get('/stock', authenticateToken, authorize('admin', 'manager'), async (re
 // Create stock item (admin/manager)
 router.post('/stock', authenticateToken, authorize('admin', 'manager'), async (req, res) => {
   try {
-    const { name, sku, branchId, unit, minThreshold } = req.body;
+    const { name, sku, branchId, unit, minStock, maxStock, currentStock, costPrice, supplier, description, isActive } = req.body;
 
     if (!name || !branchId) {
       return res.status(400).json({ error: 'Name and branch ID are required' });
@@ -45,8 +45,14 @@ router.post('/stock', authenticateToken, authorize('admin', 'manager'), async (r
       name,
       sku,
       branch_id: branchId,
-      unit: unit || 'pieces',
-      min_threshold: minThreshold || 0
+      unit: unit || 'piece',
+      min_stock: minStock || 0,
+      max_stock: maxStock || 100,
+      current_stock: currentStock || 0,
+      cost_price: costPrice || 0,
+      supplier: supplier || '',
+      description: description || '',
+      is_active: isActive !== false
     });
 
     const stockItem = await db('stock_items')
@@ -62,7 +68,7 @@ router.post('/stock', authenticateToken, authorize('admin', 'manager'), async (r
       meta: JSON.stringify({ stockItemId, name, sku, branchId })
     });
 
-    res.status(201).json({ stockItem });
+    res.status(201).json({ success: true, item: stockItem });
   } catch (error) {
     logger.error('Stock item creation error:', error);
     res.status(500).json({ error: 'Failed to create stock item' });

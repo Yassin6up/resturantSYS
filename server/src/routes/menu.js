@@ -80,7 +80,7 @@ router.get('/categories', authenticateToken, authorize('admin', 'manager'), asyn
 // Create category (admin)
 router.post('/categories', authenticateToken, authorize('admin', 'manager'), async (req, res) => {
   try {
-    const { name, branchId, position } = req.body;
+    const { name, branchId, position, description, isActive } = req.body;
 
     if (!name || !branchId) {
       return res.status(400).json({ error: 'Name and branch ID are required' });
@@ -89,7 +89,9 @@ router.post('/categories', authenticateToken, authorize('admin', 'manager'), asy
     const [categoryId] = await db('categories').insert({
       name,
       branch_id: branchId,
-      position: position || 0
+      position: position || 0,
+      description: description || '',
+      is_active: isActive !== false
     });
 
     const category = await db('categories').where({ id: categoryId }).first();
@@ -101,7 +103,7 @@ router.post('/categories', authenticateToken, authorize('admin', 'manager'), asy
       meta: JSON.stringify({ categoryId, name, branchId })
     });
 
-    res.status(201).json({ category });
+    res.status(201).json({ success: true, category });
   } catch (error) {
     logger.error('Category creation error:', error);
     res.status(500).json({ error: 'Failed to create category' });
@@ -112,13 +114,15 @@ router.post('/categories', authenticateToken, authorize('admin', 'manager'), asy
 router.put('/categories/:id', authenticateToken, authorize('admin', 'manager'), async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, position } = req.body;
+    const { name, position, description, isActive } = req.body;
 
     await db('categories')
       .where({ id })
       .update({
         name,
         position,
+        description: description || '',
+        is_active: isActive !== false,
         updated_at: db.raw('CURRENT_TIMESTAMP')
       });
 
@@ -131,7 +135,7 @@ router.put('/categories/:id', authenticateToken, authorize('admin', 'manager'), 
       meta: JSON.stringify({ categoryId: id, name, position })
     });
 
-    res.json({ category });
+    res.json({ success: true, category });
   } catch (error) {
     logger.error('Category update error:', error);
     res.status(500).json({ error: 'Failed to update category' });

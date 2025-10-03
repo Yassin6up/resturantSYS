@@ -1,6 +1,7 @@
 import { Outlet, useLocation } from 'react-router-dom'
 import { useCart } from '../../contexts/CartContext'
 import { ShoppingCartIcon } from '@heroicons/react/24/outline'
+import CartBottomBar from '../CartBottomBar'
 
 function CustomerLayout() {
   const location = useLocation()
@@ -67,6 +68,9 @@ function CustomerLayout() {
           </div>
         </div>
       </footer>
+
+      {/* Mobile Cart Bottom Bar */}
+      <CartBottomBar />
     </div>
   )
 }

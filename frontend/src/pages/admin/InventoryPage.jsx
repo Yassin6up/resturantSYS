@@ -2,35 +2,46 @@ import { useState, useEffect } from 'react'
 import { inventoryAPI } from '../../services/api'
 import { 
   PlusIcon, 
+  PencilIcon, 
+  TrashIcon,
   ExclamationTriangleIcon,
-  ChartBarIcon,
-  CubeIcon
+  TrendingUpIcon,
+  TrendingDownIcon
 } from '@heroicons/react/24/outline'
+import StockItemForm from '../../components/StockItemForm'
 import toast from 'react-hot-toast'
 
 function InventoryPage() {
   const [activeTab, setActiveTab] = useState('stock')
   const [stockItems, setStockItems] = useState([])
-  const [lowStockItems, setLowStockItems] = useState([])
   const [recipes, setRecipes] = useState([])
   const [loading, setLoading] = useState(true)
+  const [showStockForm, setShowStockForm] = useState(false)
+  const [editingItem, setEditingItem] = useState(null)
+  const [lowStockItems, setLowStockItems] = useState([])
 
   useEffect(() => {
-    loadInventoryData()
+    loadData()
   }, [])
 
-  const loadInventoryData = async () => {
+  const loadData = async () => {
     try {
       setLoading(true)
-      const [stockRes, lowStockRes, recipesRes] = await Promise.all([
-        inventoryAPI.getStockItems({ branchId: 1 }),
-        inventoryAPI.getLowStockAlerts({ branchId: 1 }),
-        inventoryAPI.getRecipes()
+      const [stockRes, recipesRes, lowStockRes] = await Promise.all([
+        inventoryAPI.getStockItems(),
+        inventoryAPI.getRecipes(),
+        inventoryAPI.getLowStockItems()
       ])
       
-      setStockItems(stockRes.data.stockItems)
-      setLowStockItems(lowStockRes.data.lowStockItems)
-      setRecipes(recipesRes.data.recipes)
+      if (stockRes.data.success) {
+        setStockItems(stockRes.data.items)
+      }
+      if (recipesRes.data.success) {
+        setRecipes(recipesRes.data.recipes)
+      }
+      if (lowStockRes.data.success) {
+        setLowStockItems(lowStockRes.data.items)
+      }
     } catch (error) {
       toast.error('Failed to load inventory data')
       console.error('Inventory load error:', error)
@@ -39,12 +50,85 @@ function InventoryPage() {
     }
   }
 
+  const handleAddStockItem = () => {
+    setEditingItem(null)
+    setShowStockForm(true)
+  }
+
+  const handleEditStockItem = (item) => {
+    setEditingItem(item)
+    setShowStockForm(true)
+  }
+
+  const handleSaveStockItem = (savedItem) => {
+    if (editingItem) {
+      // Update existing item
+      setStockItems(prev => prev.map(item => 
+        item.id === savedItem.id ? savedItem : item
+      ))
+    } else {
+      // Add new item
+      setStockItems(prev => [savedItem, ...prev])
+    }
+    setShowStockForm(false)
+    setEditingItem(null)
+  }
+
+  const handleCancelStockForm = () => {
+    setShowStockForm(false)
+    setEditingItem(null)
+  }
+
+  const handleDeleteStockItem = async (itemId) => {
+    if (!window.confirm('Are you sure you want to delete this stock item? This action cannot be undone.')) {
+      return
+    }
+
+    try {
+      await inventoryAPI.deleteStockItem(itemId)
+      setStockItems(prev => prev.filter(item => item.id !== itemId))
+      toast.success('Stock item deleted successfully')
+    } catch (error) {
+      console.error('Stock item deletion error:', error)
+      toast.error(error.response?.data?.error || 'Failed to delete stock item')
+    }
+  }
+
+  const handleStockMovement = async (itemId, type, quantity, reason) => {
+    try {
+      const response = await inventoryAPI.recordStockMovement(itemId, {
+        type,
+        quantity: parseFloat(quantity),
+        reason: reason || 'Manual adjustment'
+      })
+      
+      if (response.data.success) {
+        // Reload data to get updated stock levels
+        await loadData()
+        toast.success('Stock movement recorded successfully')
+      }
+    } catch (error) {
+      console.error('Stock movement error:', error)
+      toast.error('Failed to record stock movement')
+    }
+  }
+
+  const getStockStatus = (item) => {
+    if (item.current_stock <= item.min_stock) {
+      return { status: 'low', color: 'text-red-600', bgColor: 'bg-red-50' }
+    } else if (item.current_stock >= item.max_stock) {
+      return { status: 'high', color: 'text-green-600', bgColor: 'bg-green-50' }
+    } else {
+      return { status: 'normal', color: 'text-gray-600', bgColor: 'bg-gray-50' }
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
         <div className="text-center">
-          <div className="loading-spinner mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading inventory data...</p>
+          <div className="loading-spinner mb-4"></div>
+          <p className="text-gray-600">Loading inventory...</p>
         </div>
       </div>
     )
@@ -55,37 +139,42 @@ function InventoryPage() {
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Inventory Management</h1>
-          <p className="text-gray-600">Manage stock items, recipes, and low stock alerts</p>
+          <h1 className="text-3xl font-bold gradient-text">Inventory Management</h1>
+          <p className="text-gray-600 mt-2">Manage stock items, recipes, and inventory levels</p>
         </div>
-        <button className="btn-primary">
+        <button
+          onClick={handleAddStockItem}
+          className="btn-primary"
+        >
           <PlusIcon className="h-5 w-5 mr-2" />
           Add Stock Item
         </button>
       </div>
 
-      {/* Low Stock Alerts */}
+      {/* Low Stock Alert */}
       {lowStockItems.length > 0 && (
-        <div className="card border-red-200 bg-red-50">
-          <div className="card-header">
-            <div className="flex items-center">
-              <ExclamationTriangleIcon className="h-5 w-5 text-red-600 mr-2" />
-              <h2 className="text-lg font-semibold text-red-800">Low Stock Alerts</h2>
-            </div>
-          </div>
+        <div className="card border-l-4 border-l-red-500 bg-red-50">
           <div className="card-body">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {lowStockItems.map((item) => (
-                <div key={item.id} className="bg-white border border-red-200 rounded-lg p-4">
-                  <h3 className="font-medium text-gray-900">{item.name}</h3>
-                  <p className="text-sm text-gray-500">SKU: {item.sku}</p>
-                  <div className="mt-2">
-                    <span className="text-sm font-medium text-red-600">
-                      Current: {item.quantity} {item.unit}
+            <div className="flex items-center">
+              <ExclamationTriangleIcon className="h-6 w-6 text-red-600 mr-3" />
+              <div>
+                <h3 className="text-lg font-semibold text-red-800">Low Stock Alert</h3>
+                <p className="text-red-700">
+                  {lowStockItems.length} item(s) are running low on stock
+                </p>
+              </div>
+            </div>
+            <div className="mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {lowStockItems.slice(0, 6).map((item) => (
+                <div key={item.id} className="bg-white rounded-lg p-3 border border-red-200">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-medium text-gray-900">{item.name}</span>
+                    <span className="text-sm text-red-600 font-semibold">
+                      {item.current_stock} {item.unit}
                     </span>
-                    <span className="text-sm text-gray-500 ml-2">
-                      Min: {item.min_threshold} {item.unit}
-                    </span>
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    Min: {item.min_stock} {item.unit}
                   </div>
                 </div>
               ))}
@@ -101,22 +190,20 @@ function InventoryPage() {
             onClick={() => setActiveTab('stock')}
             className={`py-2 px-1 border-b-2 font-medium text-sm ${
               activeTab === 'stock'
-                ? 'border-primary-500 text-primary-600'
+                ? 'border-blue-500 text-blue-600'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
             }`}
           >
-            <CubeIcon className="h-4 w-4 mr-2 inline" />
             Stock Items ({stockItems.length})
           </button>
           <button
             onClick={() => setActiveTab('recipes')}
             className={`py-2 px-1 border-b-2 font-medium text-sm ${
               activeTab === 'recipes'
-                ? 'border-primary-500 text-primary-600'
+                ? 'border-blue-500 text-blue-600'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
             }`}
           >
-            <ChartBarIcon className="h-4 w-4 mr-2 inline" />
             Recipes ({recipes.length})
           </button>
         </nav>
@@ -128,7 +215,10 @@ function InventoryPage() {
           <div className="card-header">
             <div className="flex justify-between items-center">
               <h2 className="text-lg font-semibold text-gray-900">Stock Items</h2>
-              <button className="btn-primary btn-sm">
+              <button 
+                onClick={handleAddStockItem}
+                className="btn-primary btn-sm"
+              >
                 <PlusIcon className="h-4 w-4 mr-1" />
                 Add Item
               </button>
@@ -137,10 +227,13 @@ function InventoryPage() {
           <div className="card-body">
             {stockItems.length === 0 ? (
               <div className="text-center py-8">
-                <CubeIcon className="mx-auto h-12 w-12 text-gray-400" />
-                <h3 className="mt-2 text-sm font-medium text-gray-900">No stock items</h3>
-                <p className="mt-1 text-sm text-gray-500">Get started by adding your first stock item.</p>
-                <button className="btn-primary mt-4">Add Stock Item</button>
+                <p className="text-gray-500">No stock items found</p>
+                <button 
+                  onClick={handleAddStockItem}
+                  className="btn-primary mt-4"
+                >
+                  Add First Stock Item
+                </button>
               </div>
             ) : (
               <div className="overflow-x-auto">
@@ -151,13 +244,13 @@ function InventoryPage() {
                         Item
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        SKU
+                        Current Stock
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Quantity
+                        Min/Max
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Min Threshold
+                        Cost Price
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Status
@@ -168,38 +261,58 @@ function InventoryPage() {
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {stockItems.map((item) => (
-                      <tr key={item.id}>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-medium text-gray-900">{item.name}</div>
-                          <div className="text-sm text-gray-500">{item.unit}</div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {item.sku}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {item.quantity} {item.unit}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {item.min_threshold} {item.unit}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`badge ${
-                            item.isLowStock ? 'badge-danger' : 'badge-success'
-                          }`}>
-                            {item.isLowStock ? 'Low Stock' : 'In Stock'}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
-                          <button className="text-blue-600 hover:text-blue-900">
-                            Edit
-                          </button>
-                          <button className="text-green-600 hover:text-green-900">
-                            Add Stock
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
+                    {stockItems.map((item) => {
+                      const stockStatus = getStockStatus(item)
+                      return (
+                        <tr key={item.id}>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div>
+                              <div className="text-sm font-medium text-gray-900">{item.name}</div>
+                              <div className="text-sm text-gray-500">{item.sku || 'No SKU'}</div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="flex items-center">
+                              <span className={`text-sm font-semibold ${stockStatus.color}`}>
+                                {item.current_stock} {item.unit}
+                              </span>
+                              {stockStatus.status === 'low' && (
+                                <TrendingDownIcon className="h-4 w-4 text-red-500 ml-1" />
+                              )}
+                              {stockStatus.status === 'high' && (
+                                <TrendingUpIcon className="h-4 w-4 text-green-500 ml-1" />
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {item.min_stock} / {item.max_stock} {item.unit}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {item.cost_price?.toFixed(2) || '0.00'} MAD
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className={`badge ${stockStatus.bgColor} ${stockStatus.color}`}>
+                              {stockStatus.status === 'low' ? 'Low Stock' : 
+                               stockStatus.status === 'high' ? 'High Stock' : 'Normal'}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
+                            <button 
+                              onClick={() => handleEditStockItem(item)}
+                              className="text-blue-600 hover:text-blue-900"
+                            >
+                              <PencilIcon className="h-4 w-4" />
+                            </button>
+                            <button 
+                              onClick={() => handleDeleteStockItem(item.id)}
+                              className="text-red-600 hover:text-red-900"
+                            >
+                              <TrashIcon className="h-4 w-4" />
+                            </button>
+                          </td>
+                        </tr>
+                      )
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -223,10 +336,10 @@ function InventoryPage() {
           <div className="card-body">
             {recipes.length === 0 ? (
               <div className="text-center py-8">
-                <ChartBarIcon className="mx-auto h-12 w-12 text-gray-400" />
-                <h3 className="mt-2 text-sm font-medium text-gray-900">No recipes</h3>
-                <p className="mt-1 text-sm text-gray-500">Create recipes to track ingredient usage.</p>
-                <button className="btn-primary mt-4">Add Recipe</button>
+                <p className="text-gray-500">No recipes found</p>
+                <button className="btn-primary mt-4">
+                  Add First Recipe
+                </button>
               </div>
             ) : (
               <div className="space-y-4">
@@ -234,17 +347,25 @@ function InventoryPage() {
                   <div key={recipe.id} className="border border-gray-200 rounded-lg p-4">
                     <div className="flex justify-between items-start">
                       <div>
-                        <h3 className="font-medium text-gray-900">{recipe.menu_item_name}</h3>
-                        <p className="text-sm text-gray-500">
-                          Uses: {recipe.stock_item_name} ({recipe.qty_per_serving} {recipe.unit} per serving)
-                        </p>
+                        <h3 className="text-lg font-medium text-gray-900">{recipe.name}</h3>
+                        <p className="text-sm text-gray-600">{recipe.description}</p>
+                        <div className="mt-2">
+                          <span className="text-sm font-medium text-gray-700">Ingredients:</span>
+                          <div className="mt-1 space-y-1">
+                            {recipe.ingredients?.map((ingredient, index) => (
+                              <div key={index} className="text-sm text-gray-600">
+                                {ingredient.quantity} {ingredient.unit} {ingredient.stock_item?.name}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
                       </div>
                       <div className="flex space-x-2">
-                        <button className="text-blue-600 hover:text-blue-900 text-sm">
-                          Edit
+                        <button className="text-blue-600 hover:text-blue-900">
+                          <PencilIcon className="h-4 w-4" />
                         </button>
-                        <button className="text-red-600 hover:text-red-900 text-sm">
-                          Delete
+                        <button className="text-red-600 hover:text-red-900">
+                          <TrashIcon className="h-4 w-4" />
                         </button>
                       </div>
                     </div>
@@ -256,32 +377,35 @@ function InventoryPage() {
         </div>
       )}
 
-      {/* Inventory Summary */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="card">
-          <div className="card-body text-center">
-            <CubeIcon className="mx-auto h-8 w-8 text-blue-600 mb-2" />
-            <h3 className="text-lg font-medium text-gray-900">Total Items</h3>
-            <p className="text-2xl font-bold text-blue-600">{stockItems.length}</p>
-          </div>
-        </div>
+      {/* Stock Item Form Modal */}
+      {showStockForm && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-xl font-semibold text-gray-900">
+                  {editingItem ? 'Edit Stock Item' : 'Add New Stock Item'}
+                </h2>
+                <button
+                  onClick={handleCancelStockForm}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <span className="sr-only">Close</span>
+                  <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
 
-        <div className="card">
-          <div className="card-body text-center">
-            <ExclamationTriangleIcon className="mx-auto h-8 w-8 text-red-600 mb-2" />
-            <h3 className="text-lg font-medium text-gray-900">Low Stock</h3>
-            <p className="text-2xl font-bold text-red-600">{lowStockItems.length}</p>
+              <StockItemForm
+                item={editingItem}
+                onSave={handleSaveStockItem}
+                onCancel={handleCancelStockForm}
+              />
+            </div>
           </div>
         </div>
-
-        <div className="card">
-          <div className="card-body text-center">
-            <ChartBarIcon className="mx-auto h-8 w-8 text-green-600 mb-2" />
-            <h3 className="text-lg font-medium text-gray-900">Recipes</h3>
-            <p className="text-2xl font-bold text-green-600">{recipes.length}</p>
-          </div>
-        </div>
-      </div>
+      )}
     </div>
   )
 }

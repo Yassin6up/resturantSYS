@@ -1,76 +1,158 @@
 import { useState, useEffect } from 'react'
-import { useSocket } from '../../contexts/SocketContext'
 import { ordersAPI } from '../../services/api'
-import { CheckCircleIcon, ClockIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline'
+import { useSocket } from '../../contexts/SocketContext'
+import { 
+  ClockIcon, 
+  CheckIcon, 
+  ExclamationTriangleIcon,
+  PrinterIcon,
+  EyeIcon
+} from '@heroicons/react/24/outline'
 import toast from 'react-hot-toast'
 
 function KitchenDisplayPage() {
-  const { orders, acknowledgeOrder } = useSocket()
-  const [kitchenOrders, setKitchenOrders] = useState([])
+  const [orders, setOrders] = useState([])
   const [loading, setLoading] = useState(true)
+  const [filter, setFilter] = useState('all') // all, confirmed, preparing, ready
+  const { socket } = useSocket()
 
   useEffect(() => {
-    loadKitchenOrders()
+    loadOrders()
   }, [])
 
   useEffect(() => {
-    // Filter orders for kitchen display
-    const kitchenOrders = orders.filter(order => 
-      ['CONFIRMED', 'PREPARING'].includes(order.status)
-    )
-    setKitchenOrders(kitchenOrders)
-  }, [orders])
+    if (socket) {
+      // Join kitchen room for real-time updates
+      socket.emit('join-kitchen')
 
-  const loadKitchenOrders = async () => {
+      // Listen for order updates
+      socket.on('order.created', handleOrderCreated)
+      socket.on('order.updated', handleOrderUpdated)
+      socket.on('order.confirmed', handleOrderConfirmed)
+
+      return () => {
+        socket.emit('leave-kitchen')
+        socket.off('order.created')
+        socket.off('order.updated')
+        socket.off('order.confirmed')
+      }
+    }
+  }, [socket])
+
+  const loadOrders = async () => {
     try {
       setLoading(true)
       const response = await ordersAPI.getOrders({ 
         branchId: 1,
-        status: 'CONFIRMED,PREPARING',
-        limit: 50
+        status: ['CONFIRMED', 'PREPARING', 'READY']
       })
-      // Orders are managed by Socket context
+      if (response.data.success) {
+        setOrders(response.data.orders)
+      }
     } catch (error) {
-      toast.error('Failed to load kitchen orders')
-      console.error('Kitchen orders load error:', error)
+      toast.error('Failed to load orders')
+      console.error('Orders load error:', error)
     } finally {
       setLoading(false)
     }
   }
 
-  const handleAcknowledge = async (orderId) => {
+  const handleOrderCreated = (order) => {
+    setOrders(prev => [order, ...prev])
+  }
+
+  const handleOrderUpdated = (updatedOrder) => {
+    setOrders(prev => prev.map(order => 
+      order.id === updatedOrder.id ? updatedOrder : order
+    ))
+  }
+
+  const handleOrderConfirmed = (order) => {
+    setOrders(prev => [order, ...prev])
+  }
+
+  const updateOrderStatus = async (orderId, status) => {
     try {
-      await acknowledgeOrder(orderId)
-      toast.success('Order acknowledged')
+      const response = await ordersAPI.updateOrderStatus(orderId, status)
+      if (response.data.success) {
+        toast.success(`Order status updated to ${status}`)
+        // The socket will handle the real-time update
+      }
     } catch (error) {
-      toast.error('Failed to acknowledge order')
-      console.error('Acknowledge error:', error)
+      console.error('Status update error:', error)
+      toast.error('Failed to update order status')
     }
   }
 
-  const getOrderPriority = (order) => {
-    const createdAt = new Date(order.created_at)
-    const now = new Date()
-    const minutesSinceCreated = (now - createdAt) / (1000 * 60)
-    
-    if (minutesSinceCreated > 30) return 'high'
-    if (minutesSinceCreated > 15) return 'medium'
-    return 'low'
+  const acknowledgeOrder = async (orderId) => {
+    try {
+      await ordersAPI.updateOrderStatus(orderId, 'PREPARING')
+      toast.success('Order acknowledged')
+    } catch (error) {
+      console.error('Acknowledge error:', error)
+      toast.error('Failed to acknowledge order')
+    }
+  }
+
+  const markOrderReady = async (orderId) => {
+    try {
+      await ordersAPI.updateOrderStatus(orderId, 'READY')
+      toast.success('Order marked as ready')
+    } catch (error) {
+      console.error('Mark ready error:', error)
+      toast.error('Failed to mark order as ready')
+    }
+  }
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'CONFIRMED':
+        return 'bg-blue-100 text-blue-800 border-blue-200'
+      case 'PREPARING':
+        return 'bg-orange-100 text-orange-800 border-orange-200'
+      case 'READY':
+        return 'bg-green-100 text-green-800 border-green-200'
+      default:
+        return 'bg-gray-100 text-gray-800 border-gray-200'
+    }
   }
 
   const getPriorityColor = (priority) => {
     switch (priority) {
-      case 'high': return 'border-red-500 bg-red-50'
-      case 'medium': return 'border-yellow-500 bg-yellow-50'
-      default: return 'border-gray-300 bg-white'
+      case 'HIGH':
+        return 'border-l-red-500 bg-red-50'
+      case 'MEDIUM':
+        return 'border-l-yellow-500 bg-yellow-50'
+      case 'LOW':
+        return 'border-l-green-500 bg-green-50'
+      default:
+        return 'border-l-gray-300 bg-white'
     }
+  }
+
+  const filteredOrders = orders.filter(order => {
+    if (filter === 'all') return true
+    return order.status === filter
+  })
+
+  const getTimeElapsed = (createdAt) => {
+    const now = new Date()
+    const created = new Date(createdAt)
+    const diffMs = now - created
+    const diffMins = Math.floor(diffMs / 60000)
+    
+    if (diffMins < 1) return 'Just now'
+    if (diffMins < 60) return `${diffMins}m ago`
+    
+    const diffHours = Math.floor(diffMins / 60)
+    return `${diffHours}h ${diffMins % 60}m ago`
   }
 
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
         <div className="text-center">
-          <div className="loading-spinner mx-auto mb-4"></div>
+          <div className="loading-spinner mb-4"></div>
           <p className="text-gray-600">Loading kitchen orders...</p>
         </div>
       </div>
@@ -82,182 +164,213 @@ function KitchenDisplayPage() {
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Kitchen Display</h1>
-          <p className="text-gray-600">Live kitchen order queue</p>
+          <h1 className="text-3xl font-bold gradient-text">Kitchen Display</h1>
+          <p className="text-gray-600 mt-2">Real-time order management for kitchen staff</p>
         </div>
-        <div className="flex items-center space-x-4">
-          <div className="text-sm text-gray-500">
-            {kitchenOrders.length} active orders
-          </div>
+        
+        {/* Status Filter */}
+        <div className="flex space-x-2">
           <button
-            onClick={loadKitchenOrders}
-            className="btn-outline btn-sm"
+            onClick={() => setFilter('all')}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              filter === 'all'
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
           >
-            Refresh
+            All ({orders.length})
+          </button>
+          <button
+            onClick={() => setFilter('CONFIRMED')}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              filter === 'CONFIRMED'
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            Confirmed ({orders.filter(o => o.status === 'CONFIRMED').length})
+          </button>
+          <button
+            onClick={() => setFilter('PREPARING')}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              filter === 'PREPARING'
+                ? 'bg-orange-600 text-white'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            Preparing ({orders.filter(o => o.status === 'PREPARING').length})
+          </button>
+          <button
+            onClick={() => setFilter('READY')}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              filter === 'READY'
+                ? 'bg-green-600 text-white'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            Ready ({orders.filter(o => o.status === 'READY').length})
           </button>
         </div>
       </div>
 
-      {/* Kitchen Orders Grid */}
-      {kitchenOrders.length === 0 ? (
-        <div className="card">
-          <div className="card-body text-center py-12">
-            <ExclamationTriangleIcon className="mx-auto h-12 w-12 text-gray-400" />
-            <h3 className="mt-2 text-sm font-medium text-gray-900">No active orders</h3>
-            <p className="mt-1 text-sm text-gray-500">All caught up! New orders will appear here.</p>
-          </div>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-          {kitchenOrders.map((order) => {
-            const priority = getOrderPriority(order)
-            const priorityColor = getPriorityColor(priority)
-            
-            return (
-              <div key={order.id} className={`card border-2 ${priorityColor}`}>
-                <div className="card-body">
-                  {/* Order Header */}
-                  <div className="flex justify-between items-start mb-4">
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-900">
-                        {order.order_code}
-                      </h3>
-                      <p className="text-sm text-gray-500">
-                        Table {order.table_number} • {order.customer_name || 'Walk-in'}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <span className={`badge ${
-                        order.status === 'CONFIRMED' ? 'badge-blue' : 'badge-orange'
-                      }`}>
-                        {order.status}
-                      </span>
-                      <p className="text-xs text-gray-500 mt-1">
-                        {new Date(order.created_at).toLocaleTimeString()}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Order Items */}
-                  <div className="space-y-2 mb-4">
-                    {order.items?.map((item) => (
-                      <div key={item.id} className="flex justify-between items-center py-2 border-b border-gray-100 last:border-b-0">
-                        <div className="flex-1">
-                          <p className="font-medium text-gray-900">
-                            {item.quantity}x {item.item_name}
-                          </p>
-                          {item.note && (
-                            <p className="text-sm text-gray-500 italic">
-                              Note: {item.note}
-                            </p>
-                          )}
-                          {item.modifiers && item.modifiers.length > 0 && (
-                            <p className="text-sm text-gray-500">
-                              With: {item.modifiers.map(m => m.name).join(', ')}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Order Total */}
-                  <div className="flex justify-between items-center mb-4">
-                    <span className="text-sm font-medium text-gray-500">Total:</span>
-                    <span className="text-lg font-bold text-gray-900">
-                      {order.total.toFixed(2)} MAD
-                    </span>
-                  </div>
-
-                  {/* Actions */}
-                  <div className="space-y-2">
-                    {order.status === 'CONFIRMED' && (
-                      <button
-                        onClick={() => handleAcknowledge(order.id)}
-                        className="btn-primary w-full"
-                      >
-                        <CheckCircleIcon className="h-4 w-4 mr-2" />
-                        Start Preparing
-                      </button>
-                    )}
-                    
-                    {order.status === 'PREPARING' && (
-                      <div className="flex space-x-2">
-                        <button
-                          onClick={() => {/* Mark as ready */}}
-                          className="btn-primary flex-1"
-                        >
-                          Mark Ready
-                        </button>
-                        <button
-                          onClick={() => {/* View details */}}
-                          className="btn-outline flex-1"
-                        >
-                          View Details
-                        </button>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Priority Indicator */}
-                  {priority === 'high' && (
-                    <div className="mt-3 p-2 bg-red-100 border border-red-200 rounded text-center">
-                      <p className="text-sm font-medium text-red-800">
-                        ⚠️ High Priority - Overdue Order
-                      </p>
-                    </div>
-                  )}
+      {/* Orders Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+        {filteredOrders.map((order) => (
+          <div
+            key={order.id}
+            className={`card border-l-4 ${getPriorityColor(order.priority || 'LOW')} hover:shadow-lg transition-shadow duration-200`}
+          >
+            <div className="card-body">
+              {/* Order Header */}
+              <div className="flex justify-between items-start mb-4">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    Order #{order.order_code}
+                  </h3>
+                  <p className="text-sm text-gray-600">Table {order.table_number}</p>
+                  <p className="text-xs text-gray-500">{order.customer_name}</p>
+                </div>
+                <div className="text-right">
+                  <span className={`badge ${getStatusColor(order.status)}`}>
+                    {order.status}
+                  </span>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {getTimeElapsed(order.created_at)}
+                  </p>
                 </div>
               </div>
-            )
-          })}
+
+              {/* Order Items */}
+              <div className="space-y-2 mb-4">
+                {order.items?.map((item, index) => (
+                  <div key={index} className="flex justify-between items-center py-2 border-b border-gray-100 last:border-b-0">
+                    <div className="flex-1">
+                      <div className="flex items-center space-x-2">
+                        <span className="text-sm font-medium text-gray-900">
+                          {item.quantity}x
+                        </span>
+                        <span className="text-sm text-gray-700">
+                          {item.menu_item?.name || 'Unknown Item'}
+                        </span>
+                      </div>
+                      {item.modifiers && item.modifiers.length > 0 && (
+                        <div className="text-xs text-gray-500 ml-6">
+                          {item.modifiers.map(mod => mod.name).join(', ')}
+                        </div>
+                      )}
+                      {item.note && (
+                        <div className="text-xs text-blue-600 ml-6 font-medium">
+                          Note: {item.note}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Order Actions */}
+              <div className="flex space-x-2">
+                {order.status === 'CONFIRMED' && (
+                  <button
+                    onClick={() => acknowledgeOrder(order.id)}
+                    className="flex-1 btn-primary btn-sm"
+                  >
+                    <CheckIcon className="h-4 w-4 mr-1" />
+                    Start Cooking
+                  </button>
+                )}
+                
+                {order.status === 'PREPARING' && (
+                  <button
+                    onClick={() => markOrderReady(order.id)}
+                    className="flex-1 btn-success btn-sm"
+                  >
+                    <CheckIcon className="h-4 w-4 mr-1" />
+                    Mark Ready
+                  </button>
+                )}
+                
+                {order.status === 'READY' && (
+                  <div className="flex-1 text-center">
+                    <span className="text-sm font-medium text-green-600">
+                      Ready for Service
+                    </span>
+                  </div>
+                )}
+                
+                <button
+                  onClick={() => window.print()}
+                  className="btn-outline btn-sm"
+                >
+                  <PrinterIcon className="h-4 w-4" />
+                </button>
+              </div>
+
+              {/* Order Total */}
+              <div className="mt-4 pt-4 border-t border-gray-200">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-600">Total:</span>
+                  <span className="text-lg font-bold text-gray-900">
+                    {order.total?.toFixed(2)} MAD
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Empty State */}
+      {filteredOrders.length === 0 && (
+        <div className="text-center py-12">
+          <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <ClockIcon className="h-8 w-8 text-gray-400" />
+          </div>
+          <h3 className="text-lg font-medium text-gray-900 mb-2">No orders found</h3>
+          <p className="text-gray-600">
+            {filter === 'all' 
+              ? 'No orders in the kitchen at the moment'
+              : `No ${filter.toLowerCase()} orders at the moment`
+            }
+          </p>
         </div>
       )}
 
-      {/* Kitchen Instructions */}
-      <div className="card">
-        <div className="card-header">
-          <h2 className="text-lg font-semibold text-gray-900">Kitchen Instructions</h2>
+      {/* Kitchen Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="card text-center">
+          <div className="card-body">
+            <div className="text-2xl font-bold text-blue-600">
+              {orders.filter(o => o.status === 'CONFIRMED').length}
+            </div>
+            <div className="text-sm text-gray-600">Confirmed</div>
+          </div>
         </div>
-        <div className="card-body">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div>
-              <h3 className="font-medium text-gray-900 mb-2">Order Flow</h3>
-              <ol className="text-sm text-gray-600 space-y-1">
-                <li>1. Order appears when confirmed</li>
-                <li>2. Click "Start Preparing" to acknowledge</li>
-                <li>3. Prepare items according to specifications</li>
-                <li>4. Click "Mark Ready" when complete</li>
-              </ol>
+        
+        <div className="card text-center">
+          <div className="card-body">
+            <div className="text-2xl font-bold text-orange-600">
+              {orders.filter(o => o.status === 'PREPARING').length}
             </div>
-            
-            <div>
-              <h3 className="font-medium text-gray-900 mb-2">Priority Colors</h3>
-              <div className="space-y-2 text-sm">
-                <div className="flex items-center space-x-2">
-                  <div className="w-4 h-4 bg-red-500 rounded"></div>
-                  <span className="text-gray-600">High Priority (30+ min)</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <div className="w-4 h-4 bg-yellow-500 rounded"></div>
-                  <span className="text-gray-600">Medium Priority (15+ min)</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <div className="w-4 h-4 bg-gray-500 rounded"></div>
-                  <span className="text-gray-600">Normal Priority</span>
-                </div>
-              </div>
+            <div className="text-sm text-gray-600">Preparing</div>
+          </div>
+        </div>
+        
+        <div className="card text-center">
+          <div className="card-body">
+            <div className="text-2xl font-bold text-green-600">
+              {orders.filter(o => o.status === 'READY').length}
             </div>
-            
-            <div>
-              <h3 className="font-medium text-gray-900 mb-2">Tips</h3>
-              <ul className="text-sm text-gray-600 space-y-1">
-                <li>• Check special instructions carefully</li>
-                <li>• Pay attention to modifiers</li>
-                <li>• Update status promptly</li>
-                <li>• Ask for help if unclear</li>
-              </ul>
+            <div className="text-sm text-gray-600">Ready</div>
+          </div>
+        </div>
+        
+        <div className="card text-center">
+          <div className="card-body">
+            <div className="text-2xl font-bold text-gray-600">
+              {orders.length}
             </div>
+            <div className="text-sm text-gray-600">Total Active</div>
           </div>
         </div>
       </div>

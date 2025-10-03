@@ -35,10 +35,149 @@ router.get('/', authenticateToken, authorize('admin', 'manager', 'cashier'), asy
       table.activeOrder = activeOrder;
     }
 
-    res.json({ tables });
+    res.json({ success: true, tables });
   } catch (error) {
     logger.error('Tables fetch error:', error);
     res.status(500).json({ error: 'Failed to fetch tables' });
+  }
+});
+
+// Create table (admin)
+router.post('/', authenticateToken, authorize('admin', 'manager'), async (req, res) => {
+  try {
+    const { number, capacity, location, branchId, isActive } = req.body;
+
+    if (!number || !capacity || !branchId) {
+      return res.status(400).json({ error: 'Table number, capacity, and branch ID are required' });
+    }
+
+    // Check if table number already exists in this branch
+    const existingTable = await db('tables')
+      .where({ 
+        table_number: number,
+        branch_id: branchId 
+      })
+      .first();
+
+    if (existingTable) {
+      return res.status(400).json({ error: 'Table number already exists in this branch' });
+    }
+
+    const [tableId] = await db('tables').insert({
+      table_number: number,
+      capacity: parseInt(capacity),
+      location: location || '',
+      branch_id: branchId,
+      is_active: isActive !== false,
+      qr_code_url: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/menu?table=${number}`
+    });
+
+    const table = await db('tables').where({ id: tableId }).first();
+
+    // Log table creation
+    await db('audit_logs').insert({
+      user_id: req.user.id,
+      action: 'TABLE_CREATE',
+      meta: JSON.stringify({ tableId, number, capacity, branchId })
+    });
+
+    res.status(201).json({ success: true, table });
+  } catch (error) {
+    logger.error('Table creation error:', error);
+    res.status(500).json({ error: 'Failed to create table' });
+  }
+});
+
+// Update table (admin)
+router.put('/:id', authenticateToken, authorize('admin', 'manager'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { number, capacity, location, isActive } = req.body;
+
+    // Check if table exists
+    const existingTable = await db('tables').where({ id }).first();
+    if (!existingTable) {
+      return res.status(404).json({ error: 'Table not found' });
+    }
+
+    // If table number is being changed, check for duplicates
+    if (number && number !== existingTable.table_number) {
+      const duplicateTable = await db('tables')
+        .where({ 
+          table_number: number,
+          branch_id: existingTable.branch_id,
+          id: { '!=': id }
+        })
+        .first();
+
+      if (duplicateTable) {
+        return res.status(400).json({ error: 'Table number already exists in this branch' });
+      }
+    }
+
+    await db('tables')
+      .where({ id })
+      .update({
+        table_number: number || existingTable.table_number,
+        capacity: capacity ? parseInt(capacity) : existingTable.capacity,
+        location: location !== undefined ? location : existingTable.location,
+        is_active: isActive !== undefined ? isActive : existingTable.is_active,
+        qr_code_url: number ? `${process.env.FRONTEND_URL || 'http://localhost:5173'}/menu?table=${number}` : existingTable.qr_code_url,
+        updated_at: db.raw('CURRENT_TIMESTAMP')
+      });
+
+    const table = await db('tables').where({ id }).first();
+
+    // Log table update
+    await db('audit_logs').insert({
+      user_id: req.user.id,
+      action: 'TABLE_UPDATE',
+      meta: JSON.stringify({ tableId: id, number, capacity })
+    });
+
+    res.json({ success: true, table });
+  } catch (error) {
+    logger.error('Table update error:', error);
+    res.status(500).json({ error: 'Failed to update table' });
+  }
+});
+
+// Delete table (admin)
+router.delete('/:id', authenticateToken, authorize('admin'), async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Check if table exists
+    const table = await db('tables').where({ id }).first();
+    if (!table) {
+      return res.status(404).json({ error: 'Table not found' });
+    }
+
+    // Check if table has active orders
+    const activeOrder = await db('orders')
+      .where({ 
+        table_id: id,
+        status: ['PENDING', 'CONFIRMED', 'PREPARING', 'READY', 'SERVED']
+      })
+      .first();
+
+    if (activeOrder) {
+      return res.status(400).json({ error: 'Cannot delete table with active orders' });
+    }
+
+    await db('tables').where({ id }).del();
+
+    // Log table deletion
+    await db('audit_logs').insert({
+      user_id: req.user.id,
+      action: 'TABLE_DELETE',
+      meta: JSON.stringify({ tableId: id, tableNumber: table.table_number })
+    });
+
+    res.json({ success: true, message: 'Table deleted successfully' });
+  } catch (error) {
+    logger.error('Table deletion error:', error);
+    res.status(500).json({ error: 'Failed to delete table' });
   }
 });
 
@@ -230,7 +369,7 @@ router.get('/:id/qr', authenticateToken, authorize('admin', 'manager', 'cashier'
 
     if (format === 'dataurl') {
       const qrCodeDataURL = await QRCode.toDataURL(table.qr_code);
-      res.json({ qrCode: qrCodeDataURL, table });
+      res.json({ success: true, qrCodeUrl: qrCodeDataURL, table });
     } else {
       const qrCodeBuffer = await QRCode.toBuffer(table.qr_code);
       res.setHeader('Content-Type', 'image/png');

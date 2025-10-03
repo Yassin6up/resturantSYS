@@ -72,6 +72,18 @@ export const ordersAPI = {
   cancelOrder: (id, reason) => api.post(`/api/orders/${id}/cancel`, { reason }),
 }
 
+// Tables API
+export const tablesAPI = {
+  getTables: (params) => api.get('/api/tables', { params }),
+  getTable: (id) => api.get(`/api/tables/${id}`),
+  createTable: (data) => api.post('/api/tables', data),
+  updateTable: (id, data) => api.put(`/api/tables/${id}`, data),
+  deleteTable: (id) => api.delete(`/api/tables/${id}`),
+  getTableQR: (id) => api.get(`/api/tables/${id}/qr?format=dataurl`),
+  getTableQRSheet: (branchId) => api.get(`/api/tables/branch/${branchId}/qr-sheet`),
+  getTableOrders: (id) => api.get(`/api/tables/${id}/orders`),
+}
+
 // Payments API
 export const paymentsAPI = {
   recordPayment: (data) => api.post('/api/payments', data),
@@ -114,7 +126,7 @@ export const settingsAPI = {
   getSetting: (key) => api.get(`/api/settings/${key}`),
   updateSetting: (key, value) => api.put(`/api/settings/${key}`, { value }),
   getOperatingMode: () => api.get('/api/settings/mode/operating'),
-  updateOperatingMode: (mode) => api.put('/api/settings/mode/operating', { mode }),
+  updateOperatingMode: (mode) => api.post('/api/settings/change-operating-mode', { mode }),
   getDatabaseConfig: () => api.get('/api/settings/database/config'),
   testDatabaseConnection: (config) => api.post('/api/settings/database/test', config),
   getPaymentGatewayConfig: () => api.get('/api/settings/payment/gateway'),

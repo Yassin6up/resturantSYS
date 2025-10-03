@@ -1,4 +1,5 @@
 const express = require('express');
+const XLSX = require('xlsx');
 const { db } = require('../database/init');
 const { authenticateToken, authorize } = require('../middleware/auth');
 const { logger } = require('../middleware/errorHandler');
@@ -439,5 +440,107 @@ function convertToCSV(data) {
 
   return csvRows.join('\n');
 }
+
+// Export report as Excel
+router.get('/export/:reportType', authenticateToken, authorize('admin', 'manager'), async (req, res) => {
+  try {
+    const { reportType } = req.params;
+    const { startDate, endDate, branchId } = req.query;
+
+    let data = [];
+    let filename = '';
+
+    switch (reportType) {
+      case 'sales':
+        data = await getSalesData(startDate, endDate, branchId);
+        filename = `sales_report_${startDate}_to_${endDate}.xlsx`;
+        break;
+      case 'items':
+        data = await getTopItemsData(startDate, endDate, branchId);
+        filename = `top_items_report_${startDate}_to_${endDate}.xlsx`;
+        break;
+      case 'tables':
+        data = await db('orders')
+          .select(
+            'tables.table_number',
+            db.raw('COUNT(*) as order_count'),
+            db.raw('SUM(orders.total) as total_revenue'),
+            db.raw('AVG(orders.total) as average_order_value')
+          )
+          .leftJoin('tables', 'orders.table_id', 'tables.id')
+          .whereBetween('orders.created_at', [startDate, endDate])
+          .groupBy('tables.id', 'tables.table_number')
+          .orderBy('order_count', 'desc');
+        filename = `table_turnover_report_${startDate}_to_${endDate}.xlsx`;
+        break;
+      case 'payments':
+        data = await db('payments')
+          .select(
+            'payment_method',
+            db.raw('COUNT(*) as transaction_count'),
+            db.raw('SUM(amount) as total_amount')
+          )
+          .whereBetween('created_at', [startDate, endDate])
+          .groupBy('payment_method')
+          .orderBy('total_amount', 'desc');
+        filename = `payment_methods_report_${startDate}_to_${endDate}.xlsx`;
+        break;
+      case 'inventory':
+        data = await getInventoryUsageData(startDate, endDate, branchId);
+        filename = `inventory_usage_report_${startDate}_to_${endDate}.xlsx`;
+        break;
+      case 'cash':
+        data = await db('payments')
+          .select(
+            db.raw('DATE(created_at) as date'),
+            db.raw('SUM(CASE WHEN payment_method = "cash" THEN amount ELSE 0 END) as cash_sales'),
+            db.raw('COUNT(CASE WHEN payment_method = "cash" THEN 1 END) as cash_transactions')
+          )
+          .whereBetween('created_at', [startDate, endDate])
+          .groupBy(db.raw('DATE(created_at)'))
+          .orderBy('date');
+        filename = `cash_reconciliation_report_${startDate}_to_${endDate}.xlsx`;
+        break;
+      default:
+        return res.status(400).json({ error: 'Invalid report type' });
+    }
+
+    // Create Excel workbook
+    const workbook = XLSX.utils.book_new();
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    
+    // Add worksheet to workbook
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Report');
+    
+    // Generate Excel buffer
+    const excelBuffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+
+    // Set response headers
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Length', excelBuffer.length);
+
+    // Send Excel file
+    res.send(excelBuffer);
+
+    // Log export
+    await db('audit_logs').insert({
+      user_id: req.user.id,
+      action: 'REPORT_EXPORT',
+      meta: JSON.stringify({ 
+        reportType, 
+        startDate, 
+        endDate, 
+        branchId,
+        recordCount: data.length 
+      })
+    });
+
+    logger.info(`Report exported: ${reportType} by ${req.user.username}`);
+  } catch (error) {
+    logger.error('Report export error:', error);
+    res.status(500).json({ error: 'Failed to export report' });
+  }
+});
 
 module.exports = router;
