@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  # Test Database
+  test-db:
+    image: sqlite:latest
+    environment:
+      - NODE_ENV=test
+    volumes:
+      - ./server/data:/app/data
+    networks:
+      - test-network
+
+  # Test API Server
+  test-api:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    environment:
+      - NODE_ENV=test
+      - DB_TYPE=sqlite
+      - DB_PATH=/app/data/test.db
+      - JWT_SECRET=test-jwt-secret
+    depends_on:
+      - test-db
+    networks:
+      - test-network
+    command: npm test
+
+  # Test Frontend
+  test-frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    environment:
+      - NODE_ENV=test
+    networks:
+      - test-network
+    command: npm test
+
+networks:
+  test-network:
+    driver: bridge

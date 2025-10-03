@@ -1,0 +1,87 @@
+version: '3.8'
+
+services:
+  # Backend API Server
+  api:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - DB_TYPE=sqlite
+      - DB_PATH=/app/data/posq.db
+      - JWT_SECRET=your-super-secret-jwt-key-change-in-production
+      - FRONTEND_URL=http://localhost:5173
+    volumes:
+      - ./server/data:/app/data
+      - ./server/uploads:/app/uploads
+    depends_on:
+      - redis
+    networks:
+      - posq-network
+
+  # Frontend React App
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_URL=http://localhost:3000
+      - VITE_SOCKET_URL=http://localhost:3000
+    depends_on:
+      - api
+    networks:
+      - posq-network
+
+  # Redis for caching and sessions
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - posq-network
+
+  # MySQL for cloud mode (optional)
+  mysql:
+    image: mysql:8.0
+    environment:
+      - MYSQL_ROOT_PASSWORD=rootpassword
+      - MYSQL_DATABASE=posq
+      - MYSQL_USER=posq
+      - MYSQL_PASSWORD=posqpassword
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - posq-network
+    profiles:
+      - cloud
+
+  # Printer Service
+  printer-service:
+    build:
+      context: ./printer-service
+      dockerfile: Dockerfile
+    ports:
+      - "4000:4000"
+    environment:
+      - API_URL=http://api:3000
+    depends_on:
+      - api
+    networks:
+      - posq-network
+
+volumes:
+  redis_data:
+  mysql_data:
+
+networks:
+  posq-network:
+    driver: bridge
