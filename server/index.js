@@ -13,7 +13,7 @@ const paymentRoutes = require('./src/routes/payments');
 const tableRoutes = require('./src/routes/tables');
 const inventoryRoutes = require('./src/routes/inventory');
 const settingsRoutes = require('./src/routes/settings');
-const syncRoutes = require('./src/routes/sync');
+const { router: syncRoutes } = require('./src/routes/sync');
 const reportRoutes = require('./src/routes/reports');
 
 const { initializeDatabase } = require('./src/database/init');

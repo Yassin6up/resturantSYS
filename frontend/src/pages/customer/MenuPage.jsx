@@ -97,21 +97,35 @@ function MenuPage() {
                 {category.items?.map((item) => (
                   <div
                     key={item.id}
-                    className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
+                    className="border border-gray-200 rounded-lg overflow-hidden hover:shadow-md transition-shadow cursor-pointer"
                     onClick={() => setSelectedItem(item)}
                   >
-                    <div className="flex justify-between items-start mb-2">
-                      <h3 className="font-medium text-gray-900">{item.name}</h3>
-                      <span className="text-sm font-semibold text-primary-600">
-                        {item.price.toFixed(2)} MAD
-                      </span>
+                    {/* Food Image */}
+                    <div className="aspect-w-16 aspect-h-9 bg-gray-200">
+                      <img
+                        src={item.image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&h=300&fit=crop'}
+                        alt={item.name}
+                        className="w-full h-48 object-cover"
+                        onError={(e) => {
+                          e.target.src = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&h=300&fit=crop';
+                        }}
+                      />
                     </div>
-                    {item.description && (
-                      <p className="text-sm text-gray-600 mb-3">{item.description}</p>
-                    )}
-                    <button className="btn-primary btn-sm w-full">
-                      Add to Cart
-                    </button>
+                    
+                    <div className="p-4">
+                      <div className="flex justify-between items-start mb-2">
+                        <h3 className="font-medium text-gray-900">{item.name}</h3>
+                        <span className="text-sm font-semibold text-primary-600">
+                          {item.price.toFixed(2)} MAD
+                        </span>
+                      </div>
+                      {item.description && (
+                        <p className="text-sm text-gray-600 mb-3 line-clamp-2">{item.description}</p>
+                      )}
+                      <button className="btn-primary btn-sm w-full">
+                        Add to Cart
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -124,6 +138,18 @@ function MenuPage() {
       {selectedItem && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg max-w-md w-full max-h-[90vh] overflow-y-auto">
+            {/* Food Image */}
+            <div className="aspect-w-16 aspect-h-9 bg-gray-200">
+              <img
+                src={selectedItem.image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&h=300&fit=crop'}
+                alt={selectedItem.name}
+                className="w-full h-48 object-cover rounded-t-lg"
+                onError={(e) => {
+                  e.target.src = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&h=300&fit=crop';
+                }}
+              />
+            </div>
+            
             <div className="p-6">
               <div className="flex justify-between items-start mb-4">
                 <h3 className="text-lg font-semibold text-gray-900">{selectedItem.name}</h3>

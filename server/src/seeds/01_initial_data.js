@@ -85,32 +85,32 @@ exports.seed = async function(knex) {
     { id: 5, branch_id: 1, name: 'Traditional Dishes', position: 5 }
   ]);
 
-  // Menu Items
-  await knex('menu_items').insert([
-    // Appetizers
-    { id: 1, branch_id: 1, category_id: 1, sku: 'APP001', name: 'Hummus', description: 'Creamy chickpea dip with olive oil', price: 25.00, is_available: true },
-    { id: 2, branch_id: 1, category_id: 1, sku: 'APP002', name: 'Baba Ganoush', description: 'Smoky eggplant dip', price: 28.00, is_available: true },
-    { id: 3, branch_id: 1, category_id: 1, sku: 'APP003', name: 'Falafel Plate', description: 'Crispy chickpea balls with tahini', price: 35.00, is_available: true },
-    
-    // Main Courses
-    { id: 4, branch_id: 1, category_id: 2, sku: 'MAIN001', name: 'Grilled Chicken', description: 'Marinated chicken breast with herbs', price: 85.00, is_available: true },
-    { id: 5, branch_id: 1, category_id: 2, sku: 'MAIN002', name: 'Beef Kebab', description: 'Tender beef cubes with vegetables', price: 95.00, is_available: true },
-    { id: 6, branch_id: 1, category_id: 2, sku: 'MAIN003', name: 'Fish Tagine', description: 'Fresh fish with preserved lemons', price: 90.00, is_available: true },
-    
-    // Traditional Dishes
-    { id: 7, branch_id: 1, category_id: 5, sku: 'TRAD001', name: 'Couscous Royal', description: 'Traditional couscous with lamb and vegetables', price: 120.00, is_available: true },
-    { id: 8, branch_id: 1, category_id: 5, sku: 'TRAD002', name: 'Tajine Lamb', description: 'Slow-cooked lamb with prunes and almonds', price: 110.00, is_available: true },
-    { id: 9, branch_id: 1, category_id: 5, sku: 'TRAD003', name: 'Pastilla', description: 'Sweet and savory pigeon pie', price: 100.00, is_available: true },
-    
-    // Desserts
-    { id: 10, branch_id: 1, category_id: 3, sku: 'DES001', name: 'Baklava', description: 'Layered pastry with nuts and honey', price: 45.00, is_available: true },
-    { id: 11, branch_id: 1, category_id: 3, sku: 'DES002', name: 'Mint Tea', description: 'Traditional Moroccan mint tea', price: 15.00, is_available: true },
-    
-    // Beverages
-    { id: 12, branch_id: 1, category_id: 4, sku: 'BEV001', name: 'Fresh Orange Juice', description: 'Freshly squeezed orange juice', price: 20.00, is_available: true },
-    { id: 13, branch_id: 1, category_id: 4, sku: 'BEV002', name: 'Moroccan Coffee', description: 'Traditional Moroccan coffee', price: 18.00, is_available: true },
-    { id: 14, branch_id: 1, category_id: 4, sku: 'BEV003', name: 'Sparkling Water', description: 'Bottled sparkling water', price: 12.00, is_available: true }
-  ]);
+    // Menu Items
+    await knex('menu_items').insert([
+      // Appetizers
+      { id: 1, branch_id: 1, category_id: 1, sku: 'APP001', name: 'Hummus', description: 'Creamy chickpea dip with olive oil', price: 25.00, image: 'https://images.unsplash.com/photo-1626645738196-c2a7c87a8f58?w=400&h=300&fit=crop', is_available: true },
+      { id: 2, branch_id: 1, category_id: 1, sku: 'APP002', name: 'Baba Ganoush', description: 'Smoky eggplant dip', price: 28.00, image: 'https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=400&h=300&fit=crop', is_available: true },
+      { id: 3, branch_id: 1, category_id: 1, sku: 'APP003', name: 'Falafel Plate', description: 'Crispy chickpea balls with tahini', price: 35.00, image: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=400&h=300&fit=crop', is_available: true },
+      
+      // Main Courses
+      { id: 4, branch_id: 1, category_id: 2, sku: 'MAIN001', name: 'Grilled Chicken', description: 'Marinated chicken breast with herbs', price: 85.00, image: 'https://images.unsplash.com/photo-1532550907401-a500c9a57435?w=400&h=300&fit=crop', is_available: true },
+      { id: 5, branch_id: 1, category_id: 2, sku: 'MAIN002', name: 'Beef Kebab', description: 'Tender beef cubes with vegetables', price: 95.00, image: 'https://images.unsplash.com/photo-1529692236671-f1f6cf9683ba?w=400&h=300&fit=crop', is_available: true },
+      { id: 6, branch_id: 1, category_id: 2, sku: 'MAIN003', name: 'Fish Tagine', description: 'Fresh fish with preserved lemons', price: 90.00, image: 'https://images.unsplash.com/photo-1551218808-94e220e084d2?w=400&h=300&fit=crop', is_available: true },
+      
+      // Traditional Dishes
+      { id: 7, branch_id: 1, category_id: 5, sku: 'TRAD001', name: 'Couscous Royal', description: 'Traditional couscous with lamb and vegetables', price: 120.00, image: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ca4b?w=400&h=300&fit=crop', is_available: true },
+      { id: 8, branch_id: 1, category_id: 5, sku: 'TRAD002', name: 'Tajine Lamb', description: 'Slow-cooked lamb with prunes and almonds', price: 110.00, image: 'https://images.unsplash.com/photo-1563379091339-03246963d4a1?w=400&h=300&fit=crop', is_available: true },
+      { id: 9, branch_id: 1, category_id: 5, sku: 'TRAD003', name: 'Pastilla', description: 'Sweet and savory pigeon pie', price: 100.00, image: 'https://images.unsplash.com/photo-1571997478779-2adcbbe9ab2f?w=400&h=300&fit=crop', is_available: true },
+      
+      // Desserts
+      { id: 10, branch_id: 1, category_id: 3, sku: 'DES001', name: 'Baklava', description: 'Layered pastry with nuts and honey', price: 45.00, image: 'https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=400&h=300&fit=crop', is_available: true },
+      { id: 11, branch_id: 1, category_id: 3, sku: 'DES002', name: 'Mint Tea', description: 'Traditional Moroccan mint tea', price: 15.00, image: 'https://images.unsplash.com/photo-1556679343-c7306c1976bc?w=400&h=300&fit=crop', is_available: true },
+      
+      // Beverages
+      { id: 12, branch_id: 1, category_id: 4, sku: 'BEV001', name: 'Fresh Orange Juice', description: 'Freshly squeezed orange juice', price: 20.00, image: 'https://images.unsplash.com/photo-1621506289937-a8e4df240d0b?w=400&h=300&fit=crop', is_available: true },
+      { id: 13, branch_id: 1, category_id: 4, sku: 'BEV002', name: 'Moroccan Coffee', description: 'Traditional Moroccan coffee', price: 18.00, image: 'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=400&h=300&fit=crop', is_available: true },
+      { id: 14, branch_id: 1, category_id: 4, sku: 'BEV003', name: 'Sparkling Water', description: 'Bottled sparkling water', price: 12.00, image: 'https://images.unsplash.com/photo-1548839140-5d6c0b0b0b0b?w=400&h=300&fit=crop', is_available: true }
+    ]);
 
   // Modifiers
   await knex('modifiers').insert([
