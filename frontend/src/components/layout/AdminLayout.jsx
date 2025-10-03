@@ -1,6 +1,7 @@
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { useSocket } from '../../contexts/SocketContext'
+import { useTheme } from '../../contexts/ThemeContext'
 import {
   HomeIcon,
   ClipboardDocumentListIcon,
@@ -32,6 +33,7 @@ function AdminLayout() {
   const navigate = useNavigate()
   const { user, logout } = useAuth()
   const { isConnected } = useSocket()
+  const { getAppName, getSetting } = useTheme()
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   const filteredNavigation = navigation.filter(item => 
@@ -50,7 +52,7 @@ function AdminLayout() {
         <div className="fixed inset-0 bg-gray-600 bg-opacity-75" onClick={() => setSidebarOpen(false)} />
         <div className="fixed inset-y-0 left-0 flex w-64 flex-col bg-black/90 backdrop-blur-md border-r border-yellow-400/30">
           <div className="flex h-16 items-center justify-between px-4 border-b border-yellow-400/30">
-            <h1 className="text-lg font-semibold text-white">POSQ Admin</h1>
+            <h1 className="text-lg font-semibold text-white">{getAppName()} Admin</h1>
             <button
               onClick={() => setSidebarOpen(false)}
               className="text-gray-400 hover:text-gray-600"
@@ -87,7 +89,7 @@ function AdminLayout() {
       <div className="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-64 lg:flex-col">
         <div className="flex flex-col flex-grow bg-black/90 backdrop-blur-md border-r border-yellow-400/30">
           <div className="flex h-16 items-center px-4 border-b border-yellow-400/30">
-            <h1 className="text-lg font-semibold text-white">POSQ Admin</h1>
+            <h1 className="text-lg font-semibold text-white">{getAppName()} Admin</h1>
           </div>
           <nav className="flex-1 px-4 py-4 space-y-1">
             {filteredNavigation.map((item) => {

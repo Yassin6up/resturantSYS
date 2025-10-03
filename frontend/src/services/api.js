@@ -174,4 +174,13 @@ export const uploadAPI = {
   getImages: () => api.get('/api/upload/images'),
 }
 
+// App Settings API (Dynamic Settings)
+export const appSettingsAPI = {
+  getSettings: () => api.get('/api/app-settings'),
+  getSettingsByCategory: (category) => api.get(`/api/app-settings/category/${category}`),
+  updateSetting: (key, value) => api.put(`/api/app-settings/${key}`, { value }),
+  updateSettings: (settings) => api.put('/api/app-settings', { settings }),
+  resetSettings: (category) => api.post('/api/app-settings/reset', { category }),
+}
+
 export default api

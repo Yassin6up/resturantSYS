@@ -1,11 +1,13 @@
 import { Outlet, useLocation } from 'react-router-dom'
 import { useCart } from '../../contexts/CartContext'
+import { useTheme } from '../../contexts/ThemeContext'
 import { ShoppingCartIcon } from '@heroicons/react/24/outline'
 import CartBottomBar from '../CartBottomBar'
 
 function CustomerLayout() {
   const location = useLocation()
   const { itemCount, total } = useCart()
+  const { getAppName, getSetting } = useTheme()
 
   const isCartPage = location.pathname === '/cart'
   const isCheckoutPage = location.pathname === '/checkout'
@@ -18,10 +20,29 @@ function CustomerLayout() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-20">
             <div className="flex items-center space-x-3">
-              <div className="w-12 h-12 bg-gradient-to-r from-red-600 to-orange-500 rounded-xl flex items-center justify-center shadow-lg border border-yellow-400">
-                <span className="text-white font-bold text-xl">P</span>
+              {getSetting('logo_url') ? (
+                <img
+                  src={getSetting('logo_url')}
+                  alt="Logo"
+                  className="w-12 h-12 rounded-xl object-contain"
+                  onError={(e) => {
+                    e.target.style.display = 'none'
+                    e.target.nextSibling.style.display = 'flex'
+                  }}
+                />
+              ) : null}
+              <div 
+                className="w-12 h-12 rounded-xl flex items-center justify-center shadow-lg"
+                style={{ 
+                  background: `linear-gradient(135deg, ${getSetting('primary_color') || '#3B82F6'} 0%, ${getSetting('secondary_color') || '#1E40AF'} 100%)`,
+                  display: getSetting('logo_url') ? 'none' : 'flex'
+                }}
+              >
+                <span className="text-white font-bold text-xl">
+                  {getAppName().charAt(0)}
+                </span>
               </div>
-              <h1 className="text-2xl font-bold text-white">POSQ Restaurant</h1>
+              <h1 className="text-2xl font-bold text-white">{getAppName()}</h1>
             </div>
             
             {/* Cart Button */}
@@ -57,10 +78,29 @@ function CustomerLayout() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <div className="text-center">
             <div className="flex justify-center items-center space-x-3 mb-6">
-              <div className="w-10 h-10 bg-gradient-to-r from-red-600 to-orange-500 rounded-xl flex items-center justify-center shadow-lg border border-yellow-400">
-                <span className="text-white font-bold text-lg">P</span>
+              {getSetting('logo_url') ? (
+                <img
+                  src={getSetting('logo_url')}
+                  alt="Logo"
+                  className="w-10 h-10 rounded-xl object-contain"
+                  onError={(e) => {
+                    e.target.style.display = 'none'
+                    e.target.nextSibling.style.display = 'flex'
+                  }}
+                />
+              ) : null}
+              <div 
+                className="w-10 h-10 rounded-xl flex items-center justify-center shadow-lg"
+                style={{ 
+                  background: `linear-gradient(135deg, ${getSetting('primary_color') || '#3B82F6'} 0%, ${getSetting('secondary_color') || '#1E40AF'} 100%)`,
+                  display: getSetting('logo_url') ? 'none' : 'flex'
+                }}
+              >
+                <span className="text-white font-bold text-lg">
+                  {getAppName().charAt(0)}
+                </span>
               </div>
-              <span className="text-xl font-bold text-white">POSQ Restaurant</span>
+              <span className="text-xl font-bold text-white">{getAppName()}</span>
             </div>
             <p className="text-gray-300 mb-2">&copy; 2024 POSQ Restaurant. All rights reserved.</p>
             <p className="text-sm text-gray-400">Scan QR code to order • Pay at cashier</p>

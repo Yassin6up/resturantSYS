@@ -2,6 +2,7 @@ import { Routes, Route } from 'react-router-dom'
 import { AuthProvider } from './contexts/AuthContext'
 import { SocketProvider } from './contexts/SocketContext'
 import { CartProvider } from './contexts/CartContext'
+import { ThemeProvider } from './contexts/ThemeContext'
 
 // Public routes (Customer PWA)
 import MenuPage from './pages/customer/MenuPage'
@@ -27,10 +28,11 @@ import ProtectedRoute from './components/auth/ProtectedRoute'
 
 function App() {
   return (
-    <AuthProvider>
-      <SocketProvider>
-        <CartProvider>
-          <Routes>
+    <ThemeProvider>
+      <AuthProvider>
+        <SocketProvider>
+          <CartProvider>
+            <Routes>
             {/* Public Customer Routes */}
             <Route path="/" element={<CustomerLayout />}>
               <Route index element={<MenuPage />} />
@@ -76,10 +78,11 @@ function App() {
                 </div>
               </div>
             } />
-          </Routes>
-        </CartProvider>
-      </SocketProvider>
-    </AuthProvider>
+            </Routes>
+          </CartProvider>
+        </SocketProvider>
+      </AuthProvider>
+    </ThemeProvider>
   )
 }
 
