@@ -97,10 +97,10 @@ function ImageUpload({
     <div className={`space-y-4 ${className}`}>
       {/* Upload Area */}
       <div
-        className={`relative border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${
+        className={`relative border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition-all duration-300 ${
           dragActive
-            ? 'border-primary-500 bg-primary-50'
-            : 'border-gray-300 hover:border-gray-400'
+            ? 'border-blue-500 bg-blue-50 scale-105 shadow-lg'
+            : 'border-gray-300 hover:border-blue-400 hover:bg-blue-50/50 hover:scale-102'
         } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
         onDrop={handleDrop}
         onDragOver={handleDragOver}
@@ -118,16 +118,18 @@ function ImageUpload({
 
         {uploading ? (
           <div className="flex flex-col items-center">
-            <div className="loading-spinner mb-2"></div>
-            <p className="text-sm text-gray-600">Uploading...</p>
+            <div className="loading-spinner mb-4"></div>
+            <p className="text-lg text-gray-600 font-medium">Uploading...</p>
           </div>
         ) : (
           <div className="flex flex-col items-center">
-            <CloudArrowUpIcon className="h-8 w-8 text-gray-400 mb-2" />
-            <p className="text-sm text-gray-600">
-              <span className="font-medium text-primary-600">Click to upload</span> or drag and drop
+            <div className="w-16 h-16 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full flex items-center justify-center mb-4 shadow-lg">
+              <CloudArrowUpIcon className="h-8 w-8 text-white" />
+            </div>
+            <p className="text-lg text-gray-700 mb-2">
+              <span className="font-semibold gradient-text">Click to upload</span> or drag and drop
             </p>
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-sm text-gray-500">
               PNG, JPG, GIF, WebP up to {Math.round(maxSize / 1024 / 1024)}MB
             </p>
           </div>
@@ -136,12 +138,12 @@ function ImageUpload({
 
       {/* Image Preview */}
       {showPreview && value && (
-        <div className="relative">
+        <div className="relative animate-fadeInUp">
           <div className="relative inline-block">
             <img
               src={value}
               alt="Uploaded"
-              className="h-32 w-32 object-cover rounded-lg border border-gray-200"
+              className="h-40 w-40 object-cover rounded-2xl border-2 border-gray-200 shadow-lg hover:shadow-xl transition-shadow duration-300"
               onError={(e) => {
                 e.target.src = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=128&h=128&fit=crop'
               }}
@@ -149,14 +151,14 @@ function ImageUpload({
             {!disabled && (
               <button
                 onClick={removeImage}
-                className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors"
+                className="absolute -top-2 -right-2 bg-gradient-to-r from-red-500 to-pink-500 text-white rounded-full p-2 hover:from-red-600 hover:to-pink-600 transition-all duration-200 shadow-lg hover:scale-110"
                 type="button"
               >
                 <XMarkIcon className="h-4 w-4" />
               </button>
             )}
           </div>
-          <p className="text-xs text-gray-500 mt-1">Click the X to remove</p>
+          <p className="text-sm text-gray-500 mt-2 font-medium">Click the X to remove</p>
         </div>
       )}
 

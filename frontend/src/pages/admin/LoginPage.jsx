@@ -69,25 +69,28 @@ function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+      <div className="sm:mx-auto sm:w-full sm:max-w-md animate-fadeInUp">
         <div className="text-center">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">POSQ Admin</h1>
-          <p className="text-gray-600">Restaurant POS Management</p>
+          <div className="mx-auto h-20 w-20 flex items-center justify-center rounded-full bg-gradient-to-r from-blue-600 to-purple-600 shadow-xl mb-6">
+            <span className="text-white font-bold text-2xl">P</span>
+          </div>
+          <h1 className="text-4xl font-bold gradient-text mb-4">POSQ Admin</h1>
+          <p className="text-lg text-gray-600">Restaurant POS Management</p>
         </div>
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
+        <div className="card py-8 px-4 sm:px-10">
           {/* Login Mode Toggle */}
-          <div className="flex rounded-md shadow-sm mb-6">
+          <div className="flex rounded-xl shadow-lg mb-8 overflow-hidden">
             <button
               type="button"
               onClick={() => setLoginMode('password')}
-              className={`flex-1 py-2 px-4 text-sm font-medium rounded-l-md border ${
+              className={`flex-1 py-3 px-4 text-sm font-semibold transition-all duration-200 ${
                 loginMode === 'password'
-                  ? 'bg-primary-600 text-white border-primary-600'
-                  : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                  ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg'
+                  : 'bg-white text-gray-700 hover:bg-gray-50'
               }`}
             >
               Password Login
@@ -95,10 +98,10 @@ function LoginPage() {
             <button
               type="button"
               onClick={() => setLoginMode('pin')}
-              className={`flex-1 py-2 px-4 text-sm font-medium rounded-r-md border ${
+              className={`flex-1 py-3 px-4 text-sm font-semibold transition-all duration-200 ${
                 loginMode === 'pin'
-                  ? 'bg-primary-600 text-white border-primary-600'
-                  : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                  ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg'
+                  : 'bg-white text-gray-700 hover:bg-gray-50'
               }`}
             >
               PIN Login

@@ -78,11 +78,15 @@ function MenuPage() {
   return (
     <div className="max-w-4xl mx-auto">
       {/* Header */}
-      <div className="text-center mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Our Menu</h1>
+      <div className="text-center mb-12 animate-fadeInUp">
+        <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full mb-6 shadow-xl">
+          <span className="text-white font-bold text-2xl">🍽️</span>
+        </div>
+        <h1 className="text-4xl font-bold gradient-text mb-4">Our Delicious Menu</h1>
         {table && (
-          <p className="text-gray-600">Table {table}</p>
+          <p className="text-xl text-gray-600">Table {table}</p>
         )}
+        <p className="text-lg text-gray-600 max-w-2xl mx-auto">Discover our carefully crafted dishes made with love and the finest ingredients</p>
       </div>
 
       {/* Menu Categories */}
@@ -97,32 +101,31 @@ function MenuPage() {
                 {category.items?.map((item) => (
                   <div
                     key={item.id}
-                    className="border border-gray-200 rounded-lg overflow-hidden hover:shadow-md transition-shadow cursor-pointer"
+                    className="menu-item-card group"
                     onClick={() => setSelectedItem(item)}
                   >
                     {/* Food Image */}
-                    <div className="aspect-w-16 aspect-h-9 bg-gray-200">
+                    <div className="relative overflow-hidden">
                       <img
                         src={item.image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&h=300&fit=crop'}
                         alt={item.name}
-                        className="w-full h-48 object-cover"
+                        className="menu-item-image"
                         onError={(e) => {
                           e.target.src = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&h=300&fit=crop';
                         }}
                       />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                      <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm rounded-full px-3 py-1 text-sm font-semibold text-gray-800 shadow-lg">
+                        {item.price.toFixed(2)} MAD
+                      </div>
                     </div>
                     
-                    <div className="p-4">
-                      <div className="flex justify-between items-start mb-2">
-                        <h3 className="font-medium text-gray-900">{item.name}</h3>
-                        <span className="text-sm font-semibold text-primary-600">
-                          {item.price.toFixed(2)} MAD
-                        </span>
-                      </div>
+                    <div className="p-6">
+                      <h3 className="font-bold text-gray-900 text-lg mb-2 group-hover:text-blue-600 transition-colors duration-200">{item.name}</h3>
                       {item.description && (
-                        <p className="text-sm text-gray-600 mb-3 line-clamp-2">{item.description}</p>
+                        <p className="text-gray-600 mb-4 line-clamp-2">{item.description}</p>
                       )}
-                      <button className="btn-primary btn-sm w-full">
+                      <button className="btn-primary w-full group-hover:animate-bounce">
                         Add to Cart
                       </button>
                     </div>
@@ -136,18 +139,22 @@ function MenuPage() {
 
       {/* Item Selection Modal */}
       {selectedItem && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg max-w-md w-full max-h-[90vh] overflow-y-auto">
+        <div className="modal-overlay">
+          <div className="modal-content">
             {/* Food Image */}
-            <div className="aspect-w-16 aspect-h-9 bg-gray-200">
+            <div className="relative overflow-hidden">
               <img
                 src={selectedItem.image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&h=300&fit=crop'}
                 alt={selectedItem.name}
-                className="w-full h-48 object-cover rounded-t-lg"
+                className="w-full h-64 object-cover"
                 onError={(e) => {
                   e.target.src = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&h=300&fit=crop';
                 }}
               />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent"></div>
+              <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm rounded-full px-4 py-2 text-lg font-bold text-gray-800 shadow-lg">
+                {selectedItem.price.toFixed(2)} MAD
+              </div>
             </div>
             
             <div className="p-6">
