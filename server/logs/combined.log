@@ -99,3 +99,20 @@
 {"level":"info","message":"Socket disconnected: BU9NUz_4UNijQP7FAAAH","service":"posq-api","timestamp":"2025-10-03T19:02:49.686Z"}
 {"level":"info","message":"Socket connected: -UvzBVrY6YGTe8gXAAAJ","service":"posq-api","timestamp":"2025-10-03T19:02:50.114Z"}
 {"level":"info","message":"Socket -UvzBVrY6YGTe8gXAAAJ joined cashier for branch 1","service":"posq-api","timestamp":"2025-10-03T19:02:50.142Z"}
+{"level":"info","message":"Socket connected: 9AaM05HKOP2PiWLSAAAB","service":"posq-api","timestamp":"2025-10-03T21:53:00.264Z"}
+{"level":"info","message":"Socket 9AaM05HKOP2PiWLSAAAB joined cashier for branch 1","service":"posq-api","timestamp":"2025-10-03T21:53:00.285Z"}
+{"level":"info","message":"Socket disconnected: 9AaM05HKOP2PiWLSAAAB","service":"posq-api","timestamp":"2025-10-03T21:53:33.423Z"}
+{"level":"info","message":"Socket connected: V45q0ARc-CbrzZ8IAAAD","service":"posq-api","timestamp":"2025-10-03T21:53:34.196Z"}
+{"level":"info","message":"Socket V45q0ARc-CbrzZ8IAAAD joined cashier for branch 1","service":"posq-api","timestamp":"2025-10-03T21:53:34.254Z"}
+{"level":"info","message":"Socket disconnected: V45q0ARc-CbrzZ8IAAAD","service":"posq-api","timestamp":"2025-10-03T21:53:37.256Z"}
+{"level":"info","message":"Socket connected: pk74LuU6xFfkouzCAAAF","service":"posq-api","timestamp":"2025-10-03T21:53:37.928Z"}
+{"level":"info","message":"Socket pk74LuU6xFfkouzCAAAF joined cashier for branch 1","service":"posq-api","timestamp":"2025-10-03T21:53:37.986Z"}
+{"level":"info","message":"Socket disconnected: pk74LuU6xFfkouzCAAAF","service":"posq-api","timestamp":"2025-10-03T21:53:40.612Z"}
+{"level":"info","message":"Socket connected: caGae-Z0_SMxeBVfAAAH","service":"posq-api","timestamp":"2025-10-03T21:53:41.326Z"}
+{"level":"info","message":"Socket caGae-Z0_SMxeBVfAAAH joined cashier for branch 1","service":"posq-api","timestamp":"2025-10-03T21:53:41.344Z"}
+{"level":"info","message":"Socket disconnected: caGae-Z0_SMxeBVfAAAH","service":"posq-api","timestamp":"2025-10-03T21:53:45.370Z"}
+{"level":"info","message":"Socket connected: MjnxK03Vd4DRYIfaAAAJ","service":"posq-api","timestamp":"2025-10-03T21:53:46.012Z"}
+{"level":"info","message":"Socket MjnxK03Vd4DRYIfaAAAJ joined cashier for branch 1","service":"posq-api","timestamp":"2025-10-03T21:53:46.046Z"}
+{"level":"info","message":"Socket disconnected: MjnxK03Vd4DRYIfaAAAJ","service":"posq-api","timestamp":"2025-10-03T21:54:06.579Z"}
+{"level":"info","message":"Order created: CAS-20251003-0001 for table 8","service":"posq-api","timestamp":"2025-10-03T21:54:45.475Z"}
+{"level":"info","message":"Order created: CAS-20251004-0001 for table 5","service":"posq-api","timestamp":"2025-10-04T16:11:02.976Z"}
