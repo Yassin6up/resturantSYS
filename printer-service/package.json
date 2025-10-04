@@ -1,5 +1,6 @@
 {
 <<<<<<< HEAD
+<<<<<<< HEAD
   "name": "posq-printer-service",
   "version": "1.0.0",
   "description": "POSQ Printer Service for Thermal Receipt Printing",
@@ -25,6 +26,8 @@
   }
 }
 =======
+=======
+>>>>>>> origin/main
   "name": "posq-printer",
   "version": "0.1.0",
   "private": true,
@@ -37,4 +40,7 @@
     "express": "^4.19.2"
   }
 }
+<<<<<<< HEAD
 >>>>>>> e0c392214cbb541e36508749d9336f9cc9e18c38
+=======
+>>>>>>> origin/main

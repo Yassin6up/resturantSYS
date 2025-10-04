@@ -1,4 +1,5 @@
 <<<<<<< HEAD
+<<<<<<< HEAD
 FROM node:18-alpine
 
 WORKDIR /app
@@ -35,6 +36,8 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
 # Start the application
 CMD ["npm", "start"]
 =======
+=======
+>>>>>>> origin/main
 FROM node:20-alpine
 WORKDIR /app
 COPY package.json package-lock.json* pnpm-lock.yaml* yarn.lock* .npmrc* ./
@@ -43,4 +46,7 @@ COPY . .
 RUN npm run build || true
 EXPOSE 3001
 CMD ["npm", "run", "dev"]
+<<<<<<< HEAD
 >>>>>>> e0c392214cbb541e36508749d9336f9cc9e18c38
+=======
+>>>>>>> origin/main
