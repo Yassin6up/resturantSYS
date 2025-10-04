@@ -67,14 +67,14 @@ function CartPage() {
 
       {/* Cart Items */}
       <div className="space-y-4 mb-8">
-        {items.map((item) => (
+        {items?.map((item) => (
           <div key={item.id} className="card">
             <div className="card-body">
               <div className="flex justify-between items-start">
                 <div className="flex-1">
                   <h3 className="font-medium text-gray-900">{item.menuItem.name}</h3>
                   <p className="text-sm text-gray-600">
-                    {item.unitPrice.toFixed(2)} MAD each
+                    {item?.total?.toFixed(2)|| 0 } MAD each
                   </p>
                   
                   {/* Modifiers */}

@@ -1,6 +1,6 @@
 import axios from 'axios'
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000'
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 
 // Create axios instance
 const api = axios.create({
@@ -74,16 +74,16 @@ export const ordersAPI = {
 }
 
 // Tables API
-export const tablesAPI = {
-  getTables: (params) => api.get('/api/tables', { params }),
-  getTable: (id) => api.get(`/api/tables/${id}`),
-  createTable: (data) => api.post('/api/tables', data),
-  updateTable: (id, data) => api.put(`/api/tables/${id}`, data),
-  deleteTable: (id) => api.delete(`/api/tables/${id}`),
-  getTableQR: (id) => api.get(`/api/tables/${id}/qr?format=dataurl`),
-  getTableQRSheet: (branchId) => api.get(`/api/tables/branch/${branchId}/qr-sheet`),
-  getTableOrders: (id) => api.get(`/api/tables/${id}/orders`),
-}
+// export const tablesAPI = {
+//   getTables: (params) => api.get('/api/tables', { params }),
+//   getTable: (id) => api.get(`/api/tables/${id}`),
+//   createTable: (data) => api.post('/api/tables', data),
+//   updateTable: (id, data) => api.put(`/api/tables/${id}`, data),
+//   deleteTable: (id) => api.delete(`/api/tables/${id}`),
+//   getTableQR: (id) => api.get(`/api/tables/${id}/qr?format=dataurl`),
+//   getTableQRSheet: (branchId) => api.get(`/api/tables/branch/${branchId}/qr-sheet`),
+//   getTableOrders: (id) => api.get(`/api/tables/${id}/orders`),
+// }
 
 // Payments API
 export const paymentsAPI = {

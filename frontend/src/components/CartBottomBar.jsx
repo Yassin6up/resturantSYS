@@ -9,13 +9,13 @@ function CartBottomBar() {
   const navigate = useNavigate()
 
   const handleCheckout = () => {
-    if (cartItems.length === 0) {
+    if (cartItems?.length === 0) {
       return
     }
     navigate('/checkout')
   }
 
-  if (cartItems.length === 0) {
+  if (cartItems?.length === 0) {
     return null
   }
 
@@ -71,7 +71,7 @@ function CartBottomBar() {
             </div>
             
             <div className="overflow-y-auto max-h-96">
-              {cartItems.map((item, index) => (
+              {cartItems?.map((item, index) => (
                 <div key={index} className="p-4 border-b border-yellow-400/20">
                   <div className="flex items-center space-x-3">
                     <img
@@ -83,7 +83,7 @@ function CartBottomBar() {
                       <h3 className="font-medium text-white">{item.name}</h3>
                       <p className="text-sm text-gray-300">Qty: {item.quantity}</p>
                       <p className="text-sm font-semibold text-yellow-400">
-                        {(item.price * item.quantity).toFixed(2)} MAD
+                        {(item.price * item.quantity)?.toFixed(2)} MAD
                       </p>
                     </div>
                   </div>

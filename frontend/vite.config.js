@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
+import path from 'path'
 
 export default defineConfig({
   plugins: [
@@ -8,6 +9,7 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
+      manifestFilename: 'manifest.json',
       manifest: {
         name: 'POSQ Restaurant POS',
         short_name: 'POSQ',
@@ -38,6 +40,7 @@ export default defineConfig({
         ]
       },
       workbox: {
+        globDirectory: path.resolve(__dirname, 'dist'),
         globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
         runtimeCaching: [
           {
@@ -55,10 +58,12 @@ export default defineConfig({
       }
     })
   ],
+
   server: {
     port: 5173,
     host: true
   },
+
   build: {
     outDir: 'dist',
     sourcemap: true

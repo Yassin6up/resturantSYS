@@ -13,7 +13,7 @@ export function SocketProvider({ children }) {
 
   useEffect(() => {
     if (isAuthenticated && user) {
-      const socketInstance = io(import.meta.env.VITE_API_URL || 'http://localhost:3000', {
+      const socketInstance = io(import.meta.env.VITE_API_URL || 'http://localhost:3001', {
         transports: ['websocket'],
         auth: {
           userId: user.id,

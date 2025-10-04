@@ -1,4 +1,6 @@
 {
+<<<<<<< HEAD
+<<<<<<< HEAD
   "name": "posq-printer-service",
   "version": "1.0.0",
   "description": "POSQ Printer Service for Thermal Receipt Printing",
@@ -23,3 +25,22 @@
     "nodemon": "^3.0.2"
   }
 }
+=======
+=======
+>>>>>>> origin/main
+  "name": "posq-printer",
+  "version": "0.1.0",
+  "private": true,
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "body-parser": "^1.20.2",
+    "express": "^4.19.2"
+  }
+}
+<<<<<<< HEAD
+>>>>>>> e0c392214cbb541e36508749d9336f9cc9e18c38
+=======
+>>>>>>> origin/main
