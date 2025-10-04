@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useCart } from '../../contexts/CartContext'
 import { useTheme } from '../../contexts/ThemeContext'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { ordersAPI } from '../../services/api'
 import { 
   CreditCardIcon, 
@@ -17,6 +17,7 @@ function CheckoutPage() {
   const { cartItems, total, clearCart } = useCart()
   const { getSetting } = useTheme()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const [loading, setLoading] = useState(false)
   const [orderData, setOrderData] = useState(null)
   const [paymentMethod, setPaymentMethod] = useState('cash')
@@ -29,6 +30,14 @@ function CheckoutPage() {
   // Get available payment methods from settings
   const availablePaymentMethods = getSetting('payment_methods') || ['cash', 'card']
   const cashOnlyMode = getSetting('cash_only_mode') || false
+
+  // Auto-detect table from URL
+  useEffect(() => {
+    const tableFromUrl = searchParams.get('table')
+    if (tableFromUrl) {
+      setTableNumber(tableFromUrl)
+    }
+  }, [searchParams])
 
   useEffect(() => {
     if (cartItems.length === 0) {
@@ -232,10 +241,16 @@ function CheckoutPage() {
                 type="text"
                 value={tableNumber}
                 onChange={(e) => setTableNumber(e.target.value)}
-                className="form-input"
+                className={`form-input ${searchParams.get('table') ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                 placeholder="Enter table number"
                 required
+                readOnly={!!searchParams.get('table')}
               />
+              {searchParams.get('table') && (
+                <p className="text-sm text-blue-600 mt-1">
+                  ✓ Table automatically detected from QR code
+                </p>
+              )}
             </div>
           </div>
         </div>

@@ -6,32 +6,33 @@
 
 /* Dynamic CSS Variables - Will be overridden by ThemeContext */
 :root {
-  /* Default Airbnb-style Blue Theme */
+  /* Default Light Theme Colors */
   --primary-color: #3B82F6;
   --secondary-color: #1E40AF;
   --accent-color: #60A5FA;
   --success-color: #10B981;
   --warning-color: #F59E0B;
   --error-color: #EF4444;
-  --background-color: #F8FAFC;
-  --surface-color: #FFFFFF;
-  --text-primary: #1E293B;
-  --text-secondary: #64748B;
+  --background-color: #FFFFFF;
+  --surface-color: #F8FAFC;
+  --text-primary: #1F2937;
+  --text-secondary: #6B7280;
+  --border-color: #E5E7EB;
   
   /* Layout Variables */
-  --border-radius: 12px;
+  --border-radius: 8px;
   --sidebar-width: 256px;
   --header-height: 64px;
   
   /* Shadow Variables */
-  --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
   --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
   --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
   
-  /* Airbnb-style Gradients */
+  /* Light Theme Gradients */
   --gradient-primary: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
-  --gradient-surface: linear-gradient(135deg, var(--surface-color) 0%, #F1F5F9 100%);
+  --gradient-surface: linear-gradient(135deg, var(--surface-color) 0%, #FFFFFF 100%);
   --gradient-hero: linear-gradient(135deg, var(--primary-color) 0%, var(--accent-color) 50%, var(--secondary-color) 100%);
 }
 
@@ -79,24 +80,30 @@ body {
     transform: translateY(-1px);
   }
   
+  .btn-primary:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  }
+  
   .btn-secondary {
-    @apply text-gray-700;
+    color: var(--text-primary);
     background: var(--surface-color);
-    border: 1px solid #E2E8F0;
+    border: 1px solid var(--border-color);
     box-shadow: var(--shadow-sm);
   }
   
   .btn-secondary:hover {
-    background: #F8FAFC;
-    border-color: #CBD5E1;
+    background: var(--background-color);
+    border-color: var(--primary-color);
+    color: var(--primary-color);
     box-shadow: var(--shadow-md);
     transform: translateY(-1px);
   }
   
   .btn-outline {
-    @apply text-gray-700;
+    color: var(--text-primary);
     background: transparent;
-    border: 1px solid #E2E8F0;
+    border: 1px solid var(--border-color);
   }
   
   .btn-outline:hover {
@@ -172,15 +179,22 @@ body {
     @apply px-8 py-4 bg-gray-50 border-t border-gray-100;
   }
   
-  /* Airbnb-style Forms */
+  /* Light Theme Forms */
   .form-input {
-    @apply block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200;
+    @apply block w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 transition-all duration-200;
     background: var(--surface-color);
+    border-color: var(--border-color);
+    color: var(--text-primary);
     border-radius: var(--border-radius);
   }
   
   .form-input:focus {
-    box-shadow: var(--shadow-sm);
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  }
+  
+  .form-input::placeholder {
+    color: var(--text-secondary);
   }
   
   .form-label {

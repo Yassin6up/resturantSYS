@@ -14,9 +14,9 @@ function CustomerLayout() {
   const isOrderPage = location.pathname.startsWith('/order/')
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
+    <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <header className="bg-black/80 backdrop-blur-md shadow-xl border-b border-yellow-400/30 sticky top-0 z-40">
+      <header className="bg-white shadow-lg border-b border-gray-200 sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-20">
             <div className="flex items-center space-x-3">
@@ -32,7 +32,7 @@ function CustomerLayout() {
                 />
               ) : null}
               <div 
-                className="w-12 h-12 rounded-xl flex items-center justify-center shadow-lg"
+                className="w-12 h-12 rounded-lg flex items-center justify-center shadow-md"
                 style={{ 
                   background: `linear-gradient(135deg, ${getSetting('primary_color') || '#3B82F6'} 0%, ${getSetting('secondary_color') || '#1E40AF'} 100%)`,
                   display: getSetting('logo_url') ? 'none' : 'flex'
@@ -42,7 +42,7 @@ function CustomerLayout() {
                   {getAppName().charAt(0)}
                 </span>
               </div>
-              <h1 className="text-2xl font-bold text-white">{getAppName()}</h1>
+              <h1 className="text-2xl font-bold text-gray-900">{getAppName()}</h1>
             </div>
             
             {/* Cart Button */}
@@ -68,12 +68,12 @@ function CustomerLayout() {
 
       {/* Welcome Section */}
       {location.pathname === '/' || location.pathname === '/menu' ? (
-        <div className="bg-white/10 backdrop-blur-md border-b border-yellow-400/30 py-8">
+        <div className="bg-white border-b border-gray-200 py-8">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            <h2 className="text-2xl font-bold text-white mb-2">
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">
               {getSetting('header_text') || getWelcomeMessage()}
             </h2>
-            <p className="text-gray-300">
+            <p className="text-gray-600">
               {getSetting('order_instructions') || 'Scan QR code to order • Pay at cashier'}
             </p>
           </div>
@@ -88,7 +88,7 @@ function CustomerLayout() {
       </main>
 
       {/* Footer */}
-      <footer className="bg-black/80 backdrop-blur-md border-t border-yellow-400/30 mt-20">
+      <footer className="bg-white border-t border-gray-200 mt-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <div className="text-center">
             <div className="flex justify-center items-center space-x-3 mb-6">
@@ -96,7 +96,7 @@ function CustomerLayout() {
                 <img
                   src={getSetting('logo_url')}
                   alt="Logo"
-                  className="w-10 h-10 rounded-xl object-contain"
+                  className="w-10 h-10 rounded-lg object-contain"
                   onError={(e) => {
                     e.target.style.display = 'none'
                     e.target.nextSibling.style.display = 'flex'
@@ -104,7 +104,7 @@ function CustomerLayout() {
                 />
               ) : null}
               <div 
-                className="w-10 h-10 rounded-xl flex items-center justify-center shadow-lg"
+                className="w-10 h-10 rounded-lg flex items-center justify-center shadow-md"
                 style={{ 
                   background: `linear-gradient(135deg, ${getSetting('primary_color') || '#3B82F6'} 0%, ${getSetting('secondary_color') || '#1E40AF'} 100%)`,
                   display: getSetting('logo_url') ? 'none' : 'flex'
@@ -114,11 +114,11 @@ function CustomerLayout() {
                   {getAppName().charAt(0)}
                 </span>
               </div>
-              <span className="text-xl font-bold text-white">{getAppName()}</span>
+              <span className="text-xl font-bold text-gray-900">{getAppName()}</span>
             </div>
-            <p className="text-gray-300 mb-2">&copy; 2024 {getAppName()}. All rights reserved.</p>
-            <p className="text-sm text-gray-400">{getSetting('order_instructions') || 'Scan QR code to order • Pay at cashier'}</p>
-            <p className="text-xs text-gray-500 mt-2">{getSetting('footer_text') || 'Powered by modern technology'}</p>
+            <p className="text-gray-600 mb-2">&copy; 2024 {getAppName()}. All rights reserved.</p>
+            <p className="text-sm text-gray-500">{getSetting('order_instructions') || 'Scan QR code to order • Pay at cashier'}</p>
+            <p className="text-xs text-gray-400 mt-2">{getSetting('footer_text') || 'Powered by modern technology'}</p>
           </div>
         </div>
       </footer>

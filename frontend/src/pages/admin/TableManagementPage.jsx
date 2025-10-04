@@ -6,7 +6,9 @@ import {
   TrashIcon, 
   QrCodeIcon,
   PrinterIcon,
-  EyeIcon
+  EyeIcon,
+  LinkIcon,
+  ClipboardDocumentIcon
 } from '@heroicons/react/24/outline'
 import TableForm from '../../components/TableForm'
 import toast from 'react-hot-toast'
@@ -152,6 +154,17 @@ function TableManagementPage() {
     } catch (error) {
       console.error('Print QR error:', error)
       toast.error('Failed to print QR code')
+    }
+  }
+
+  const handleCopyLink = async (table) => {
+    try {
+      const tableUrl = `${window.location.origin}/menu?table=${table.number}`
+      await navigator.clipboard.writeText(tableUrl)
+      toast.success('Table link copied to clipboard!')
+    } catch (error) {
+      console.error('Copy link error:', error)
+      toast.error('Failed to copy link')
     }
   }
 
@@ -341,17 +354,26 @@ function TableManagementPage() {
                   <p>and place orders for Table {selectedTable.number}</p>
                 </div>
 
-                <div className="flex space-x-3">
-                  <button
-                    onClick={() => handlePrintQR(selectedTable)}
-                    className="flex-1 btn-primary"
-                  >
-                    <PrinterIcon className="h-5 w-5 mr-2" />
-                    Print QR Code
-                  </button>
+                <div className="space-y-3">
+                  <div className="flex space-x-3">
+                    <button
+                      onClick={() => handlePrintQR(selectedTable)}
+                      className="flex-1 btn-primary"
+                    >
+                      <PrinterIcon className="h-5 w-5 mr-2" />
+                      Print QR Code
+                    </button>
+                    <button
+                      onClick={() => handleCopyLink(selectedTable)}
+                      className="flex-1 btn-secondary"
+                    >
+                      <ClipboardDocumentIcon className="h-5 w-5 mr-2" />
+                      Copy Link
+                    </button>
+                  </div>
                   <button
                     onClick={() => setShowQRModal(false)}
-                    className="flex-1 btn-outline"
+                    className="w-full btn-outline"
                   >
                     Close
                   </button>
