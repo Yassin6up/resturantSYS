@@ -4,8 +4,13 @@ require('dotenv').config({ path: path.resolve(process.cwd(), 'server/.env') });
 const mode = process.env.MODE || 'LOCAL';
 
 const common = {
-  migrations: { directory: path.resolve(process.cwd(), 'src/migrations') },
-  seeds: { directory: path.resolve(process.cwd(), 'src/seeds') },
+  migrations: { 
+    directory: path.resolve(process.cwd(), 'src/migrations'),
+    tableName: 'knex_migrations'
+  },
+  seeds: { 
+    directory: path.resolve(process.cwd(), 'src/seeds') 
+  },
   pool: { min: 1, max: 10 }
 };
 
@@ -21,13 +26,21 @@ const sqlite = {
 const mysql = {
   client: process.env.DB_CLIENT || 'mysql2',
   connection: {
-    host: process.env.DB_HOST,
+    host: process.env.DB_HOST || 'localhost',
     port: process.env.DB_PORT ? Number(process.env.DB_PORT) : 3306,
-    database: process.env.DB_NAME,
-    user: process.env.DB_USER,
-    password: process.env.DB_PASSWORD
+    database: process.env.DB_NAME || 'resturant',
+    user: process.env.DB_USER || 'root',
+    password: process.env.DB_PASSWORD || '',
+    charset: 'utf8mb4'
   },
   ...common
 };
 
-module.exports = mode === 'LOCAL' ? sqlite : mysql;
+// Use MySQL configuration since you want MySQL
+const config = mysql;
+
+module.exports = {
+  development: config,
+  production: config,
+  test: config
+};

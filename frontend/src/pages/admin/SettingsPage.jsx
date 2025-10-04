@@ -4,7 +4,6 @@ import { useTheme } from '../../contexts/ThemeContext'
 import { 
   CogIcon, 
   PaintBrushIcon, 
-  DatabaseIcon, 
   CloudIcon, 
   ComputerDesktopIcon,
   CheckIcon,
@@ -13,7 +12,6 @@ import {
   EyeSlashIcon,
   BuildingOfficeIcon,
   PhotoIcon,
-  PaletteIcon,
   AdjustmentsHorizontalIcon
 } from '@heroicons/react/24/outline'
 import toast from 'react-hot-toast'
@@ -110,11 +108,11 @@ function SettingsPage() {
   const tabs = [
     { id: 'general', name: 'General', icon: CogIcon },
     { id: 'branding', name: 'Branding', icon: BuildingOfficeIcon },
-    { id: 'theme', name: 'Theme', icon: PaletteIcon },
+    { id: 'theme', name: 'Theme', icon: BuildingOfficeIcon },
     { id: 'layout', name: 'Layout', icon: AdjustmentsHorizontalIcon },
     { id: 'ui_text', name: 'UI Text', icon: PhotoIcon },
     { id: 'payment', name: 'Payment', icon: CloudIcon },
-    { id: 'database', name: 'Database', icon: DatabaseIcon },
+    { id: 'database', name: 'Database', icon: CloudIcon },
     { id: 'printer', name: 'Printer', icon: ComputerDesktopIcon }
   ]
 
