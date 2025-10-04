@@ -186,6 +186,50 @@ exports.seed = async function(knex) {
       category: 'layout',
       description: 'Shadow intensity (light, medium, heavy)',
       is_public: true
+    },
+
+    // Payment Settings
+    {
+      key: 'payment_methods',
+      value: '["cash", "card"]',
+      type: 'json',
+      category: 'payment',
+      description: 'Available payment methods',
+      is_public: true
+    },
+    {
+      key: 'cash_only_mode',
+      value: 'false',
+      type: 'boolean',
+      category: 'payment',
+      description: 'Enable cash-only mode',
+      is_public: true
+    },
+
+    // UI Text Settings
+    {
+      key: 'header_text',
+      value: 'Welcome to our restaurant!',
+      type: 'string',
+      category: 'ui_text',
+      description: 'Header text for menu page',
+      is_public: true
+    },
+    {
+      key: 'footer_text',
+      value: 'Thank you for choosing us!',
+      type: 'string',
+      category: 'ui_text',
+      description: 'Footer text for menu page',
+      is_public: true
+    },
+    {
+      key: 'order_instructions',
+      value: 'Scan QR code to order • Pay at cashier',
+      type: 'string',
+      category: 'ui_text',
+      description: 'Order instructions text',
+      is_public: true
     }
   ]);
 };

@@ -112,8 +112,9 @@ function SettingsPage() {
     { id: 'branding', name: 'Branding', icon: BuildingOfficeIcon },
     { id: 'theme', name: 'Theme', icon: PaletteIcon },
     { id: 'layout', name: 'Layout', icon: AdjustmentsHorizontalIcon },
-    { id: 'database', name: 'Database', icon: DatabaseIcon },
+    { id: 'ui_text', name: 'UI Text', icon: PhotoIcon },
     { id: 'payment', name: 'Payment', icon: CloudIcon },
+    { id: 'database', name: 'Database', icon: DatabaseIcon },
     { id: 'printer', name: 'Printer', icon: ComputerDesktopIcon }
   ]
 
@@ -681,14 +682,111 @@ function SettingsPage() {
           </div>
         )}
 
+        {/* UI Text Settings */}
+        {activeTab === 'ui_text' && (
+          <div className="card">
+            <div className="card-header">
+              <h2 className="text-xl font-semibold text-gray-900">UI Text Settings</h2>
+              <p className="text-gray-600">Customize text displayed to customers</p>
+            </div>
+            <div className="card-body space-y-6">
+              <div>
+                <label className="form-label">Header Text</label>
+                <input
+                  type="text"
+                  value={localSettings.header_text || ''}
+                  onChange={(e) => handleSettingChange('header_text', e.target.value)}
+                  className="form-input"
+                  placeholder="Welcome to our restaurant!"
+                />
+                <p className="text-sm text-gray-500 mt-1">Text displayed at the top of the menu page</p>
+              </div>
+              
+              <div>
+                <label className="form-label">Footer Text</label>
+                <input
+                  type="text"
+                  value={localSettings.footer_text || ''}
+                  onChange={(e) => handleSettingChange('footer_text', e.target.value)}
+                  className="form-input"
+                  placeholder="Thank you for choosing us!"
+                />
+                <p className="text-sm text-gray-500 mt-1">Text displayed at the bottom of the menu page</p>
+              </div>
+
+              <div>
+                <label className="form-label">Order Instructions</label>
+                <input
+                  type="text"
+                  value={localSettings.order_instructions || ''}
+                  onChange={(e) => handleSettingChange('order_instructions', e.target.value)}
+                  className="form-input"
+                  placeholder="Scan QR code to order • Pay at cashier"
+                />
+                <p className="text-sm text-gray-500 mt-1">Instructions shown to customers</p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Payment Settings */}
         {activeTab === 'payment' && (
           <div className="card">
             <div className="card-header">
               <h2 className="text-xl font-semibold text-gray-900">Payment Settings</h2>
-              <p className="text-gray-600">Configure payment gateways and methods</p>
+              <p className="text-gray-600">Configure payment methods and gateways</p>
             </div>
             <div className="card-body space-y-6">
+              {/* Payment Methods */}
+              <div>
+                <label className="form-label">Payment Methods</label>
+                <div className="space-y-3">
+                  <div className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={localSettings.payment_methods?.includes('cash') || false}
+                      onChange={(e) => {
+                        const methods = localSettings.payment_methods || []
+                        if (e.target.checked) {
+                          handleSettingChange('payment_methods', [...methods, 'cash'])
+                        } else {
+                          handleSettingChange('payment_methods', methods.filter(m => m !== 'cash'))
+                        }
+                      }}
+                      className="form-checkbox"
+                    />
+                    <label className="ml-2 text-sm text-gray-700">Cash Payment</label>
+                  </div>
+                  <div className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={localSettings.payment_methods?.includes('card') || false}
+                      onChange={(e) => {
+                        const methods = localSettings.payment_methods || []
+                        if (e.target.checked) {
+                          handleSettingChange('payment_methods', [...methods, 'card'])
+                        } else {
+                          handleSettingChange('payment_methods', methods.filter(m => m !== 'card'))
+                        }
+                      }}
+                      className="form-checkbox"
+                    />
+                    <label className="ml-2 text-sm text-gray-700">Card Payment</label>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  checked={localSettings.cash_only_mode || false}
+                  onChange={(e) => handleSettingChange('cash_only_mode', e.target.checked)}
+                  className="form-checkbox"
+                />
+                <label className="ml-2 text-sm text-gray-700">Cash Only Mode</label>
+                <p className="text-xs text-gray-500 ml-2">Hide card payment option from customers</p>
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="form-label">Stripe Public Key</label>

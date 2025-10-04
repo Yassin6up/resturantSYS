@@ -7,7 +7,7 @@ import CartBottomBar from '../CartBottomBar'
 function CustomerLayout() {
   const location = useLocation()
   const { itemCount, total } = useCart()
-  const { getAppName, getSetting } = useTheme()
+  const { getAppName, getSetting, getWelcomeMessage } = useTheme()
 
   const isCartPage = location.pathname === '/cart'
   const isCheckoutPage = location.pathname === '/checkout'
@@ -66,6 +66,20 @@ function CustomerLayout() {
         </div>
       </header>
 
+      {/* Welcome Section */}
+      {location.pathname === '/' || location.pathname === '/menu' ? (
+        <div className="bg-white/10 backdrop-blur-md border-b border-yellow-400/30 py-8">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+            <h2 className="text-2xl font-bold text-white mb-2">
+              {getSetting('header_text') || getWelcomeMessage()}
+            </h2>
+            <p className="text-gray-300">
+              {getSetting('order_instructions') || 'Scan QR code to order • Pay at cashier'}
+            </p>
+          </div>
+        </div>
+      ) : null}
+
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="animate-fadeInUp">
@@ -102,9 +116,9 @@ function CustomerLayout() {
               </div>
               <span className="text-xl font-bold text-white">{getAppName()}</span>
             </div>
-            <p className="text-gray-300 mb-2">&copy; 2024 POSQ Restaurant. All rights reserved.</p>
-            <p className="text-sm text-gray-400">Scan QR code to order • Pay at cashier</p>
-            <p className="text-xs text-gray-500 mt-2">Powered by modern technology</p>
+            <p className="text-gray-300 mb-2">&copy; 2024 {getAppName()}. All rights reserved.</p>
+            <p className="text-sm text-gray-400">{getSetting('order_instructions') || 'Scan QR code to order • Pay at cashier'}</p>
+            <p className="text-xs text-gray-500 mt-2">{getSetting('footer_text') || 'Powered by modern technology'}</p>
           </div>
         </div>
       </footer>

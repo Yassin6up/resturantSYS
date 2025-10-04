@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useCart } from '../../contexts/CartContext'
+import { useTheme } from '../../contexts/ThemeContext'
 import { useNavigate } from 'react-router-dom'
 import { ordersAPI } from '../../services/api'
 import { 
@@ -14,6 +15,7 @@ import toast from 'react-hot-toast'
 
 function CheckoutPage() {
   const { cartItems, total, clearCart } = useCart()
+  const { getSetting } = useTheme()
   const navigate = useNavigate()
   const [loading, setLoading] = useState(false)
   const [orderData, setOrderData] = useState(null)
@@ -23,6 +25,10 @@ function CheckoutPage() {
   const [showQRCode, setShowQRCode] = useState(false)
   const [orderCode, setOrderCode] = useState('')
   const [pinCode, setPinCode] = useState('')
+
+  // Get available payment methods from settings
+  const availablePaymentMethods = getSetting('payment_methods') || ['cash', 'card']
+  const cashOnlyMode = getSetting('cash_only_mode') || false
 
   useEffect(() => {
     if (cartItems.length === 0) {
@@ -98,7 +104,11 @@ function CheckoutPage() {
   }
 
   const handlePaymentComplete = () => {
-    navigate('/order/' + orderData.id)
+    navigate('/order-status')
+  }
+
+  const handleCheckOrderStatus = () => {
+    navigate('/order-status')
   }
 
   const totals = calculateTotals()
@@ -145,7 +155,7 @@ function CheckoutPage() {
                 <h3 className="font-semibold text-gray-900 mb-4">Payment QR Code</h3>
                 <div className="flex justify-center mb-4">
                   <QRCode 
-                    value={`${window.location.origin}/order/${orderData.id}`}
+                    value={`${window.location.origin}/order-status`}
                     size={200}
                     level="H"
                     includeMargin={true}
@@ -165,11 +175,11 @@ function CheckoutPage() {
               {/* Actions */}
               <div className="space-y-3">
                 <button
-                  onClick={handlePaymentComplete}
+                  onClick={handleCheckOrderStatus}
                   className="w-full btn-primary py-3"
                 >
-                  <CreditCardIcon className="h-5 w-5 mr-2" />
-                  Payment Complete
+                  <QrCodeIcon className="h-5 w-5 mr-2" />
+                  Check Order Status
                 </button>
                 
                 <button
@@ -266,32 +276,43 @@ function CheckoutPage() {
           </div>
           <div className="card-body">
             <div className="space-y-4">
-              <div className="flex space-x-4">
-                <button
-                  onClick={() => setPaymentMethod('cash')}
-                  className={`flex-1 p-4 rounded-xl border-2 transition-all duration-200 ${
-                    paymentMethod === 'cash'
-                      ? 'border-blue-500 bg-blue-50 text-blue-700'
-                      : 'border-gray-300 hover:border-gray-400'
-                  }`}
-                >
-                  <BanknotesIcon className="h-8 w-8 mx-auto mb-2" />
-                  <h3 className="font-semibold">Cash</h3>
-                  <p className="text-sm text-gray-600">Pay at cashier</p>
-                </button>
-                <button
-                  onClick={() => setPaymentMethod('card')}
-                  className={`flex-1 p-4 rounded-xl border-2 transition-all duration-200 ${
-                    paymentMethod === 'card'
-                      ? 'border-blue-500 bg-blue-50 text-blue-700'
-                      : 'border-gray-300 hover:border-gray-400'
-                  }`}
-                >
-                  <CreditCardIcon className="h-8 w-8 mx-auto mb-2" />
-                  <h3 className="font-semibold">Card</h3>
-                  <p className="text-sm text-gray-600">Online payment</p>
-                </button>
+              <div className={`flex space-x-4 ${availablePaymentMethods.length === 1 ? 'justify-center' : ''}`}>
+                {availablePaymentMethods.includes('cash') && (
+                  <button
+                    onClick={() => setPaymentMethod('cash')}
+                    className={`flex-1 p-4 rounded-lg border-2 transition-all duration-200 ${
+                      paymentMethod === 'cash'
+                        ? 'border-blue-500 bg-blue-50 text-blue-700'
+                        : 'border-gray-300 hover:border-gray-400'
+                    }`}
+                  >
+                    <BanknotesIcon className="h-8 w-8 mx-auto mb-2" />
+                    <h3 className="font-semibold">Cash</h3>
+                    <p className="text-sm text-gray-600">Pay at cashier</p>
+                  </button>
+                )}
+                {availablePaymentMethods.includes('card') && !cashOnlyMode && (
+                  <button
+                    onClick={() => setPaymentMethod('card')}
+                    className={`flex-1 p-4 rounded-lg border-2 transition-all duration-200 ${
+                      paymentMethod === 'card'
+                        ? 'border-blue-500 bg-blue-50 text-blue-700'
+                        : 'border-gray-300 hover:border-gray-400'
+                    }`}
+                  >
+                    <CreditCardIcon className="h-8 w-8 mx-auto mb-2" />
+                    <h3 className="font-semibold">Card</h3>
+                    <p className="text-sm text-gray-600">Online payment</p>
+                  </button>
+                )}
               </div>
+              {cashOnlyMode && (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                  <p className="text-sm text-yellow-800 text-center">
+                    💡 Cash payment only - Card payments are currently disabled
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         </div>

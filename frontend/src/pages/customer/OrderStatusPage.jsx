@@ -114,15 +114,15 @@ function OrderStatusPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
       <div className="max-w-md w-full">
         <div className="card">
           <div className="card-header text-center">
-            <div className="w-16 h-16 bg-gradient-to-r from-red-600 to-orange-500 rounded-full flex items-center justify-center mx-auto mb-4 border border-yellow-400">
+            <div className="w-16 h-16 bg-blue-500 rounded-full flex items-center justify-center mx-auto mb-4">
               <MagnifyingGlassIcon className="h-8 w-8 text-white" />
             </div>
-            <h1 className="text-2xl font-bold text-white mb-2">Check Order Status</h1>
-            <p className="text-gray-300">Enter your 8-digit order PIN</p>
+            <h1 className="text-2xl font-bold text-gray-900 mb-2">Check Order Status</h1>
+            <p className="text-gray-600">Enter your 8-digit order PIN</p>
           </div>
           
           <div className="card-body space-y-6">
@@ -158,10 +158,10 @@ function OrderStatusPage() {
             {/* Order Status */}
             {order && (
               <div className="space-y-4">
-                <div className="bg-white/10 rounded-xl p-6 border border-yellow-400/30">
+                <div className="bg-gray-50 rounded-lg p-6 border border-gray-200">
                   <div className="text-center mb-4">
                     {getStatusIcon(order.status)}
-                    <h3 className="text-xl font-bold text-white mt-2">
+                    <h3 className="text-xl font-bold text-gray-900 mt-2">
                       {getStatusText(order.status)}
                     </h3>
                     <span className={`inline-block px-3 py-1 rounded-full text-sm font-semibold mt-2 ${getStatusColor(order.status)}`}>
@@ -171,20 +171,24 @@ function OrderStatusPage() {
 
                   <div className="space-y-3 text-sm">
                     <div className="flex justify-between">
-                      <span className="text-gray-300">Order Code:</span>
-                      <span className="text-white font-mono">{order.orderCode}</span>
+                      <span className="text-gray-600">Order Code:</span>
+                      <span className="text-gray-900 font-mono">{order.orderCode}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-300">Table:</span>
-                      <span className="text-white">{order.tableNumber}</span>
+                      <span className="text-gray-600">PIN:</span>
+                      <span className="text-blue-600 font-bold font-mono">{order.pin}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-300">Total:</span>
-                      <span className="text-yellow-400 font-bold">{order.total.toFixed(2)} MAD</span>
+                      <span className="text-gray-600">Table:</span>
+                      <span className="text-gray-900">{order.tableNumber}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-300">Ordered:</span>
-                      <span className="text-white">
+                      <span className="text-gray-600">Total:</span>
+                      <span className="text-blue-600 font-bold">{order.total.toFixed(2)} MAD</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Ordered:</span>
+                      <span className="text-gray-900">
                         {new Date(order.createdAt).toLocaleString()}
                       </span>
                     </div>
@@ -193,15 +197,15 @@ function OrderStatusPage() {
 
                 {/* Order Items */}
                 {order.items && order.items.length > 0 && (
-                  <div className="bg-white/10 rounded-xl p-6 border border-yellow-400/30">
-                    <h4 className="text-lg font-semibold text-white mb-4">Your Order</h4>
-                    <div className="space-y-2">
+                  <div className="bg-white rounded-lg p-6 border border-gray-200">
+                    <h4 className="text-lg font-semibold text-gray-900 mb-4">Your Order</h4>
+                    <div className="space-y-3">
                       {order.items.map((item, index) => (
-                        <div key={index} className="flex justify-between items-center">
-                          <span className="text-gray-300">
+                        <div key={index} className="flex justify-between items-center py-2 border-b border-gray-100 last:border-b-0">
+                          <span className="text-gray-700">
                             {item.quantity}x {item.item_name}
                           </span>
-                          <span className="text-white font-semibold">
+                          <span className="text-gray-900 font-semibold">
                             {(item.price * item.quantity).toFixed(2)} MAD
                           </span>
                         </div>
@@ -211,8 +215,8 @@ function OrderStatusPage() {
                 )}
 
                 {/* Status Messages */}
-                <div className="bg-white/5 rounded-xl p-4 border border-yellow-400/20">
-                  <p className="text-gray-300 text-sm text-center">
+                <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
+                  <p className="text-blue-800 text-sm text-center">
                     {order.status === 'PENDING' && 'Your order has been received and is being processed.'}
                     {order.status === 'CONFIRMED' && 'Your order has been confirmed and will be prepared shortly.'}
                     {order.status === 'PREPARING' && 'Our kitchen is preparing your delicious meal!'}
