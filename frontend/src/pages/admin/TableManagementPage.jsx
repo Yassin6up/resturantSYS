@@ -87,7 +87,7 @@ function TableManagementPage() {
 
   const handleShowQR = async (table) => {
     try {
-      const response = await tablesAPI.getTableQR(table.id)
+      const response = await tablesAPI.getTableQR(table.id, 'dataurl')
       if (response.data.success) {
         setQrCodeUrl(response.data.qrCodeUrl)
         setSelectedTable(table)

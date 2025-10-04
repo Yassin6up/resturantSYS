@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { useCart } from '../../contexts/CartContext'
 import { menuAPI } from '../../services/api'
 import { PlusIcon, MinusIcon } from '@heroicons/react/24/outline'
+import CartBottomBar from '../../components/CartBottomBar'
 import toast from 'react-hot-toast'
 
 function MenuPage() {
@@ -270,6 +271,9 @@ function MenuPage() {
           </div>
         </div>
       )}
+      
+      {/* Cart Bottom Bar */}
+      <CartBottomBar />
     </div>
   )
 }

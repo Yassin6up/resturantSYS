@@ -1,16 +1,46 @@
 /** @param {import('knex').Knex} knex */
 const bcrypt = require('bcrypt');
 exports.seed = async function seed(knex) {
-  await knex('order_item_modifier').del();
-  await knex('order_items').del();
-  await knex('payments').del();
-  await knex('orders').del();
-  await knex('modifiers').del();
-  await knex('menu_items').del();
-  await knex('categories').del();
-  await knex('tables').del();
-  await knex('branches').del();
-  await knex('users').del();
+  // Delete in reverse order to respect foreign key constraints
+  try {
+    await knex('order_item_modifier').del();
+  } catch (e) { /* table doesn't exist */ }
+  
+  try {
+    await knex('order_items').del();
+  } catch (e) { /* table doesn't exist */ }
+  
+  try {
+    await knex('payments').del();
+  } catch (e) { /* table doesn't exist */ }
+  
+  try {
+    await knex('orders').del();
+  } catch (e) { /* table doesn't exist */ }
+  
+  try {
+    await knex('modifiers').del();
+  } catch (e) { /* table doesn't exist */ }
+  
+  try {
+    await knex('menu_items').del();
+  } catch (e) { /* table doesn't exist */ }
+  
+  try {
+    await knex('categories').del();
+  } catch (e) { /* table doesn't exist */ }
+  
+  try {
+    await knex('tables').del();
+  } catch (e) { /* table doesn't exist */ }
+  
+  try {
+    await knex('branches').del();
+  } catch (e) { /* table doesn't exist */ }
+  
+  try {
+    await knex('users').del();
+  } catch (e) { /* table doesn't exist */ }
 
   const [branchId] = await knex('branches').insert({ name: 'Casablanca', code: 'CAS', address: 'Bd Mohammed V' });
   const tables = Array.from({ length: 8 }).map((_, i) => ({ branch_id: branchId, table_number: `T${i + 1}` }));
