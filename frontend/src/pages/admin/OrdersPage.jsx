@@ -10,7 +10,8 @@ import {
 import toast from 'react-hot-toast'
 
 function OrdersPage() {
-  const { orders, updateOrderStatus } = useSocket()
+  const { updateOrderStatus } = useSocket()
+  const [orders, setOrders] = useState([])
   const [filteredOrders, setFilteredOrders] = useState([])
   const [loading, setLoading] = useState(true)
   const [filters, setFilters] = useState({
@@ -34,7 +35,12 @@ function OrdersPage() {
         branchId: 1,
         limit: 100 
       })
-      // Orders are managed by Socket context
+      
+      if (response.data.success) {
+        setOrders(response.data.orders)
+      } else {
+        toast.error('Failed to load orders')
+      }
     } catch (error) {
       toast.error('Failed to load orders')
       console.error('Orders load error:', error)

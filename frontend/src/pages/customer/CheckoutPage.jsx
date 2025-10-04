@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useCart } from '../../contexts/CartContext'
-import { useNavigate } from 'react-router-dom'
+import { useTheme } from '../../contexts/ThemeContext'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { ordersAPI } from '../../services/api'
 import { 
   CreditCardIcon, 
@@ -13,8 +14,10 @@ import QRCode from 'qrcode.react'
 import toast from 'react-hot-toast'
 
 function CheckoutPage() {
-  const { items, total, clearCart } = useCart()
+  const { cartItems, total, clearCart } = useCart()
+  const { getSetting } = useTheme()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const [loading, setLoading] = useState(false)
   const [orderData, setOrderData] = useState(null)
   const [paymentMethod, setPaymentMethod] = useState('cash')
@@ -23,14 +26,24 @@ function CheckoutPage() {
   const [showQRCode, setShowQRCode] = useState(false)
   const [orderCode, setOrderCode] = useState('')
   const [pinCode, setPinCode] = useState('')
-  const [qr, setQrCode] = useState('')
 
+  // Get available payment methods from settings
+  const availablePaymentMethods = getSetting('payment_methods') || ['cash', 'card']
+  const cashOnlyMode = getSetting('cash_only_mode') || false
+
+  // Auto-detect table from URL
+  useEffect(() => {
+    const tableFromUrl = searchParams.get('table')
+    if (tableFromUrl) {
+      setTableNumber(tableFromUrl)
+    }
+  }, [searchParams])
 
   useEffect(() => {
-    // if (items?.length === 0) {
-    //   navigate('/menu')
-    // }
-  }, [items, navigate])
+    if (cartItems.length === 0) {
+      navigate('/menu')
+    }
+  }, [cartItems, navigate])
 
   const calculateTotals = () => {
     const subtotal = total
@@ -64,36 +77,26 @@ function CheckoutPage() {
       setLoading(true)
       
       const totals = calculateTotals()
-      console.log(items)
+      
       const orderData = {
-        tableId:  Number(tableNumber),
-        branchId:1,
-        customer_name: customerName,
-        items: items?.map(item => ({
+        branchId: 1,
+        tableId: parseInt(tableNumber) || 1,
+        customerName: customerName,
+        items: cartItems.map(item => ({
           menuItemId: item.menuItemId,
           quantity: item.quantity,
-          unit_price: item.unitPrice,
-          modifiers: item.modifiers || [],
+          modifiers: item.modifiers?.map(m => m.id) || [],
           note: item.note || ''
         })),
-        subtotal: totals.subtotal,
-        tax: totals.tax,
-        service_charge: totals.serviceCharge,
-        total: totals.grandTotal,
-        payment_method: paymentMethod,
-        status: paymentMethod === 'cash' ? 'PENDING' : 'PAID'
+        paymentMethod: paymentMethod
       }
 
       const response = await ordersAPI.createOrder(orderData)
-      console.log(response.data)
-      if (response.data.message == "Order created successfully") {
-        const order = response.data
-
-        setOrderData(order.orderId)
-        setQrCode(order.qrCode)
-
-        setOrderCode(order.orderCode)
-        setPinCode(order.orderId)
+      
+      if (response.data.orderId) {
+        setOrderData(response.data)
+        setOrderCode(response.data.orderCode)
+        setPinCode(response.data.pin)
         setShowQRCode(true)
         
         // Clear cart after successful order
@@ -110,13 +113,16 @@ function CheckoutPage() {
   }
 
   const handlePaymentComplete = () => {
-    console.log(orderData)
-    navigate('/order/' + orderData)
+    navigate('/order-status')
+  }
+
+  const handleCheckOrderStatus = () => {
+    navigate('/order-status')
   }
 
   const totals = calculateTotals()
 
-  if (showQRCode && qr) {
+  if (showQRCode && orderData) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center p-4">
         <div className="max-w-md w-full">
@@ -157,13 +163,12 @@ function CheckoutPage() {
               <div className="bg-white border-2 border-gray-200 rounded-xl p-6">
                 <h3 className="font-semibold text-gray-900 mb-4">Payment QR Code</h3>
                 <div className="flex justify-center mb-4">
-                  <img  src={qr} style={{width: 200 , hieght:200}} />
-                  {/* <QRCode 
-                    value={`${window.location.origin}/order/${orderData.id}`}
+                  <QRCode 
+                    value={`${window.location.origin}/order-status`}
                     size={200}
                     level="H"
-                    inclueMargin={true}
-                  /> */}
+                    includeMargin={true}
+                  />
                 </div>
                 <p className="text-sm text-gray-600 mb-2">Show this QR code to the cashier</p>
                 <p className="text-xs text-gray-500">Or scan to view order details</p>
@@ -179,11 +184,11 @@ function CheckoutPage() {
               {/* Actions */}
               <div className="space-y-3">
                 <button
-                  onClick={handlePaymentComplete}
+                  onClick={handleCheckOrderStatus}
                   className="w-full btn-primary py-3"
                 >
-                  <CreditCardIcon className="h-5 w-5 mr-2" />
-                  Payment Complete
+                  <QrCodeIcon className="h-5 w-5 mr-2" />
+                  Check Order Status
                 </button>
                 
                 <button
@@ -233,13 +238,19 @@ function CheckoutPage() {
             <div>
               <label className="form-label">Table Number</label>
               <input
-                type="number"
+                type="text"
                 value={tableNumber}
                 onChange={(e) => setTableNumber(e.target.value)}
-                className="form-input"
+                className={`form-input ${searchParams.get('table') ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                 placeholder="Enter table number"
                 required
+                readOnly={!!searchParams.get('table')}
               />
+              {searchParams.get('table') && (
+                <p className="text-sm text-blue-600 mt-1">
+                  ✓ Table automatically detected from QR code
+                </p>
+              )}
             </div>
           </div>
         </div>
@@ -251,7 +262,7 @@ function CheckoutPage() {
           </div>
           <div className="card-body">
             <div className="space-y-3">
-              {items?.map((item, index) => (
+              {cartItems.map((item, index) => (
                 <div key={index} className="flex items-center justify-between py-2 border-b border-gray-100">
                   <div className="flex items-center space-x-3">
                     <img
@@ -280,32 +291,43 @@ function CheckoutPage() {
           </div>
           <div className="card-body">
             <div className="space-y-4">
-              <div className="flex space-x-4">
-                <button
-                  onClick={() => setPaymentMethod('cash')}
-                  className={`flex-1 p-4 rounded-xl border-2 transition-all duration-200 ${
-                    paymentMethod === 'cash'
-                      ? 'border-blue-500 bg-blue-50 text-blue-700'
-                      : 'border-gray-300 hover:border-gray-400'
-                  }`}
-                >
-                  <BanknotesIcon className="h-8 w-8 mx-auto mb-2" />
-                  <h3 className="font-semibold">Cash</h3>
-                  <p className="text-sm text-gray-600">Pay at cashier</p>
-                </button>
-                <button
-                  onClick={() => setPaymentMethod('card')}
-                  className={`flex-1 p-4 rounded-xl border-2 transition-all duration-200 ${
-                    paymentMethod === 'card'
-                      ? 'border-blue-500 bg-blue-50 text-blue-700'
-                      : 'border-gray-300 hover:border-gray-400'
-                  }`}
-                >
-                  <CreditCardIcon className="h-8 w-8 mx-auto mb-2" />
-                  <h3 className="font-semibold">Card</h3>
-                  <p className="text-sm text-gray-600">Online payment</p>
-                </button>
+              <div className={`flex space-x-4 ${availablePaymentMethods.length === 1 ? 'justify-center' : ''}`}>
+                {availablePaymentMethods.includes('cash') && (
+                  <button
+                    onClick={() => setPaymentMethod('cash')}
+                    className={`flex-1 p-4 rounded-lg border-2 transition-all duration-200 ${
+                      paymentMethod === 'cash'
+                        ? 'border-blue-500 bg-blue-50 text-blue-700'
+                        : 'border-gray-300 hover:border-gray-400'
+                    }`}
+                  >
+                    <BanknotesIcon className="h-8 w-8 mx-auto mb-2" />
+                    <h3 className="font-semibold">Cash</h3>
+                    <p className="text-sm text-gray-600">Pay at cashier</p>
+                  </button>
+                )}
+                {availablePaymentMethods.includes('card') && !cashOnlyMode && (
+                  <button
+                    onClick={() => setPaymentMethod('card')}
+                    className={`flex-1 p-4 rounded-lg border-2 transition-all duration-200 ${
+                      paymentMethod === 'card'
+                        ? 'border-blue-500 bg-blue-50 text-blue-700'
+                        : 'border-gray-300 hover:border-gray-400'
+                    }`}
+                  >
+                    <CreditCardIcon className="h-8 w-8 mx-auto mb-2" />
+                    <h3 className="font-semibold">Card</h3>
+                    <p className="text-sm text-gray-600">Online payment</p>
+                  </button>
+                )}
               </div>
+              {cashOnlyMode && (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                  <p className="text-sm text-yellow-800 text-center">
+                    💡 Cash payment only - Card payments are currently disabled
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         </div>

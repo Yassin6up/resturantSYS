@@ -5,6 +5,7 @@ import dotenv from 'dotenv';
 dotenv.config({ path: path.resolve(process.cwd(), 'server/.env') });
 
 const mode = process.env.MODE || 'LOCAL';
+console.log('Database mode:', mode);
 
 const common: Partial<Knex.Config> = {
   migrations: {
@@ -37,6 +38,7 @@ const mysql: Knex.Config = {
   ...common
 };
 
+// FIXED: Use mode to determine which config to use
 const config: Knex.Config = mode === 'LOCAL' ? sqlite : mysql;
 
 export default config;

@@ -21,6 +21,17 @@ router.post('/', orderRateLimiter, validateOrder, async (req, res) => {
     const orderCount = await db('orders').where({ branch_id: branchId }).count('id as count').first();
     const orderCode = `${branch.code}-${timestamp}-${String(orderCount.count + 1).padStart(4, '0')}`;
 
+    // Generate unique 8-digit PIN
+    let pin;
+    let isUnique = false;
+    while (!isUnique) {
+      pin = Math.floor(10000000 + Math.random() * 90000000).toString();
+      const existingOrder = await db('orders').where({ pin }).first();
+      if (!existingOrder) {
+        isUnique = true;
+      }
+    }
+
     // Calculate totals
     let subtotal = 0;
     const orderItems = [];
@@ -67,13 +78,15 @@ router.post('/', orderRateLimiter, validateOrder, async (req, res) => {
     const [orderId] = await trx('orders').insert({
       branch_id: branchId,
       order_code: orderCode,
+      pin: pin,
       table_id: tableId,
       customer_name: customerName,
       total,
       tax,
       service_charge: serviceCharge,
       status: paymentMethod === 'CARD' ? 'AWAITING_PAYMENT' : 'PENDING',
-      payment_status: 'UNPAID'
+      payment_status: 'UNPAID',
+      payment_method: paymentMethod || 'cash'
     });
 
     // Create order items
@@ -134,6 +147,7 @@ router.post('/', orderRateLimiter, validateOrder, async (req, res) => {
     res.status(201).json({
       orderId,
       orderCode,
+      pin: pin,
       qr: orderQr,
       qrCode: qrCodeDataURL,
       status: order.status,
@@ -207,10 +221,75 @@ router.get('/', authenticateToken, authorize('admin', 'manager', 'cashier'), asy
       order.items = items;
     }
 
-    res.json({ orders });
+    res.json({ success: true, orders });
   } catch (error) {
     logger.error('Orders fetch error:', error);
     res.status(500).json({ error: 'Failed to fetch orders' });
+  }
+});
+
+// Get order by PIN (public endpoint for customers)
+router.get('/pin/:pin', async (req, res) => {
+  try {
+    const { pin } = req.params;
+
+    if (!pin || pin.length !== 8) {
+      return res.status(400).json({ error: 'Invalid PIN format' });
+    }
+
+    const order = await db('orders')
+      .select(
+        'orders.id',
+        'orders.order_code',
+        'orders.pin',
+        'orders.status',
+        'orders.payment_status',
+        'orders.total',
+        'orders.created_at',
+        'orders.updated_at',
+        'tables.table_number',
+        'branches.name as branch_name'
+      )
+      .leftJoin('tables', 'orders.table_id', 'tables.id')
+      .leftJoin('branches', 'orders.branch_id', 'branches.id')
+      .where({ 'orders.pin': pin })
+      .first();
+
+    if (!order) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
+
+    // Get order items (only basic info for customer view)
+    const items = await db('order_items')
+      .select(
+        'order_items.quantity',
+        'menu_items.name as item_name',
+        'menu_items.price'
+      )
+      .leftJoin('menu_items', 'order_items.menu_item_id', 'menu_items.id')
+      .where({ 'order_items.order_id': order.id });
+
+    order.items = items;
+
+    res.json({ 
+      success: true,
+      order: {
+        id: order.id,
+        orderCode: order.order_code,
+        pin: order.pin,
+        status: order.status,
+        paymentStatus: order.payment_status,
+        total: order.total,
+        tableNumber: order.table_number,
+        branchName: order.branch_name,
+        createdAt: order.created_at,
+        updatedAt: order.updated_at,
+        items: items
+      }
+    });
+  } catch (error) {
+    logger.error('Order PIN lookup error:', error);
+    res.status(500).json({ error: 'Failed to lookup order' });
   }
 });
 
