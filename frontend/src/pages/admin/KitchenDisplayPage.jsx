@@ -218,17 +218,17 @@ function KitchenDisplayPage() {
         {filteredOrders.map((order) => (
           <div
             key={order.id}
-            className={`card border-l-4 ${getPriorityColor(order.priority || 'LOW')} hover:shadow-lg transition-shadow duration-200 bg-black/80 backdrop-blur-md border border-yellow-400/30`}
+            className={`card border-l-4 ${getPriorityColor(order.priority || 'LOW')} hover:shadow-lg transition-shadow duration-200`}
           >
             <div className="card-body">
               {/* Order Header */}
               <div className="flex justify-between items-start mb-4">
                 <div>
-                  <h3 className="text-lg font-semibold text-white">
+                  <h3 className="text-lg font-semibold text-gray-900">
                     Order #{order.order_code}
                   </h3>
-                  <p className="text-sm text-gray-300">Table {order.table_number}</p>
-                  <p className="text-xs text-gray-400">{order.customer_name}</p>
+                  <p className="text-sm text-gray-600">Table {order.table_number}</p>
+                  <p className="text-xs text-gray-500">{order.customer_name}</p>
                 </div>
                 <div className="text-right">
                   <span className={`badge ${getStatusColor(order.status)}`}>
@@ -242,17 +242,17 @@ function KitchenDisplayPage() {
 
               {/* Order Items */}
               <div className="space-y-3 mb-4">
-                <h4 className="text-sm font-semibold text-white border-b border-yellow-400/30 pb-1">
+                <h4 className="text-sm font-semibold text-gray-900 border-b border-gray-200 pb-1">
                   Items to Prepare:
                 </h4>
                 {order.items?.map((item, index) => (
-                  <div key={index} className="flex items-start space-x-3 p-3 bg-white/5 rounded-lg border border-yellow-400/20">
+                  <div key={index} className="flex items-start space-x-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
                     {/* Item Image */}
                     <div className="flex-shrink-0">
                       <img
                         src={item.menu_item?.image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=80&h=80&fit=crop'}
                         alt={item.item_name || 'Food item'}
-                        className="w-16 h-16 rounded-lg object-cover border border-yellow-400/30"
+                        className="w-16 h-16 rounded-lg object-cover border border-gray-300"
                         onError={(e) => {
                           e.target.src = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=80&h=80&fit=crop'
                         }}
@@ -262,22 +262,22 @@ function KitchenDisplayPage() {
                     {/* Item Details */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center space-x-2 mb-1">
-                        <span className="text-lg font-bold text-yellow-400">
+                        <span className="text-lg font-bold text-blue-600">
                           {item.quantity}x
                         </span>
-                        <span className="text-sm font-semibold text-white">
+                        <span className="text-sm font-semibold text-gray-900">
                           {item.item_name || 'Unknown Item'}
                         </span>
                       </div>
                       
                       {item.modifiers && item.modifiers.length > 0 && (
-                        <div className="text-xs text-gray-300 mb-1">
-                          <span className="text-yellow-400">Modifiers:</span> {item.modifiers.map(mod => mod.name).join(', ')}
+                        <div className="text-xs text-gray-600 mb-1">
+                          <span className="text-blue-600">Modifiers:</span> {item.modifiers.map(mod => mod.name).join(', ')}
                         </div>
                       )}
                       
                       {item.note && (
-                        <div className="text-xs text-yellow-400 font-medium bg-yellow-400/10 px-2 py-1 rounded border border-yellow-400/30">
+                        <div className="text-xs text-blue-700 font-medium bg-blue-50 px-2 py-1 rounded border border-blue-200">
                           📝 Note: {item.note}
                         </div>
                       )}

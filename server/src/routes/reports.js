@@ -35,14 +35,28 @@ router.get('/sales/daily', authenticateToken, authorize('admin', 'manager'), asy
       .where(db.raw('DATE(created_at) = ?', [targetDate]))
       .groupBy('status');
 
-    // Get hourly breakdown (SQLite compatible)
-    const hourlyBreakdown = await db('orders')
-      .select(db.raw('CAST(strftime("%H", created_at) AS INTEGER) as hour'))
-      .count('id as count')
-      .sum('total as revenue')
-      .where(db.raw('DATE(created_at) = ?', [targetDate]))
-      .groupBy(db.raw('strftime("%H", created_at)'))
-      .orderBy('hour');
+    // Get hourly breakdown (Database agnostic)
+    const dbType = process.env.DB_TYPE || 'sqlite3';
+    let hourlyBreakdown;
+    
+    if (dbType === 'sqlite3') {
+      hourlyBreakdown = await db('orders')
+        .select(db.raw('CAST(strftime("%H", created_at) AS INTEGER) as hour'))
+        .count('id as count')
+        .sum('total as revenue')
+        .where(db.raw('DATE(created_at) = ?', [targetDate]))
+        .groupBy(db.raw('strftime("%H", created_at)'))
+        .orderBy('hour');
+    } else {
+      // MySQL/PostgreSQL
+      hourlyBreakdown = await db('orders')
+        .select(db.raw('HOUR(created_at) as hour'))
+        .count('id as count')
+        .sum('total as revenue')
+        .where(db.raw('DATE(created_at) = ?', [targetDate]))
+        .groupBy(db.raw('HOUR(created_at)'))
+        .orderBy('hour');
+    }
 
     res.json({
       date: targetDate,
@@ -155,18 +169,26 @@ router.get('/tables/turnover', authenticateToken, authorize('admin', 'manager'),
   try {
     const { startDate, endDate, branchId } = req.query;
 
+    const dbType = process.env.DB_TYPE || 'sqlite3';
     let query = db('orders')
       .select(
         'tables.table_number',
         db.raw('COUNT(*) as total_orders'),
         db.raw('SUM(total) as total_revenue'),
-        db.raw('AVG(total) as average_order_value'),
-        db.raw('AVG((julianday(updated_at) - julianday(created_at)) * 24 * 60) as average_service_time')
+        db.raw('AVG(total) as average_order_value')
       )
       .leftJoin('tables', 'orders.table_id', 'tables.id')
       .where('orders.status', '!=', 'CANCELLED')
       .groupBy('tables.id', 'tables.table_number')
       .orderBy('total_orders', 'desc');
+
+    // Add database-specific service time calculation
+    if (dbType === 'sqlite3') {
+      query = query.addSelect(db.raw('AVG((julianday(updated_at) - julianday(created_at)) * 24 * 60) as average_service_time'));
+    } else {
+      // MySQL/PostgreSQL
+      query = query.addSelect(db.raw('AVG(TIMESTAMPDIFF(MINUTE, created_at, updated_at)) as average_service_time'));
+    }
 
     if (startDate && endDate) {
       query = query.whereBetween('orders.created_at', [startDate, endDate]);
