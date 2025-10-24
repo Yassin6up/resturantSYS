@@ -50,7 +50,61 @@ The system employs a client-server architecture with a React + Vite frontend and
 
 ## Recent Changes (October 24, 2025)
 
-### ✅ Enhanced OrdersPage Management (Latest Update)
+### ✅ Customizable Menu Page Templates System (Latest Update)
+
+#### New Feature:
+Restaurant owners can now customize their customer-facing menu page with 4 beautiful pre-designed templates:
+
+1. **Default - Luxury Gradient** (Current design):
+   - Modern 3-column grid layout with gradient hero
+   - Card-based design with hover effects
+   - Gradient accents from blue to purple
+   - Perfect for upscale, modern restaurants
+
+2. **Modern - Minimalist**:
+   - Clean 2-column list layout with large typography
+   - Bold black and white aesthetic
+   - Horizontal item cards with side-by-side image/details
+   - Ideal for contemporary, trendy establishments
+
+3. **Elegant - Sophisticated**:
+   - Premium full-width list with large imagery
+   - Serif fonts and amber/orange gradient accents
+   - Luxury feel with detailed descriptions
+   - Best for fine dining and upscale venues
+
+4. **Minimal - Grid**:
+   - Simple 4-column grid with clean borders
+   - Light typography and minimal decoration
+   - Compact square thumbnails
+   - Perfect for cafes and quick-service restaurants
+
+#### Implementation Details:
+- **Settings Integration**: New "Menu Templates" tab in Admin Settings with visual preview cards
+- **Database Storage**: Template selection saved in `app_settings.menu_template` (public setting)
+- **Dynamic Rendering**: MenuPage automatically loads and renders selected template
+- **Shared Modal**: All templates use the same customization modal for item selection
+- **Responsive Design**: All templates fully responsive across mobile, tablet, and desktop
+- **Theme Context**: Templates accessed via `useTheme().getSetting('menu_template')`
+
+#### Files Created:
+- `frontend/src/pages/customer/templates/DefaultTemplate.jsx` - Luxury gradient design
+- `frontend/src/pages/customer/templates/ModernTemplate.jsx` - Minimalist clean layout
+- `frontend/src/pages/customer/templates/ElegantTemplate.jsx` - Sophisticated list design
+- `frontend/src/pages/customer/templates/MinimalTemplate.jsx` - Simple grid layout
+
+#### Files Modified:
+- `frontend/src/pages/customer/MenuPage.jsx` - Dynamic template loading and rendering
+- `frontend/src/pages/admin/SettingsPage.jsx` - Added Menu Templates tab with selection UI
+- `server/src/seeds/02_app_settings.js` - Added menu_template setting to database
+- `server/index.js` - Fixed Express trust proxy setting from `true` to `1` for secure rate limiting
+
+#### Security Enhancement:
+- **Express Rate Limiting Fix**: Changed `app.set('trust proxy', true)` to `app.set('trust proxy', 1)` 
+- Properly configures trust for Replit's single proxy layer
+- Prevents IP-based rate limiting bypass vulnerabilities
+
+### ✅ Enhanced OrdersPage Management
 
 #### New Features:
 1. **Quick Order Search with QR Code Support**:
