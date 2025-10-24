@@ -2,6 +2,22 @@ import axios from 'axios'
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || ''
 
+// Utility function to get full image URL
+export const getImageUrl = (imagePath) => {
+  if (!imagePath) return ''
+  
+  // If it's already a full URL, return as is
+  if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+    return imagePath
+  }
+  
+  // Remove leading slash if present
+  const cleanPath = imagePath.startsWith('/') ? imagePath.substring(1) : imagePath
+  
+  // Combine with API base URL
+  return `${API_BASE_URL}/${cleanPath}`
+}
+
 // Create axios instance
 const api = axios.create({
   baseURL: API_BASE_URL,

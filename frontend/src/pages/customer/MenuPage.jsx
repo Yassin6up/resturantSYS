@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useCart } from '../../contexts/CartContext'
-import { menuAPI } from '../../services/api'
+import { menuAPI, getImageUrl } from '../../services/api'
 import { PlusIcon, MinusIcon } from '@heroicons/react/24/outline'
 import CartBottomBar from '../../components/CartBottomBar'
 import toast from 'react-hot-toast'
@@ -116,7 +116,7 @@ function MenuPage() {
                     {/* Food Image */}
                     <div className="relative overflow-hidden">
                       <img
-                        src={item.image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&h=300&fit=crop'}
+                        src={item.image ? getImageUrl(item.image) : 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&h=300&fit=crop'}
                         alt={item.name}
                         className="menu-item-image"
                         onError={(e) => {

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useCart } from '../contexts/CartContext'
+import { getImageUrl } from '../services/api'
 import { ShoppingCartIcon, CreditCardIcon, QrCodeIcon } from '@heroicons/react/24/outline'
 import { useNavigate } from 'react-router-dom'
 
@@ -75,7 +76,7 @@ function CartBottomBar() {
                 <div key={index} className="p-4 border-b border-yellow-400/20">
                   <div className="flex items-center space-x-3">
                     <img
-                      src={item.image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=100&h=100&fit=crop'}
+                      src={item.image ? getImageUrl(item.image) : 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=100&h=100&fit=crop'}
                       alt={item.name}
                       className="w-16 h-16 rounded-lg object-cover"
                     />

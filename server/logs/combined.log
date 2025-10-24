@@ -151,3 +151,6 @@
 {"level":"info","message":"Image uploaded: menu-item-1761322005483-64133576.png by user admin","service":"posq-api","timestamp":"2025-10-24T16:06:45.728Z"}
 {"level":"info","message":"Image uploaded: menu-item-1761323000680-187378812.png by user admin","service":"posq-api","timestamp":"2025-10-24T16:23:21.104Z"}
 {"level":"info","message":"Image uploaded: menu-item-1761323006800-439771950.png by user admin","service":"posq-api","timestamp":"2025-10-24T16:23:28.940Z"}
+{"level":"info","message":"Image uploaded: menu-item-1761323541162-834757437.png by user admin","service":"posq-api","timestamp":"2025-10-24T16:32:22.116Z"}
+{"level":"info","message":"Image uploaded: menu-item-1761323600457-811044352.png by user admin","service":"posq-api","timestamp":"2025-10-24T16:33:21.203Z"}
+{"level":"info","message":"User admin logged out","service":"posq-api","timestamp":"2025-10-24T16:34:40.934Z"}
