@@ -268,12 +268,15 @@ function CheckoutPage() {
                 <div key={index} className="flex items-center justify-between py-2 border-b border-gray-100">
                   <div className="flex items-center space-x-3">
                     <img
-                      src={item.menuItem.image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=100&h=100&fit=crop'}
-                      alt={item.menuItem.name}
+                      src={item.image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=100&h=100&fit=crop'}
+                      alt={item.name}
                       className="w-12 h-12 rounded-lg object-cover"
+                      onError={(e) => {
+                        e.target.src = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=100&h=100&fit=crop';
+                      }}
                     />
                     <div>
-                      <h3 className="font-medium text-gray-900">{item.menuItem.name}</h3>
+                      <h3 className="font-medium text-gray-900">{item.name}</h3>
                       <p className="text-sm text-gray-600">Qty: {item.quantity}</p>
                     </div>
                   </div>
