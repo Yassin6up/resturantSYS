@@ -1,10 +1,16 @@
 import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useCart } from "../../contexts/CartContext";
+import { useTheme } from "../../contexts/ThemeContext";
 import { menuAPI } from "../../services/api";
 import { PlusIcon, MinusIcon } from "@heroicons/react/24/outline";
 import CartBottomBar from "../../components/CartBottomBar";
 import toast from "react-hot-toast";
+
+import DefaultTemplate from "./templates/DefaultTemplate";
+import ModernTemplate from "./templates/ModernTemplate";
+import ElegantTemplate from "./templates/ElegantTemplate";
+import MinimalTemplate from "./templates/MinimalTemplate";
 
 function MenuPage() {
   const [searchParams] = useSearchParams();
@@ -19,9 +25,11 @@ function MenuPage() {
   const [note, setNote] = useState("");
 
   const { addItem, setBranchInfo } = useCart();
+  const { getSetting } = useTheme();
+
+  const menuTemplate = getSetting('menu_template') || 'default';
 
   useEffect(() => {
-    // Set branch info in cart when page loads
     setBranchInfo(parseInt(branch), table);
   }, [branch, table]);
 
@@ -45,7 +53,6 @@ function MenuPage() {
   const handleAddToCart = () => {
     if (!selectedItem) return;
 
-    console.log("item : ", selectedItem);
     const tableNumber = table ? parseInt(table) : null;
     addItem(
       selectedItem,
@@ -81,6 +88,12 @@ function MenuPage() {
     return (parseFloat(item.price || 0) + modifierTotal) * quantity;
   };
 
+  const quickAddItem = (item) => {
+    const tableNumber = table ? parseInt(table) : null;
+    addItem(item, 1, [], "", parseInt(branch), tableNumber);
+    toast.success(`${item.name} added to cart`);
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -92,92 +105,27 @@ function MenuPage() {
     );
   }
 
+  const templates = {
+    default: DefaultTemplate,
+    modern: ModernTemplate,
+    elegant: ElegantTemplate,
+    minimal: MinimalTemplate
+  };
+
+  const SelectedTemplate = templates[menuTemplate] || DefaultTemplate;
+
   return (
-    <div className="max-w-4xl mx-auto">
-      {/* Header */}
-      <div className="text-center mb-12 animate-fadeInUp">
-        <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full mb-6 shadow-xl">
-          <span className="text-white font-bold text-2xl">🍽️</span>
-        </div>
-        <h1 className="text-4xl font-bold gradient-text mb-4">
-          Our Delicious Menu
-        </h1>
-        {table && <p className="text-xl text-gray-600">Table {table}</p>}
-        <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-          Discover our carefully crafted dishes made with love and the finest
-          ingredients
-        </p>
-      </div>
+    <>
+      <SelectedTemplate
+        menu={menu}
+        table={table}
+        addItem={quickAddItem}
+        onSelectItem={setSelectedItem}
+      />
 
-      {/* Menu Categories */}
-      <div className="space-y-8">
-        {menu.map((category) => (
-          <div key={category.id} className="card">
-            <div className="card-header">
-              <h2 className="text-xl font-semibold text-gray-900">
-                {category.name}
-              </h2>
-            </div>
-            <div className="card-body">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {category.items?.map((item) => (
-                  <div
-                    key={item.id}
-                    className="menu-item-card group"
-                    onClick={() => setSelectedItem(item)}
-                  >
-                    {/* Food Image */}
-                    <div className="relative overflow-hidden">
-                      <img
-                        src={
-                          ("https://ba89c33a-6fa6-48ea-817e-88d8c16def61-00-2t6yh5v0wxjx3.spock.replit.dev/api",
-                          item.image) || item.image
-                        }
-                        alt={item.name}
-                        className="menu-item-image"
-                        onError={(e) => {
-                          console.log("error :", e);
-                          console.log(item.image);
-                        }}
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                      <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm rounded-full px-3 py-1 text-sm font-semibold text-gray-800 shadow-lg">
-                        {parseFloat(item?.price || 0).toFixed(2)} MAD
-                      </div>
-                    </div>
-
-                    <div className="p-6">
-                      <h3 className="font-bold text-gray-900 text-lg mb-2 group-hover:text-blue-600 transition-colors duration-200">
-                        {item.name}
-                      </h3>
-                      {item.description && (
-                        <p className="text-gray-600 mb-4 line-clamp-2">
-                          {item.description}
-                        </p>
-                      )}
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          addItem(item);
-                        }}
-                        className="btn-primary w-full group-hover:animate-bounce"
-                      >
-                        Add to Cart
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Item Selection Modal */}
       {selectedItem && (
         <div className="modal-overlay">
           <div className="modal-content">
-            {/* Food Image */}
             <div className="relative overflow-hidden">
               <img
                 src={
@@ -227,7 +175,6 @@ function MenuPage() {
                 <p className="text-gray-600 mb-4">{selectedItem.description}</p>
               )}
 
-              {/* Modifiers */}
               {selectedItem.modifiers && selectedItem.modifiers.length > 0 && (
                 <div className="mb-4">
                   <h4 className="font-medium text-gray-900 mb-2">Modifiers</h4>
@@ -260,7 +207,6 @@ function MenuPage() {
                 </div>
               )}
 
-              {/* Note */}
               <div className="mb-4">
                 <label className="form-label">Special Instructions</label>
                 <textarea
@@ -272,7 +218,6 @@ function MenuPage() {
                 />
               </div>
 
-              {/* Quantity */}
               <div className="mb-6">
                 <label className="form-label">Quantity</label>
                 <div className="flex items-center space-x-3">
@@ -292,7 +237,6 @@ function MenuPage() {
                 </div>
               </div>
 
-              {/* Total */}
               <div className="flex justify-between items-center mb-6">
                 <span className="text-lg font-semibold">Total:</span>
                 <span className="text-lg font-bold text-primary-600">
@@ -300,7 +244,6 @@ function MenuPage() {
                 </span>
               </div>
 
-              {/* Actions */}
               <div className="flex space-x-3">
                 <button
                   onClick={() => setSelectedItem(null)}
@@ -320,9 +263,8 @@ function MenuPage() {
         </div>
       )}
 
-      {/* Cart Bottom Bar */}
       <CartBottomBar />
-    </div>
+    </>
   );
 }
 

@@ -230,6 +230,16 @@ exports.seed = async function(knex) {
       category: 'ui_text',
       description: 'Order instructions text',
       is_public: true
+    },
+
+    // Menu Template Settings
+    {
+      key: 'menu_template',
+      value: 'default',
+      type: 'string',
+      category: 'ui_text',
+      description: 'Menu page template (default, modern, elegant, minimal)',
+      is_public: true
     }
   ]);
 };
