@@ -47,3 +47,31 @@ The system employs a client-server architecture with a React + Vite frontend and
     - bcrypt (password hashing)
     - Multer (file uploads)
     - JWT (JSON Web Tokens for authentication)
+
+## Recent Changes (October 24, 2025)
+
+### API Endpoint for Image Serving ✅
+- **New Endpoint**: `GET /api/upload/image/:filename` serves images with proper headers
+- **Security**: Path validation prevents directory traversal attacks
+- **Performance**: 1-year cache headers for optimal loading
+- **Auto Content-Type**: Detects and sets correct MIME types (jpeg, png, gif, webp)
+- **URL Format**: `https://domain.com/api/upload/image/menu-item-123456.png`
+
+### Cart System Bug Fixed ✅
+- **Problem**: Cart items missing name, image, and price properties causing empty cart display
+- **Solution**: Modified CartContext `addItem()` to extract and store essential item properties
+- **Cart Item Structure**:
+  ```js
+  {
+    menuItemId, name, image, price,  // Essential properties now stored
+    quantity, unitPrice, total, modifiers, note, branchId, tableNumber
+  }
+  ```
+- **Result**: Cart now displays correctly with images, names, and prices
+- **localStorage**: Cart persists properly across page refreshes
+
+### Files Modified
+- `server/src/routes/upload.js` - Added image serving API endpoint
+- `frontend/src/contexts/CartContext.jsx` - Fixed addItem to store item properties
+- `frontend/src/components/CartBottomBar.jsx` - Uses direct image URLs
+- `frontend/src/pages/customer/MenuPage.jsx` - Uses direct image URLs

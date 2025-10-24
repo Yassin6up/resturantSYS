@@ -115,7 +115,9 @@ export function CartProvider({ children }) {
       type: 'ADD_ITEM',
       payload: {
         menuItemId: menuItem.id,
-        menuItem: menuItem,
+        name: menuItem.name,
+        image: menuItem.image,
+        price: menuItem.price,
         quantity,
         unitPrice,
         total,

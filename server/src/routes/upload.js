@@ -7,6 +7,50 @@ const { logger } = require('../middleware/errorHandler');
 
 const router = express.Router();
 
+// API endpoint to serve/render images
+router.get('/image/:filename', async (req, res) => {
+  try {
+    const filename = req.params.filename;
+    const uploadsDir = path.join(__dirname, '../../uploads');
+    const filePath = path.join(uploadsDir, filename);
+
+    // Security check: ensure the file path is within uploads directory
+    const resolvedPath = path.resolve(filePath);
+    const resolvedUploadsDir = path.resolve(uploadsDir);
+    
+    if (!resolvedPath.startsWith(resolvedUploadsDir)) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    // Check if file exists
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ error: 'Image not found' });
+    }
+
+    // Get file extension and set content type
+    const ext = path.extname(filename).toLowerCase();
+    const contentTypes = {
+      '.jpg': 'image/jpeg',
+      '.jpeg': 'image/jpeg',
+      '.png': 'image/png',
+      '.gif': 'image/gif',
+      '.webp': 'image/webp'
+    };
+
+    const contentType = contentTypes[ext] || 'application/octet-stream';
+    
+    // Set headers
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Cache-Control', 'public, max-age=31536000'); // Cache for 1 year
+    
+    // Send file
+    res.sendFile(filePath);
+  } catch (error) {
+    logger.error('Image serving error:', error);
+    res.status(500).json({ error: 'Failed to serve image' });
+  }
+});
+
 // Ensure uploads directory exists
 const uploadsDir = path.join(__dirname, '../../uploads');
 if (!fs.existsSync(uploadsDir)) {
@@ -54,10 +98,10 @@ router.post('/image', authenticateToken, authorize('admin', 'manager'), upload.s
       return res.status(400).json({ error: 'No image file provided' });
     }
 
-    // Get full URL with domain
+    // Get full URL with domain using API endpoint
     const protocol = req.protocol;
     const host = req.get('host');
-    const imageUrl = `${protocol}://${host}/uploads/${req.file.filename}`;
+    const imageUrl = `${protocol}://${host}/api/upload/image/${req.file.filename}`;
     
     // Log upload
     await logger.info(`Image uploaded: ${req.file.filename} by user ${req.user.username}`);
@@ -82,12 +126,12 @@ router.post('/images', authenticateToken, authorize('admin', 'manager'), upload.
       return res.status(400).json({ error: 'No image files provided' });
     }
 
-    // Get full URL with domain
+    // Get full URL with domain using API endpoint
     const protocol = req.protocol;
     const host = req.get('host');
     
     const uploadedImages = req.files.map(file => ({
-      imageUrl: `${protocol}://${host}/uploads/${file.filename}`,
+      imageUrl: `${protocol}://${host}/api/upload/image/${file.filename}`,
       filename: file.filename,
       originalName: file.originalname,
       size: file.size
@@ -138,7 +182,7 @@ router.get('/images', authenticateToken, authorize('admin', 'manager'), async (r
   try {
     const files = fs.readdirSync(uploadsDir);
     
-    // Get full URL with domain
+    // Get full URL with domain using API endpoint
     const protocol = req.protocol;
     const host = req.get('host');
     
@@ -149,7 +193,7 @@ router.get('/images', authenticateToken, authorize('admin', 'manager'), async (r
       })
       .map(file => ({
         filename: file,
-        imageUrl: `${protocol}://${host}/uploads/${file}`,
+        imageUrl: `${protocol}://${host}/api/upload/image/${file}`,
         uploadDate: fs.statSync(path.join(uploadsDir, file)).mtime
       }))
       .sort((a, b) => b.uploadDate - a.uploadDate);
