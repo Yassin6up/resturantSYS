@@ -53,14 +53,13 @@ function MenuPage() {
   const handleAddToCart = () => {
     if (!selectedItem) return;
 
-    const tableNumber = table ? parseInt(table) : null;
     addItem(
       selectedItem,
       quantity,
       selectedModifiers,
       note,
       parseInt(branch),
-      tableNumber,
+      table,
     );
 
     toast.success(`${quantity}x ${selectedItem.name} added to cart`);
@@ -89,8 +88,7 @@ function MenuPage() {
   };
 
   const quickAddItem = (item) => {
-    const tableNumber = table ? parseInt(table) : null;
-    addItem(item, 1, [], "", parseInt(branch), tableNumber);
+    addItem(item, 1, [], "", parseInt(branch), table);
     toast.success(`${item.name} added to cart`);
   };
 
