@@ -73,6 +73,38 @@ Both workflows start automatically and are configured in the Replit workspace.
 
 ### Latest (October 24, 2025)
 
+- **Admin Features & Table Management Improvements**: ✅
+  - **Restaurant Admin Employee Creation**: Option to create admin employee during restaurant setup
+    - Checkbox in restaurant creation form to create admin user
+    - Validates username, password (min 6 characters), email, phone
+    - Backend hashes password with bcrypt and links user to new restaurant
+    - Implemented in `frontend/src/pages/owner/RestaurantForm.jsx` and `server/src/routes/restaurants.js`
+  
+  - **Menu Item Image Uploads**: Complete implementation with multer
+    - POST/PUT endpoints handle file uploads with 5MB limit
+    - Strict file type validation (jpeg, png, webp only)
+    - Images saved to `server/uploads` folder, path stored in database
+    - Old images automatically deleted on update
+    - Implemented in `server/src/routes/menu.js`
+  
+  - **Category Management**: Fixed schema and creation flow
+    - Added `description` (TEXT) and `is_active` (INTEGER) columns to categories table
+    - Created `applyCategorySchema` function in database init for automatic migration
+    - Category creation now works without 500 errors
+    - Implemented in `server/src/database/init.js`
+  
+  - **Table Management Enhancements**: Complete overhaul with all features working
+    - **Dynamic Status**: Tables show "Free" or "Busy" based on active orders
+      - Status determined by checking for PENDING, CONFIRMED, PREPARING, READY, or SERVED orders
+      - Uses activeOrder field from backend to display current order info
+    - **Fixed Field Mappings**: Corrected all `tableNumber` → `table_number` field references
+    - **Full Data Reload**: After create/edit, fetches complete table list to preserve activeOrder metadata
+    - **Edit Functionality**: Opens modal with pre-populated data, updates correctly
+    - **Delete Functionality**: Removes tables with confirmation dialog
+    - **QR Code Printing**: Opens styled print window with browser window.print()
+      - Formatted layout with restaurant name, table number, and scannable QR code
+    - Implemented across `frontend/src/pages/admin/TableManagementPage.jsx` and `frontend/src/components/TableForm.jsx`
+
 - **Bug Fixes & Database Enhancements**: ✅
   - Fixed analytics endpoint inventory query (changed `current_stock` to `quantity`, `min_stock` to `min_threshold`)
   - Fixed WebSocket connection issue (updated frontend .env to use correct API URL instead of localhost)
