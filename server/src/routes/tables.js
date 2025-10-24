@@ -368,10 +368,10 @@ router.get('/:id/qr', authenticateToken, authorize('admin', 'manager', 'cashier'
     }
 
     if (format === 'dataurl') {
-      const qrCodeDataURL = await QRCode.toDataURL(table.qr_code);
+      const qrCodeDataURL = await QRCode.toDataURL(table.qr_code_url);
       res.json({ success: true, qrCodeUrl: qrCodeDataURL, table });
     } else {
-      const qrCodeBuffer = await QRCode.toBuffer(table.qr_code);
+      const qrCodeBuffer = await QRCode.toBuffer(table.qr_code_url);
       res.setHeader('Content-Type', 'image/png');
       res.send(qrCodeBuffer);
     }
@@ -394,7 +394,7 @@ router.get('/branch/:branchId/qr-sheet', authenticateToken, authorize('admin', '
 
     const qrCodes = [];
     for (const table of tables) {
-      const qrCodeDataURL = await QRCode.toDataURL(table.qr_code);
+      const qrCodeDataURL = await QRCode.toDataURL(table.qr_code_url);
       qrCodes.push({
         table,
         qrCode: qrCodeDataURL

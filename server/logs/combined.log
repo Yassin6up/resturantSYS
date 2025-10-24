@@ -120,3 +120,4 @@
 {"level":"info","message":"User admin logged in successfully","service":"posq-api","timestamp":"2025-10-24T00:27:40.835Z"}
 {"level":"info","message":"User admin logged in successfully","service":"posq-api","timestamp":"2025-10-24T00:27:48.576Z"}
 {"level":"info","message":"User admin logged in successfully","service":"posq-api","timestamp":"2025-10-24T00:27:56.992Z"}
+{"level":"info","message":"Database backup created by admin","service":"posq-api","timestamp":"2025-10-24T01:03:11.001Z"}

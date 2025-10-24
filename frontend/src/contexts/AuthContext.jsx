@@ -84,9 +84,10 @@ export function AuthProvider({ children }) {
     
     try {
       const response = await authAPI.login(credentials)
-      const { accessToken, user } = response.data
+      const { accessToken, refreshToken, user } = response.data
       
       localStorage.setItem('token', accessToken)
+      localStorage.setItem('refreshToken', refreshToken)
       localStorage.setItem('user', JSON.stringify(user))
       
       dispatch({
@@ -109,9 +110,10 @@ export function AuthProvider({ children }) {
     
     try {
       const response = await authAPI.pinLogin(credentials)
-      const { accessToken, user } = response.data
+      const { accessToken, refreshToken, user } = response.data
       
       localStorage.setItem('token', accessToken)
+      localStorage.setItem('refreshToken', refreshToken)
       localStorage.setItem('user', JSON.stringify(user))
       
       dispatch({
@@ -136,6 +138,7 @@ export function AuthProvider({ children }) {
       console.error('Logout error:', error)
     } finally {
       localStorage.removeItem('token')
+      localStorage.removeItem('refreshToken')
       localStorage.removeItem('user')
       dispatch({ type: 'AUTH_LOGOUT' })
       toast.success('Logged out successfully')

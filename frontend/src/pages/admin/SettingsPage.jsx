@@ -15,7 +15,8 @@ import {
   AdjustmentsHorizontalIcon,
   ArrowDownTrayIcon,
   ArrowUpTrayIcon,
-  TrashIcon
+  TrashIcon,
+  CircleStackIcon
 } from '@heroicons/react/24/outline'
 import toast from 'react-hot-toast'
 
@@ -756,7 +757,7 @@ function SettingsPage() {
                     </>
                   ) : (
                     <>
-                      <DatabaseIcon className="h-5 w-5 mr-2" />
+                      <CircleStackIcon className="h-5 w-5 mr-2" />
                       Test Connection
                     </>
                   )}
