@@ -50,6 +50,39 @@ The system employs a client-server architecture with a React + Vite frontend and
 
 ## Recent Changes (October 24, 2025)
 
+### ✅ Enhanced OrdersPage Management (Latest Update)
+
+#### New Features:
+1. **Quick Order Search with QR Code Support**:
+   - Search by order code input field (can be used for QR scanning)
+   - Instant order lookup and display in modal
+   
+2. **Payment Status Management**:
+   - One-click toggle between PAID/UNPAID status
+   - Automatic kitchen notification via Socket.IO when marked as PAID
+   - Visual indicators (green for PAID, red for UNPAID)
+   
+3. **Order Status Dropdown**:
+   - Change order status directly from table
+   - Real-time Socket.IO updates to all connected clients
+   - All statuses: PENDING, CONFIRMED, PREPARING, READY, SERVED, COMPLETED, CANCELLED
+   
+4. **Order Details Modal**:
+   - Shows complete order information
+   - Displays both Payment QR Code and Tracking QR Code
+   - Shows order items with quantities and prices
+   - Total amount prominently displayed
+   - Quick payment confirmation action
+
+5. **Fixed Inventory Page Error**:
+   - Added missing `getLowStockItems()` method to inventoryAPI
+
+#### Files Modified:
+- `frontend/src/services/api.js` - Added getLowStockItems method
+- `frontend/src/pages/admin/OrdersPage.jsx` - Complete redesign with all new features
+
+## Recent Changes (October 24, 2025)
+
 ### ✅ Complete Table-Based Ordering Flow with Cash Payment System
 
 #### Backend Enhancements:

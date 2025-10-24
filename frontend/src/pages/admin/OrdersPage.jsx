@@ -3,14 +3,16 @@ import { useSocket } from '../../contexts/SocketContext'
 import { ordersAPI } from '../../services/api'
 import { 
   MagnifyingGlassIcon, 
-  FunnelIcon,
-  PrinterIcon,
-  EyeIcon
+  QrCodeIcon,
+  CheckCircleIcon,
+  XCircleIcon,
+  EyeIcon,
+  PrinterIcon
 } from '@heroicons/react/24/outline'
 import toast from 'react-hot-toast'
 
 function OrdersPage() {
-  const { updateOrderStatus } = useSocket()
+  const { socket, updateOrderStatus: socketUpdateOrderStatus } = useSocket()
   const [orders, setOrders] = useState([])
   const [filteredOrders, setFilteredOrders] = useState([])
   const [loading, setLoading] = useState(true)
@@ -19,6 +21,9 @@ function OrdersPage() {
     table: '',
     search: ''
   })
+  const [searchInput, setSearchInput] = useState('')
+  const [showOrderModal, setShowOrderModal] = useState(false)
+  const [selectedOrder, setSelectedOrder] = useState(null)
 
   useEffect(() => {
     loadOrders()
@@ -72,10 +77,88 @@ function OrdersPage() {
     setFilteredOrders(filtered)
   }
 
+  const handleSearchByCode = async () => {
+    if (!searchInput.trim()) {
+      toast.error('Please enter an order code')
+      return
+    }
+
+    try {
+      const response = await ordersAPI.getOrderByCode(searchInput.trim())
+      if (response.data && response.data.order) {
+        setSelectedOrder(response.data.order)
+        setShowOrderModal(true)
+      }
+    } catch (error) {
+      toast.error('Order not found')
+      console.error('Order search error:', error)
+    }
+  }
+
+  const handlePaymentConfirmation = async (order) => {
+    try {
+      const newStatus = order.payment_status === 'PAID' ? 'UNPAID' : 'PAID'
+      
+      await ordersAPI.updatePayment(order.id, {
+        paymentStatus: newStatus,
+        paymentMethod: order.payment_method || 'cash'
+      })
+
+      // Update local state
+      setOrders(prev => prev.map(o => 
+        o.id === order.id 
+          ? { ...o, payment_status: newStatus, status: newStatus === 'PAID' ? 'CONFIRMED' : o.status }
+          : o
+      ))
+
+      // Update selected order in modal
+      if (selectedOrder && selectedOrder.id === order.id) {
+        setSelectedOrder(prev => ({
+          ...prev,
+          payment_status: newStatus,
+          status: newStatus === 'PAID' ? 'CONFIRMED' : prev.status
+        }))
+      }
+
+      if (newStatus === 'PAID') {
+        // Send to kitchen via Socket.IO when payment is confirmed
+        if (socket) {
+          socket.emit('order.paid', {
+            orderId: order.id,
+            branchId: order.branch_id,
+            orderCode: order.order_code
+          })
+        }
+        toast.success('Payment confirmed! Order sent to kitchen')
+      } else {
+        toast.success('Payment status updated')
+      }
+
+      loadOrders()
+    } catch (error) {
+      toast.error('Failed to update payment status')
+      console.error('Payment update error:', error)
+    }
+  }
+
   const handleStatusUpdate = async (orderId, newStatus) => {
     try {
       await ordersAPI.updateOrderStatus(orderId, newStatus)
+      
+      // Update local state
+      setOrders(prev => prev.map(o => 
+        o.id === orderId ? { ...o, status: newStatus } : o
+      ))
+      
+      // Send status update via Socket.IO for real-time updates
+      if (socketUpdateOrderStatus) {
+        socketUpdateOrderStatus(orderId, newStatus)
+      } else if (socket) {
+        socket.emit('order.updated', { orderId, status: newStatus })
+      }
+      
       toast.success(`Order status updated to ${newStatus}`)
+      loadOrders()
     } catch (error) {
       toast.error('Failed to update order status')
       console.error('Status update error:', error)
@@ -131,12 +214,45 @@ function OrdersPage() {
         </button>
       </div>
 
+      {/* Quick Search by Order Code */}
+      <div className="card bg-gradient-to-r from-blue-50 to-purple-50">
+        <div className="card-body">
+          <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+            <QrCodeIcon className="h-5 w-5" />
+            Quick Order Search
+          </h3>
+          <p className="text-sm text-gray-600 mb-4">
+            Enter order code manually or use a QR scanner device/app to scan the payment QR code
+          </p>
+          <div className="flex gap-3">
+            <div className="relative flex-1">
+              <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+              <input
+                type="text"
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && handleSearchByCode()}
+                placeholder="Enter order code (e.g., R0120241024001)"
+                className="form-input pl-10"
+              />
+            </div>
+            <button
+              onClick={handleSearchByCode}
+              className="btn-primary px-8 whitespace-nowrap"
+            >
+              <MagnifyingGlassIcon className="h-5 w-5 mr-2" />
+              Search Order
+            </button>
+          </div>
+        </div>
+      </div>
+
       {/* Filters */}
       <div className="card">
         <div className="card-body">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
-              <label className="form-label">Search</label>
+              <label className="form-label">Filter by Code/Customer</label>
               <div className="relative">
                 <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <input
@@ -212,13 +328,13 @@ function OrdersPage() {
                       Customer
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Status
+                      Total
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Payment
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Total
+                      Status
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Time
@@ -230,47 +346,71 @@ function OrdersPage() {
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {filteredOrders.map((order) => (
-                    <tr key={order.id}>
+                    <tr key={order.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm font-medium text-gray-900">{order.order_code}</div>
                         <div className="text-sm text-gray-500">#{order.id}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {order.table_number}
+                        {order.table_number || '-'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {order.customer_name || '-'}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`badge ${getStatusColor(order.status)}`}>
-                          {order.status}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`badge ${getPaymentStatusColor(order.payment_status)}`}>
-                          {order.payment_status}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">
                         {order.total.toFixed(2)} MAD
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <button
+                          onClick={() => handlePaymentConfirmation(order)}
+                          className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                            order.payment_status === 'PAID'
+                              ? 'bg-green-100 text-green-800 hover:bg-green-200'
+                              : 'bg-red-100 text-red-800 hover:bg-red-200'
+                          }`}
+                          title="Click to toggle payment status"
+                        >
+                          {order.payment_status === 'PAID' ? (
+                            <>
+                              <CheckCircleIcon className="h-3 w-3 mr-1" />
+                              PAID
+                            </>
+                          ) : (
+                            <>
+                              <XCircleIcon className="h-3 w-3 mr-1" />
+                              UNPAID
+                            </>
+                          )}
+                        </button>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <select
+                          value={order.status}
+                          onChange={(e) => handleStatusUpdate(order.id, e.target.value)}
+                          className={`text-xs font-medium rounded-full px-3 py-1 border-0 ${getStatusColor(order.status)}`}
+                        >
+                          <option value="PENDING">PENDING</option>
+                          <option value="CONFIRMED">CONFIRMED</option>
+                          <option value="PREPARING">PREPARING</option>
+                          <option value="READY">READY</option>
+                          <option value="SERVED">SERVED</option>
+                          <option value="COMPLETED">COMPLETED</option>
+                          <option value="CANCELLED">CANCELLED</option>
+                        </select>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {new Date(order.created_at).toLocaleTimeString()}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
                         <button
-                          onClick={() => window.open(`/order/${order.id}`, '_blank')}
+                          onClick={() => {
+                            setSelectedOrder(order)
+                            setShowOrderModal(true)
+                          }}
                           className="text-blue-600 hover:text-blue-900"
-                          title="View Order"
+                          title="View Order Details & QR"
                         >
-                          <EyeIcon className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => {/* Print receipt */}}
-                          className="text-gray-600 hover:text-gray-900"
-                          title="Print Receipt"
-                        >
-                          <PrinterIcon className="h-4 w-4" />
+                          <EyeIcon className="h-5 w-5" />
                         </button>
                       </td>
                     </tr>
@@ -282,32 +422,130 @@ function OrdersPage() {
         </div>
       </div>
 
-      {/* Order Status Legend */}
-      <div className="card">
-        <div className="card-header">
-          <h2 className="text-lg font-semibold text-gray-900">Order Status Legend</h2>
-        </div>
-        <div className="card-body">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="flex items-center space-x-2">
-              <span className="badge bg-yellow-100 text-yellow-800">PENDING</span>
-              <span className="text-sm text-gray-600">Waiting for confirmation</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <span className="badge bg-blue-100 text-blue-800">CONFIRMED</span>
-              <span className="text-sm text-gray-600">Order confirmed</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <span className="badge bg-orange-100 text-orange-800">PREPARING</span>
-              <span className="text-sm text-gray-600">Being prepared</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <span className="badge bg-green-100 text-green-800">READY</span>
-              <span className="text-sm text-gray-600">Ready for pickup</span>
+      {/* Order Details Modal */}
+      {showOrderModal && selectedOrder && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+            <div className="p-8">
+              {/* Header */}
+              <div className="flex justify-between items-start mb-6">
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900">Order Details</h2>
+                  <p className="text-gray-600">Order #{selectedOrder.order_code}</p>
+                </div>
+                <button
+                  onClick={() => setShowOrderModal(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Order Info */}
+              <div className="grid grid-cols-2 gap-4 mb-6">
+                <div className="bg-gray-50 rounded-xl p-4">
+                  <p className="text-sm text-gray-600">Customer</p>
+                  <p className="font-semibold">{selectedOrder.customer_name || '-'}</p>
+                </div>
+                <div className="bg-gray-50 rounded-xl p-4">
+                  <p className="text-sm text-gray-600">Table</p>
+                  <p className="font-semibold">{selectedOrder.table_number || '-'}</p>
+                </div>
+                <div className="bg-gray-50 rounded-xl p-4">
+                  <p className="text-sm text-gray-600">Payment Status</p>
+                  <span className={`badge ${getPaymentStatusColor(selectedOrder.payment_status)}`}>
+                    {selectedOrder.payment_status}
+                  </span>
+                </div>
+                <div className="bg-gray-50 rounded-xl p-4">
+                  <p className="text-sm text-gray-600">Order Status</p>
+                  <span className={`badge ${getStatusColor(selectedOrder.status)}`}>
+                    {selectedOrder.status}
+                  </span>
+                </div>
+              </div>
+
+              {/* Total */}
+              <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl p-6 mb-6">
+                <div className="flex justify-between items-center">
+                  <span className="text-lg font-semibold">Total Amount:</span>
+                  <span className="text-3xl font-bold text-blue-600">
+                    {selectedOrder.total.toFixed(2)} MAD
+                  </span>
+                </div>
+              </div>
+
+              {/* Order QR Codes */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
+                {selectedOrder.payment_qr_code && (
+                  <div className="bg-white border-2 border-blue-100 rounded-2xl p-6 text-center">
+                    <h3 className="font-bold text-gray-900 mb-4">Payment QR Code</h3>
+                    <img 
+                      src={selectedOrder.payment_qr_code} 
+                      alt="Payment QR Code"
+                      className="w-48 h-48 mx-auto"
+                    />
+                    <p className="text-sm text-gray-600 mt-4">
+                      For cashier payment confirmation
+                    </p>
+                  </div>
+                )}
+                {selectedOrder.tracking_qr_code && (
+                  <div className="bg-white border-2 border-purple-100 rounded-2xl p-6 text-center">
+                    <h3 className="font-bold text-gray-900 mb-4">Tracking QR Code</h3>
+                    <img 
+                      src={selectedOrder.tracking_qr_code} 
+                      alt="Tracking QR Code"
+                      className="w-48 h-48 mx-auto"
+                    />
+                    <p className="text-sm text-gray-600 mt-4">
+                      For customer order tracking
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Order Items */}
+              {selectedOrder.items && selectedOrder.items.length > 0 && (
+                <div className="mt-6">
+                  <h3 className="font-bold text-gray-900 mb-3">Order Items</h3>
+                  <div className="space-y-2">
+                    {selectedOrder.items.map((item, index) => (
+                      <div key={index} className="flex justify-between items-center bg-gray-50 rounded-lg p-3">
+                        <div>
+                          <p className="font-medium">{item.item_name}</p>
+                          <p className="text-sm text-gray-600">Qty: {item.quantity}</p>
+                        </div>
+                        <p className="font-semibold">{item.total.toFixed(2)} MAD</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Actions */}
+              <div className="mt-6 flex gap-3">
+                <button
+                  onClick={() => handlePaymentConfirmation(selectedOrder)}
+                  className={`flex-1 py-3 px-6 rounded-xl font-semibold transition-colors ${
+                    selectedOrder.payment_status === 'PAID'
+                      ? 'bg-red-100 text-red-700 hover:bg-red-200'
+                      : 'bg-green-600 text-white hover:bg-green-700'
+                  }`}
+                >
+                  {selectedOrder.payment_status === 'PAID' ? 'Mark as Unpaid' : 'Confirm Payment'}
+                </button>
+                <button
+                  onClick={() => setShowOrderModal(false)}
+                  className="flex-1 py-3 px-6 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold rounded-xl transition-colors"
+                >
+                  Close
+                </button>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   )
 }
