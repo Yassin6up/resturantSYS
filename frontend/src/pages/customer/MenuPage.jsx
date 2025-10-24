@@ -1,77 +1,84 @@
-import { useState, useEffect } from 'react'
-import { useSearchParams } from 'react-router-dom'
-import { useCart } from '../../contexts/CartContext'
-import { menuAPI, getImageUrl } from '../../services/api'
-import { PlusIcon, MinusIcon } from '@heroicons/react/24/outline'
-import CartBottomBar from '../../components/CartBottomBar'
-import toast from 'react-hot-toast'
+import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
+import { useCart } from "../../contexts/CartContext";
+import { menuAPI } from "../../services/api";
+import { PlusIcon, MinusIcon } from "@heroicons/react/24/outline";
+import CartBottomBar from "../../components/CartBottomBar";
+import toast from "react-hot-toast";
 
 function MenuPage() {
-  const [searchParams] = useSearchParams()
-  const table = searchParams.get('table')
-  const branch = searchParams.get('branch') || '1'
-  
-  const [menu, setMenu] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [selectedItem, setSelectedItem] = useState(null)
-  const [quantity, setQuantity] = useState(1)
-  const [selectedModifiers, setSelectedModifiers] = useState([])
-  const [note, setNote] = useState('')
-  
-  const { addItem, setBranchInfo } = useCart()
+  const [searchParams] = useSearchParams();
+  const table = searchParams.get("table");
+  const branch = searchParams.get("branch") || "1";
+
+  const [menu, setMenu] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedItem, setSelectedItem] = useState(null);
+  const [quantity, setQuantity] = useState(1);
+  const [selectedModifiers, setSelectedModifiers] = useState([]);
+  const [note, setNote] = useState("");
+
+  const { addItem, setBranchInfo } = useCart();
 
   useEffect(() => {
     // Set branch info in cart when page loads
-    setBranchInfo(parseInt(branch), table)
-  }, [branch, table])
+    setBranchInfo(parseInt(branch), table);
+  }, [branch, table]);
 
   useEffect(() => {
-    loadMenu()
-  }, [branch])
+    loadMenu();
+  }, [branch]);
 
   const loadMenu = async () => {
     try {
-      setLoading(true)
-      const response = await menuAPI.getMenu({ branchId: parseInt(branch) })
-      setMenu(response.data.categories)
+      setLoading(true);
+      const response = await menuAPI.getMenu({ branchId: parseInt(branch) });
+      setMenu(response.data.categories);
     } catch (error) {
-      toast.error('Failed to load menu')
-      console.error('Menu load error:', error)
+      toast.error("Failed to load menu");
+      console.error("Menu load error:", error);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   const handleAddToCart = () => {
-    if (!selectedItem) return
+    if (!selectedItem) return;
 
-    console.log("item : " , selectedItem)
-    addItem(selectedItem, quantity, selectedModifiers, note, parseInt(branch), table)
-    
-    toast.success(`${quantity}x ${selectedItem.name} added to cart`)
-    setSelectedItem(null)
-    setQuantity(1)
-    setSelectedModifiers([])
-    setNote('')
-  }
+    console.log("item : ", selectedItem);
+    addItem(
+      selectedItem,
+      quantity,
+      selectedModifiers,
+      note,
+      parseInt(branch),
+      table,
+    );
+
+    toast.success(`${quantity}x ${selectedItem.name} added to cart`);
+    setSelectedItem(null);
+    setQuantity(1);
+    setSelectedModifiers([]);
+    setNote("");
+  };
 
   const toggleModifier = (modifier) => {
-    setSelectedModifiers(prev => {
-      const exists = prev.find(m => m.id === modifier.id)
+    setSelectedModifiers((prev) => {
+      const exists = prev.find((m) => m.id === modifier.id);
       if (exists) {
-        return prev.filter(m => m.id !== modifier.id)
+        return prev.filter((m) => m.id !== modifier.id);
       } else {
-        return [...prev, modifier]
+        return [...prev, modifier];
       }
-    })
-  }
+    });
+  };
 
   const calculateItemTotal = (item) => {
     const modifierTotal = selectedModifiers.reduce((sum, modifier) => {
-      return sum + parseFloat(modifier.extra_price || 0)
-    }, 0)
-    return (parseFloat(item.price || 0) + modifierTotal) * quantity
-  }
+      return sum + parseFloat(modifier.extra_price || 0);
+    }, 0);
+    return (parseFloat(item.price || 0) + modifierTotal) * quantity;
+  };
 
   if (loading) {
     return (
@@ -81,7 +88,7 @@ function MenuPage() {
           <p className="text-gray-600">Loading menu...</p>
         </div>
       </div>
-    )
+    );
   }
 
   return (
@@ -91,11 +98,14 @@ function MenuPage() {
         <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full mb-6 shadow-xl">
           <span className="text-white font-bold text-2xl">🍽️</span>
         </div>
-        <h1 className="text-4xl font-bold gradient-text mb-4">Our Delicious Menu</h1>
-        {table && (
-          <p className="text-xl text-gray-600">Table {table}</p>
-        )}
-        <p className="text-lg text-gray-600 max-w-2xl mx-auto">Discover our carefully crafted dishes made with love and the finest ingredients</p>
+        <h1 className="text-4xl font-bold gradient-text mb-4">
+          Our Delicious Menu
+        </h1>
+        {table && <p className="text-xl text-gray-600">Table {table}</p>}
+        <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+          Discover our carefully crafted dishes made with love and the finest
+          ingredients
+        </p>
       </div>
 
       {/* Menu Categories */}
@@ -103,7 +113,9 @@ function MenuPage() {
         {menu.map((category) => (
           <div key={category.id} className="card">
             <div className="card-header">
-              <h2 className="text-xl font-semibold text-gray-900">{category.name}</h2>
+              <h2 className="text-xl font-semibold text-gray-900">
+                {category.name}
+              </h2>
             </div>
             <div className="card-body">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -116,11 +128,14 @@ function MenuPage() {
                     {/* Food Image */}
                     <div className="relative overflow-hidden">
                       <img
-                        src={item.image ? getImageUrl(item.image) : 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&h=300&fit=crop'}
+                        src={
+                          item.image || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&h=300&fit=crop"
+                        }
                         alt={item.name}
                         className="menu-item-image"
                         onError={(e) => {
-                          e.target.src = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&h=300&fit=crop';
+                          e.target.src =
+                            "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&h=300&fit=crop";
                         }}
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
@@ -128,13 +143,17 @@ function MenuPage() {
                         {parseFloat(item?.price || 0).toFixed(2)} MAD
                       </div>
                     </div>
-                    
+
                     <div className="p-6">
-                      <h3 className="font-bold text-gray-900 text-lg mb-2 group-hover:text-blue-600 transition-colors duration-200">{item.name}</h3>
+                      <h3 className="font-bold text-gray-900 text-lg mb-2 group-hover:text-blue-600 transition-colors duration-200">
+                        {item.name}
+                      </h3>
                       {item.description && (
-                        <p className="text-gray-600 mb-4 line-clamp-2">{item.description}</p>
+                        <p className="text-gray-600 mb-4 line-clamp-2">
+                          {item.description}
+                        </p>
                       )}
-                      <button 
+                      <button
                         onClick={(e) => {
                           e.stopPropagation();
                           addItem(item);
@@ -159,11 +178,15 @@ function MenuPage() {
             {/* Food Image */}
             <div className="relative overflow-hidden">
               <img
-                src={selectedItem.image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&h=300&fit=crop'}
+                src={
+                  selectedItem.image ||
+                  "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&h=300&fit=crop"
+                }
                 alt={selectedItem.name}
                 className="w-full h-64 object-cover"
                 onError={(e) => {
-                  e.target.src = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&h=300&fit=crop';
+                  e.target.src =
+                    "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&h=300&fit=crop";
                 }}
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent"></div>
@@ -171,17 +194,29 @@ function MenuPage() {
                 {parseFloat(selectedItem.price || 0).toFixed(2)} MAD
               </div>
             </div>
-            
+
             <div className="p-6">
               <div className="flex justify-between items-start mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">{selectedItem.name}</h3>
+                <h3 className="text-lg font-semibold text-gray-900">
+                  {selectedItem.name}
+                </h3>
                 <button
                   onClick={() => setSelectedItem(null)}
                   className="text-gray-400 hover:text-gray-600"
                 >
                   <span className="sr-only">Close</span>
-                  <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  <svg
+                    className="h-6 w-6"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
                   </svg>
                 </button>
               </div>
@@ -199,7 +234,9 @@ function MenuPage() {
                       <label key={modifier.id} className="flex items-center">
                         <input
                           type="checkbox"
-                          checked={selectedModifiers.some(m => m.id === modifier.id)}
+                          checked={selectedModifiers.some(
+                            (m) => m.id === modifier.id,
+                          )}
                           onChange={() => toggleModifier(modifier)}
                           className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
                         />
@@ -207,7 +244,9 @@ function MenuPage() {
                           {modifier.name}
                           {parseFloat(modifier.extra_price || 0) > 0 && (
                             <span className="text-primary-600 ml-1">
-                              (+{parseFloat(modifier.extra_price || 0).toFixed(2)} MAD)
+                              (+
+                              {parseFloat(modifier.extra_price || 0).toFixed(2)}{" "}
+                              MAD)
                             </span>
                           )}
                         </span>
@@ -276,11 +315,11 @@ function MenuPage() {
           </div>
         </div>
       )}
-      
+
       {/* Cart Bottom Bar */}
       <CartBottomBar />
     </div>
-  )
+  );
 }
 
-export default MenuPage
+export default MenuPage;

@@ -54,7 +54,10 @@ router.post('/image', authenticateToken, authorize('admin', 'manager'), upload.s
       return res.status(400).json({ error: 'No image file provided' });
     }
 
-    const imageUrl = `/uploads/${req.file.filename}`;
+    // Get full URL with domain
+    const protocol = req.protocol;
+    const host = req.get('host');
+    const imageUrl = `${protocol}://${host}/uploads/${req.file.filename}`;
     
     // Log upload
     await logger.info(`Image uploaded: ${req.file.filename} by user ${req.user.username}`);
@@ -79,8 +82,12 @@ router.post('/images', authenticateToken, authorize('admin', 'manager'), upload.
       return res.status(400).json({ error: 'No image files provided' });
     }
 
+    // Get full URL with domain
+    const protocol = req.protocol;
+    const host = req.get('host');
+    
     const uploadedImages = req.files.map(file => ({
-      imageUrl: `/uploads/${file.filename}`,
+      imageUrl: `${protocol}://${host}/uploads/${file.filename}`,
       filename: file.filename,
       originalName: file.originalname,
       size: file.size
@@ -130,6 +137,11 @@ router.delete('/image/:filename', authenticateToken, authorize('admin', 'manager
 router.get('/images', authenticateToken, authorize('admin', 'manager'), async (req, res) => {
   try {
     const files = fs.readdirSync(uploadsDir);
+    
+    // Get full URL with domain
+    const protocol = req.protocol;
+    const host = req.get('host');
+    
     const images = files
       .filter(file => {
         const ext = path.extname(file).toLowerCase();
@@ -137,7 +149,7 @@ router.get('/images', authenticateToken, authorize('admin', 'manager'), async (r
       })
       .map(file => ({
         filename: file,
-        imageUrl: `/uploads/${file}`,
+        imageUrl: `${protocol}://${host}/uploads/${file}`,
         uploadDate: fs.statSync(path.join(uploadsDir, file)).mtime
       }))
       .sort((a, b) => b.uploadDate - a.uploadDate);

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { menuAPI, getImageUrl } from '../../services/api'
+import { menuAPI } from '../../services/api'
 import { PlusIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/outline'
 import MenuItemForm from '../../components/MenuItemForm'
 import CategoryForm from '../../components/CategoryForm'
@@ -273,7 +273,7 @@ function MenuManagementPage() {
                       <tr key={item.id}>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <img 
-                            src={item.image ? getImageUrl(item.image) : 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=100&h=100&fit=crop'} 
+                            src={item.image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=100&h=100&fit=crop'} 
                             alt={item.name}
                             className="h-12 w-12 rounded-lg object-cover"
                             onError={(e) => {

@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { uploadAPI, getImageUrl } from "../services/api";
+import { uploadAPI } from "../services/api";
 import {
   PhotoIcon,
   XMarkIcon,
@@ -156,11 +156,11 @@ function ImageUpload({
         <div className="relative animate-fadeInUp">
           <div className="relative inline-block">
             <img
-              src={getImageUrl(value)}
+              src={value}
               alt="Uploaded"
               className="h-40 w-40 object-cover rounded-2xl border-2 border-gray-200 shadow-lg hover:shadow-xl transition-shadow duration-300"
               onError={(e) => {
-                console.error("Failed to load image:", getImageUrl(value));
+                console.error("Failed to load image:", value);
                 e.target.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160"><rect width="160" height="160" fill="%23f3f4f6"/><text x="50%" y="50%" font-family="Arial" font-size="14" fill="%239ca3af" text-anchor="middle" dy=".3em">Image Error</text></svg>';
               }}
             />
