@@ -16,9 +16,9 @@ router.post('/', orderRateLimiter, validateOrder, async (req, res) => {
     const { branchId, tableId, customerName, items, paymentMethod, clientMeta } = req.body;
 
     // Generate order code
-    const branch = await db('branches').where({ id: branchId }).first();
+    const branch = await trx('branches').where({ id: branchId }).first();
     const timestamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-    const orderCount = await db('orders').where({ branch_id: branchId }).count('id as count').first();
+    const orderCount = await trx('orders').where({ branch_id: branchId }).count('id as count').first();
     const orderCode = `${branch.code}-${timestamp}-${String(orderCount.count + 1).padStart(4, '0')}`;
 
     // Generate unique 8-digit PIN
@@ -26,7 +26,7 @@ router.post('/', orderRateLimiter, validateOrder, async (req, res) => {
     let isUnique = false;
     while (!isUnique) {
       pin = Math.floor(10000000 + Math.random() * 90000000).toString();
-      const existingOrder = await db('orders').where({ pin }).first();
+      const existingOrder = await trx('orders').where({ pin }).first();
       if (!existingOrder) {
         isUnique = true;
       }
@@ -37,7 +37,7 @@ router.post('/', orderRateLimiter, validateOrder, async (req, res) => {
     const orderItems = [];
 
     for (const item of items) {
-      const menuItem = await db('menu_items').where({ id: item.menuItemId }).first();
+      const menuItem = await trx('menu_items').where({ id: item.menuItemId }).first();
       if (!menuItem || !menuItem.is_available) {
         throw new Error(`Menu item ${item.menuItemId} not available`);
       }
@@ -48,7 +48,7 @@ router.post('/', orderRateLimiter, validateOrder, async (req, res) => {
       // Add modifier costs
       if (item.modifiers && item.modifiers.length > 0) {
         for (const modifierId of item.modifiers) {
-          const modifier = await db('modifiers').where({ id: modifierId }).first();
+          const modifier = await trx('modifiers').where({ id: modifierId }).first();
           if (modifier) {
             itemTotal += modifier.extra_price * item.quantity;
             modifiers.push(modifier);
@@ -67,8 +67,8 @@ router.post('/', orderRateLimiter, validateOrder, async (req, res) => {
     }
 
     // Get tax and service charge rates
-    const taxRate = await db('settings').where({ key: 'tax_rate' }).first();
-    const serviceChargeRate = await db('settings').where({ key: 'service_charge_rate' }).first();
+    const taxRate = await trx('settings').where({ key: 'tax_rate' }).first();
+    const serviceChargeRate = await trx('settings').where({ key: 'service_charge_rate' }).first();
     
     const tax = subtotal * (parseFloat(taxRate?.value || 0) / 100);
     const serviceCharge = subtotal * (parseFloat(serviceChargeRate?.value || 0) / 100);
