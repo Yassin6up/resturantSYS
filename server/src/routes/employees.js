@@ -143,9 +143,7 @@ router.post('/', authenticateToken, authorize('admin'), async (req, res) => {
     await db('audit_logs').insert({
       user_id: req.user.id,
       action: 'CREATE_EMPLOYEE',
-      entity_type: 'user',
-      entity_id: employeeId,
-      meta: JSON.stringify({ username, full_name, role })
+      meta: JSON.stringify({ employeeId, username, full_name, role, branchId })
     });
 
     logger.info(`Employee ${username} created by ${req.user.username}`);
@@ -177,7 +175,14 @@ router.put('/:id', authenticateToken, authorize('admin'), async (req, res) => {
       is_active
     } = req.body;
 
-    const employee = await db('users').where({ id }).first();
+    // Use authenticated user's branch_id for security
+    const branchId = req.user.branch_id;
+    
+    if (!branchId) {
+      return res.status(400).json({ error: 'User is not assigned to a branch' });
+    }
+
+    const employee = await db('users').where({ id, branch_id: branchId }).first();
     
     if (!employee) {
       return res.status(404).json({ error: 'Employee not found' });
@@ -228,9 +233,7 @@ router.put('/:id', authenticateToken, authorize('admin'), async (req, res) => {
     await db('audit_logs').insert({
       user_id: req.user.id,
       action: 'UPDATE_EMPLOYEE',
-      entity_type: 'user',
-      entity_id: id,
-      meta: JSON.stringify({ changes: updateData })
+      meta: JSON.stringify({ employeeId: id, changes: updateData, branchId })
     });
 
     logger.info(`Employee ${id} updated by ${req.user.username}`);
@@ -249,11 +252,18 @@ router.delete('/:id', authenticateToken, authorize('admin'), async (req, res) =>
   try {
     const { id } = req.params;
 
+    // Use authenticated user's branch_id for security
+    const branchId = req.user.branch_id;
+    
+    if (!branchId) {
+      return res.status(400).json({ error: 'User is not assigned to a branch' });
+    }
+
     if (parseInt(id) === req.user.id) {
       return res.status(400).json({ error: 'Cannot delete your own account' });
     }
 
-    const employee = await db('users').where({ id }).first();
+    const employee = await db('users').where({ id, branch_id: branchId }).first();
     
     if (!employee) {
       return res.status(404).json({ error: 'Employee not found' });
@@ -266,9 +276,7 @@ router.delete('/:id', authenticateToken, authorize('admin'), async (req, res) =>
     await db('audit_logs').insert({
       user_id: req.user.id,
       action: 'DELETE_EMPLOYEE',
-      entity_type: 'user',
-      entity_id: id,
-      meta: JSON.stringify({ username: employee.username })
+      meta: JSON.stringify({ employeeId: id, username: employee.username, branchId })
     });
 
     logger.info(`Employee ${id} deactivated by ${req.user.username}`);
@@ -287,7 +295,14 @@ router.post('/:id/activate', authenticateToken, authorize('admin'), async (req, 
   try {
     const { id } = req.params;
 
-    const employee = await db('users').where({ id }).first();
+    // Use authenticated user's branch_id for security
+    const branchId = req.user.branch_id;
+    
+    if (!branchId) {
+      return res.status(400).json({ error: 'User is not assigned to a branch' });
+    }
+
+    const employee = await db('users').where({ id, branch_id: branchId }).first();
     
     if (!employee) {
       return res.status(404).json({ error: 'Employee not found' });
@@ -300,9 +315,7 @@ router.post('/:id/activate', authenticateToken, authorize('admin'), async (req, 
     await db('audit_logs').insert({
       user_id: req.user.id,
       action: 'ACTIVATE_EMPLOYEE',
-      entity_type: 'user',
-      entity_id: id,
-      meta: JSON.stringify({ username: employee.username })
+      meta: JSON.stringify({ employeeId: id, username: employee.username, branchId })
     });
 
     logger.info(`Employee ${id} activated by ${req.user.username}`);

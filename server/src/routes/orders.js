@@ -362,6 +362,13 @@ router.patch('/:id/status', authenticateToken, authorize('admin', 'manager', 'ca
       return res.status(400).json({ error: 'Invalid status' });
     }
 
+    // Get current order status before updating
+    const currentOrder = await db('orders').where({ id }).first();
+    
+    if (!currentOrder) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
+
     await db('orders')
       .where({ id })
       .update({
@@ -374,6 +381,48 @@ router.patch('/:id/status', authenticateToken, authorize('admin', 'manager', 'ca
       .leftJoin('tables', 'orders.table_id', 'tables.id')
       .where({ 'orders.id': id })
       .first();
+
+    // Automatic inventory deduction when order is completed
+    if (status === 'COMPLETED' && currentOrder.status !== 'COMPLETED') {
+      try {
+        // Get all order items
+        const orderItems = await db('order_items')
+          .select('menu_item_id', 'quantity')
+          .where({ order_id: id });
+
+        for (const item of orderItems) {
+          // Get recipes for this menu item
+          const recipes = await db('recipes')
+            .select('stock_item_id', 'qty_per_serving')
+            .where({ menu_item_id: item.menu_item_id });
+
+          for (const recipe of recipes) {
+            const deductionQty = recipe.qty_per_serving * item.quantity;
+            
+            // Update stock quantity
+            await db('stock_items')
+              .where({ id: recipe.stock_item_id })
+              .decrement('quantity', deductionQty);
+
+            // Record the movement
+            await db('stock_movements').insert({
+              stock_item_id: recipe.stock_item_id,
+              movement_type: 'OUT',
+              quantity: deductionQty,
+              reference_type: 'ORDER',
+              reference_id: id,
+              notes: `Auto-deduction for order ${order.order_code}`,
+              created_by: req.user.id
+            });
+          }
+        }
+
+        logger.info(`Inventory deducted for completed order ${order.order_code}`);
+      } catch (invError) {
+        logger.error(`Inventory deduction error for order ${id}:`, invError);
+        // Don't fail the entire request if inventory deduction fails
+      }
+    }
 
     // Emit real-time event
     const io = req.app.get('io');

@@ -73,6 +73,51 @@ Both workflows start automatically and are configured in the Replit workspace.
 
 ### Latest (October 24, 2025)
 
+- **Complete Multi-Restaurant Cart & Order System**: ✅
+  - **Cart Persistence with Branch Tracking**:
+    - Cart now tracks branchId and tableNumber for multi-restaurant support
+    - localStorage automatically saves cart data on every change (prevents data loss on refresh)
+    - setBranchInfo function to link cart to specific restaurant and table
+    - Order submission uses cart's branch info ensuring correct restaurant receives order
+  
+  - **Menu Item Image Upload Fix**:
+    - Backend accepts both direct file uploads AND pre-uploaded image URLs
+    - Supports frontend pattern where images upload separately via /api/upload/image
+    - Image paths properly saved to database and displayed in UI
+  
+  - **Automatic Inventory Deduction**:
+    - When order status changes to COMPLETED, system automatically:
+      - Fetches all order items and their recipes (menu_item → stock_item mappings)
+      - Calculates deduction: qty_per_serving × order_quantity
+      - Decrements stock_items.quantity for each ingredient
+      - Records movement in stock_movements with order reference
+    - Prevents duplicate deduction (checks if status was already COMPLETED)
+    - Error handling ensures order completion doesn't fail if inventory update fails
+  
+  - **Employee Management Branch Security**:
+    - All employee CRUD operations now enforce branch isolation
+    - GET / - Filters employees by authenticated user's branch_id
+    - GET /:id - Verifies employee belongs to user's branch
+    - POST / - Automatically assigns new employees to user's branch_id
+    - PUT /:id - Verifies employee belongs to user's branch before update
+    - DELETE /:id - Verifies employee belongs to user's branch before deactivation
+    - POST /:id/activate - Verifies employee belongs to user's branch before activation
+    - Audit logs fixed to match schema (removed non-existent entity_id and entity_type fields)
+  
+  - **Verified Existing Features**:
+    - Customer order tracking by PIN (OrderStatusPage.jsx)
+    - Kitchen display with real-time WebSocket updates (KitchenDisplayPage.jsx)
+    - All reports filter by branchId (sales, items, inventory, payments, cash reconciliation)
+    - Owner dashboard aggregates statistics from all owned restaurants
+  
+  - **Files Modified**:
+    - server/src/routes/menu.js - Image upload flexibility
+    - server/src/routes/orders.js - Automatic inventory deduction
+    - server/src/routes/employees.js - Complete branch isolation + audit log schema fix
+    - frontend/src/contexts/CartContext.jsx - Branch tracking + localStorage
+    - frontend/src/pages/customer/MenuPage.jsx - Set branch info on load
+    - frontend/src/pages/customer/CheckoutPage.jsx - Use branch info from cart
+
 - **Admin Features & Table Management Improvements**: ✅
   - **Restaurant Admin Employee Creation**: Option to create admin employee during restaurant setup
     - Checkbox in restaurant creation form to create admin user

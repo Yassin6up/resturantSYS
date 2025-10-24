@@ -14,7 +14,7 @@ import QRCode from 'qrcode.react'
 import toast from 'react-hot-toast'
 
 function CheckoutPage() {
-  const { cartItems, total, clearCart, branchId, tableNumber: cartTableNumber } = useCart()
+  const { items: cartItems, total, clearCart, branchId, tableNumber: cartTableNumber } = useCart()
   const { getSetting } = useTheme()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
