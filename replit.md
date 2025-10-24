@@ -64,13 +64,36 @@ Both workflows start automatically and are configured in the Replit workspace.
 ## Recent Changes
 
 ### Latest (October 24, 2025)
+- **Employee Management System**: Full CRUD implementation
+  - Backend API routes (`/api/employees`) with role-based access control
+  - Create, update, deactivate, and reactivate employees
+  - Comprehensive employee data: roles, salaries, contact info, hire dates, PINs
+  - Frontend Employee Management page with data tables, search, filters, and modal forms
+  - Audit logging for all employee actions
+  - Security: bcrypt password hashing, admin/manager-only access
+
+- **Enhanced Reports Page**: Comprehensive analytics and data tables
+  - Top Selling Items with ranked table view
+  - Table Turnover analysis with detailed statistics
+  - Daily sales, sales range, inventory usage reports
+  - Payment methods and cash reconciliation
+  - Excel export functionality for all reports
+  - Real-time data fetching from backend APIs
+
+- **Authentication System**: Production-ready token refresh
+  - Automatic token refresh with deadlock prevention
+  - Seamless session management without forced logouts
+  - Request queue handling for expired tokens
+  - Security fixes reviewed and approved
+
 - **Backup & Restore System**: Complete implementation
   - Backend API routes (`/api/backup`) with admin authentication
   - Security: Path traversal protection, filename validation, audit logging
   - Frontend UI in Settings page with create/restore/delete functionality
   - Supports SQLite, MySQL, and PostgreSQL backups
+
 - **QR Code System**: Verified table QR codes use user-friendly table numbers
-- **API Integration**: Added backupAPI to frontend services
+- **Customer Ordering**: Full implementation with menu, cart, checkout, order tracking
 
 ### Replit Setup
 - Configured Vite to run on port 5000 with allowed hosts for Replit proxy
