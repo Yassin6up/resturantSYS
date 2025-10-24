@@ -165,7 +165,14 @@ router.post('/', orderRateLimiter, validateOrder, async (req, res) => {
 // Get orders (admin/cashier)
 router.get('/', authenticateToken, authorize('admin', 'manager', 'cashier'), async (req, res) => {
   try {
-    const { branchId, status, tableId, limit = 50, offset = 0 } = req.query;
+    // Use authenticated user's branch_id for security
+    const branchId = req.user.branch_id;
+    
+    if (!branchId) {
+      return res.status(400).json({ error: 'User is not assigned to a branch' });
+    }
+    
+    const { status, tableId, limit = 50, offset = 0 } = req.query;
 
     let query = db('orders')
       .select(
@@ -174,11 +181,8 @@ router.get('/', authenticateToken, authorize('admin', 'manager', 'cashier'), asy
         'branches.name as branch_name'
       )
       .leftJoin('tables', 'orders.table_id', 'tables.id')
-      .leftJoin('branches', 'orders.branch_id', 'branches.id');
-
-    if (branchId) {
-      query = query.where({ 'orders.branch_id': branchId });
-    }
+      .leftJoin('branches', 'orders.branch_id', 'branches.id')
+      .where({ 'orders.branch_id': branchId });
 
     if (status) {
       if (Array.isArray(status)) {

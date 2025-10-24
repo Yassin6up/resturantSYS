@@ -63,11 +63,16 @@ router.get('/', async (req, res) => {
 // Get all categories (admin)
 router.get('/categories', authenticateToken, authorize('admin', 'manager'), async (req, res) => {
   try {
-    const { branchId } = req.query;
+    // Use authenticated user's branch_id for security
+    const branchId = req.user.branch_id;
+    
+    if (!branchId) {
+      return res.status(400).json({ error: 'User is not assigned to a branch' });
+    }
 
     const categories = await db('categories')
       .select('categories.*')
-      .where(branchId ? { 'categories.branch_id': branchId } : {})
+      .where({ 'categories.branch_id': branchId })
       .orderBy('categories.position');
 
     res.json({ categories });
@@ -80,10 +85,17 @@ router.get('/categories', authenticateToken, authorize('admin', 'manager'), asyn
 // Create category (admin)
 router.post('/categories', authenticateToken, authorize('admin', 'manager'), async (req, res) => {
   try {
-    const { name, branchId, position, description, isActive } = req.body;
+    const { name, position, description, isActive } = req.body;
+    
+    // Use authenticated user's branch_id for security
+    const branchId = req.user.branch_id;
+    
+    if (!branchId) {
+      return res.status(400).json({ error: 'User is not assigned to a branch' });
+    }
 
-    if (!name || !branchId) {
-      return res.status(400).json({ error: 'Name and branch ID are required' });
+    if (!name) {
+      return res.status(400).json({ error: 'Name is required' });
     }
 
     const [categoryId] = await db('categories').insert({
@@ -115,6 +127,22 @@ router.put('/categories/:id', authenticateToken, authorize('admin', 'manager'), 
   try {
     const { id } = req.params;
     const { name, position, description, isActive } = req.body;
+    
+    // Use authenticated user's branch_id for security
+    const branchId = req.user.branch_id;
+    
+    if (!branchId) {
+      return res.status(400).json({ error: 'User is not assigned to a branch' });
+    }
+    
+    // Verify the category belongs to the user's branch
+    const existingCategory = await db('categories').where({ id }).first();
+    if (!existingCategory) {
+      return res.status(404).json({ error: 'Category not found' });
+    }
+    if (existingCategory.branch_id !== branchId) {
+      return res.status(403).json({ error: 'Access denied: Category belongs to different branch' });
+    }
 
     await db('categories')
       .where({ id })
@@ -146,6 +174,22 @@ router.put('/categories/:id', authenticateToken, authorize('admin', 'manager'), 
 router.delete('/categories/:id', authenticateToken, authorize('admin', 'manager'), async (req, res) => {
   try {
     const { id } = req.params;
+    
+    // Use authenticated user's branch_id for security
+    const branchId = req.user.branch_id;
+    
+    if (!branchId) {
+      return res.status(400).json({ error: 'User is not assigned to a branch' });
+    }
+    
+    // Verify the category belongs to the user's branch
+    const existingCategory = await db('categories').where({ id }).first();
+    if (!existingCategory) {
+      return res.status(404).json({ error: 'Category not found' });
+    }
+    if (existingCategory.branch_id !== branchId) {
+      return res.status(403).json({ error: 'Access denied: Category belongs to different branch' });
+    }
 
     // Check if category has menu items
     const itemCount = await db('menu_items').where({ category_id: id }).count('id as count').first();
@@ -173,15 +217,19 @@ router.delete('/categories/:id', authenticateToken, authorize('admin', 'manager'
 // Get all menu items (admin)
 router.get('/items', authenticateToken, authorize('admin', 'manager'), async (req, res) => {
   try {
-    const { branchId, categoryId } = req.query;
+    // Use authenticated user's branch_id for security
+    const branchId = req.user.branch_id;
+    
+    if (!branchId) {
+      return res.status(400).json({ error: 'User is not assigned to a branch' });
+    }
+    
+    const { categoryId } = req.query;
 
     let query = db('menu_items')
       .select('menu_items.*', 'categories.name as category_name')
-      .leftJoin('categories', 'menu_items.category_id', 'categories.id');
-
-    if (branchId) {
-      query = query.where({ 'menu_items.branch_id': branchId });
-    }
+      .leftJoin('categories', 'menu_items.category_id', 'categories.id')
+      .where({ 'menu_items.branch_id': branchId });
 
     if (categoryId) {
       query = query.where({ 'menu_items.category_id': categoryId });
@@ -208,7 +256,14 @@ router.get('/items', authenticateToken, authorize('admin', 'manager'), async (re
 // Create menu item (admin)
 router.post('/items', authenticateToken, authorize('admin', 'manager'), validateMenuItem, async (req, res) => {
   try {
-    const { name, description, price, categoryId, branchId, sku, modifiers } = req.body;
+    const { name, description, price, categoryId, sku, modifiers } = req.body;
+    
+    // Use authenticated user's branch_id for security
+    const branchId = req.user.branch_id;
+    
+    if (!branchId) {
+      return res.status(400).json({ error: 'User is not assigned to a branch' });
+    }
 
     const [itemId] = await db('menu_items').insert({
       name,
@@ -262,6 +317,22 @@ router.put('/items/:id', authenticateToken, authorize('admin', 'manager'), async
   try {
     const { id } = req.params;
     const { name, description, price, categoryId, sku, isAvailable, modifiers } = req.body;
+    
+    // Use authenticated user's branch_id for security
+    const branchId = req.user.branch_id;
+    
+    if (!branchId) {
+      return res.status(400).json({ error: 'User is not assigned to a branch' });
+    }
+    
+    // Verify the item belongs to the user's branch
+    const existingItem = await db('menu_items').where({ id }).first();
+    if (!existingItem) {
+      return res.status(404).json({ error: 'Menu item not found' });
+    }
+    if (existingItem.branch_id !== branchId) {
+      return res.status(403).json({ error: 'Access denied: Item belongs to different branch' });
+    }
 
     await db('menu_items')
       .where({ id })

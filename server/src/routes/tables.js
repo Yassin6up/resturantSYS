@@ -10,15 +10,17 @@ const router = express.Router();
 // Get all tables (admin/cashier)
 router.get('/', authenticateToken, authorize('admin', 'manager', 'cashier'), async (req, res) => {
   try {
-    const { branchId } = req.query;
-
-    let query = db('tables')
-      .select('tables.*', 'branches.name as branch_name')
-      .leftJoin('branches', 'tables.branch_id', 'branches.id');
-
-    if (branchId) {
-      query = query.where({ 'tables.branch_id': branchId });
+    // Use authenticated user's branch_id for security
+    const branchId = req.user.branch_id;
+    
+    if (!branchId) {
+      return res.status(400).json({ error: 'User is not assigned to a branch' });
     }
+
+    const query = db('tables')
+      .select('tables.*', 'branches.name as branch_name')
+      .leftJoin('branches', 'tables.branch_id', 'branches.id')
+      .where({ 'tables.branch_id': branchId });
 
     const tables = await query.orderBy('tables.table_number');
 
@@ -45,10 +47,17 @@ router.get('/', authenticateToken, authorize('admin', 'manager', 'cashier'), asy
 // Create table (admin)
 router.post('/', authenticateToken, authorize('admin', 'manager'), async (req, res) => {
   try {
-    const { number, capacity, location, branchId, isActive } = req.body;
+    const { number, capacity, location, isActive } = req.body;
+    
+    // Use authenticated user's branch_id for security
+    const branchId = req.user.branch_id;
+    
+    if (!branchId) {
+      return res.status(400).json({ error: 'User is not assigned to a branch' });
+    }
 
-    if (!number || !capacity || !branchId) {
-      return res.status(400).json({ error: 'Table number, capacity, and branch ID are required' });
+    if (!number || !capacity) {
+      return res.status(400).json({ error: 'Table number and capacity are required' });
     }
 
     // Check if table number already exists in this branch
@@ -93,11 +102,21 @@ router.put('/:id', authenticateToken, authorize('admin', 'manager'), async (req,
   try {
     const { id } = req.params;
     const { number, capacity, location, isActive } = req.body;
+    
+    // Use authenticated user's branch_id for security
+    const branchId = req.user.branch_id;
+    
+    if (!branchId) {
+      return res.status(400).json({ error: 'User is not assigned to a branch' });
+    }
 
-    // Check if table exists
+    // Check if table exists and belongs to user's branch
     const existingTable = await db('tables').where({ id }).first();
     if (!existingTable) {
       return res.status(404).json({ error: 'Table not found' });
+    }
+    if (existingTable.branch_id !== branchId) {
+      return res.status(403).json({ error: 'Access denied: Table belongs to different branch' });
     }
 
     // If table number is being changed, check for duplicates
@@ -146,11 +165,21 @@ router.put('/:id', authenticateToken, authorize('admin', 'manager'), async (req,
 router.delete('/:id', authenticateToken, authorize('admin'), async (req, res) => {
   try {
     const { id } = req.params;
+    
+    // Use authenticated user's branch_id for security
+    const branchId = req.user.branch_id;
+    
+    if (!branchId) {
+      return res.status(400).json({ error: 'User is not assigned to a branch' });
+    }
 
-    // Check if table exists
+    // Check if table exists and belongs to user's branch
     const table = await db('tables').where({ id }).first();
     if (!table) {
       return res.status(404).json({ error: 'Table not found' });
+    }
+    if (table.branch_id !== branchId) {
+      return res.status(403).json({ error: 'Access denied: Table belongs to different branch' });
     }
 
     // Check if table has active orders
@@ -185,6 +214,13 @@ router.delete('/:id', authenticateToken, authorize('admin'), async (req, res) =>
 router.get('/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
+    
+    // Use authenticated user's branch_id for security  
+    const branchId = req.user.branch_id;
+    
+    if (!branchId) {
+      return res.status(400).json({ error: 'User is not assigned to a branch' });
+    }
 
     const table = await db('tables')
       .select('tables.*', 'branches.name as branch_name')
@@ -194,6 +230,9 @@ router.get('/:id', authenticateToken, async (req, res) => {
 
     if (!table) {
       return res.status(404).json({ error: 'Table not found' });
+    }
+    if (table.branch_id !== branchId) {
+      return res.status(403).json({ error: 'Access denied: Table belongs to different branch' });
     }
 
     // Get current order
@@ -214,148 +253,18 @@ router.get('/:id', authenticateToken, async (req, res) => {
   }
 });
 
-// Create table (admin)
-router.post('/', authenticateToken, authorize('admin', 'manager'), validateTable, async (req, res) => {
-  try {
-    const { tableNumber, branchId, description } = req.body;
-
-    // Check if table number already exists in branch
-    const existingTable = await db('tables')
-      .where({ table_number: tableNumber, branch_id: branchId })
-      .first();
-
-    if (existingTable) {
-      return res.status(400).json({ error: 'Table number already exists in this branch' });
-    }
-
-    // Generate QR code URL
-    const branch = await db('branches').where({ id: branchId }).first();
-    const qrCodeUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/menu?table=${tableNumber}&branch=${branch.code}`;
-
-    const [tableId] = await db('tables').insert({
-      table_number: tableNumber,
-      branch_id: branchId,
-      qr_code: qrCodeUrl,
-      description
-    });
-
-    const table = await db('tables')
-      .select('tables.*', 'branches.name as branch_name')
-      .leftJoin('branches', 'tables.branch_id', 'branches.id')
-      .where({ 'tables.id': tableId })
-      .first();
-
-    // Log table creation
-    await db('audit_logs').insert({
-      user_id: req.user.id,
-      action: 'TABLE_CREATE',
-      meta: JSON.stringify({ tableId, tableNumber, branchId })
-    });
-
-    res.status(201).json({ table });
-  } catch (error) {
-    logger.error('Table creation error:', error);
-    res.status(500).json({ error: 'Failed to create table' });
-  }
-});
-
-// Update table (admin)
-router.put('/:id', authenticateToken, authorize('admin', 'manager'), async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { tableNumber, description } = req.body;
-
-    const table = await db('tables').where({ id }).first();
-    if (!table) {
-      return res.status(404).json({ error: 'Table not found' });
-    }
-
-    // Check if new table number conflicts with existing tables
-    if (tableNumber && tableNumber !== table.table_number) {
-      const existingTable = await db('tables')
-        .where({ table_number: tableNumber, branch_id: table.branch_id })
-        .where('id', '!=', id)
-        .first();
-
-      if (existingTable) {
-        return res.status(400).json({ error: 'Table number already exists in this branch' });
-      }
-    }
-
-    // Update QR code if table number changed
-    let qrCodeUrl = table.qr_code;
-    if (tableNumber && tableNumber !== table.table_number) {
-      const branch = await db('branches').where({ id: table.branch_id }).first();
-      qrCodeUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/menu?table=${tableNumber}&branch=${branch.code}`;
-    }
-
-    await db('tables')
-      .where({ id })
-      .update({
-        table_number: tableNumber,
-        description,
-        qr_code: qrCodeUrl,
-        updated_at: db.raw('CURRENT_TIMESTAMP')
-      });
-
-    const updatedTable = await db('tables')
-      .select('tables.*', 'branches.name as branch_name')
-      .leftJoin('branches', 'tables.branch_id', 'branches.id')
-      .where({ 'tables.id': id })
-      .first();
-
-    // Log table update
-    await db('audit_logs').insert({
-      user_id: req.user.id,
-      action: 'TABLE_UPDATE',
-      meta: JSON.stringify({ tableId: id, tableNumber, description })
-    });
-
-    res.json({ table: updatedTable });
-  } catch (error) {
-    logger.error('Table update error:', error);
-    res.status(500).json({ error: 'Failed to update table' });
-  }
-});
-
-// Delete table (admin)
-router.delete('/:id', authenticateToken, authorize('admin', 'manager'), async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    // Check if table has active orders
-    const activeOrder = await db('orders')
-      .where({ 
-        table_id: id,
-        status: ['PENDING', 'CONFIRMED', 'PREPARING', 'READY', 'SERVED']
-      })
-      .first();
-
-    if (activeOrder) {
-      return res.status(400).json({ error: 'Cannot delete table with active orders' });
-    }
-
-    await db('tables').where({ id }).del();
-
-    // Log table deletion
-    await db('audit_logs').insert({
-      user_id: req.user.id,
-      action: 'TABLE_DELETE',
-      meta: JSON.stringify({ tableId: id })
-    });
-
-    res.json({ message: 'Table deleted successfully' });
-  } catch (error) {
-    logger.error('Table deletion error:', error);
-    res.status(500).json({ error: 'Failed to delete table' });
-  }
-});
-
 // Generate QR code for table
 router.get('/:id/qr', authenticateToken, authorize('admin', 'manager', 'cashier'), async (req, res) => {
   try {
     const { id } = req.params;
     const { format = 'png' } = req.query;
+    
+    // Use authenticated user's branch_id for security
+    const branchId = req.user.branch_id;
+    
+    if (!branchId) {
+      return res.status(400).json({ error: 'User is not assigned to a branch' });
+    }
 
     const table = await db('tables')
       .select('tables.*', 'branches.name as branch_name', 'branches.code as branch_code')
@@ -365,6 +274,11 @@ router.get('/:id/qr', authenticateToken, authorize('admin', 'manager', 'cashier'
 
     if (!table) {
       return res.status(404).json({ error: 'Table not found' });
+    }
+    
+    // Verify the table belongs to the user's branch
+    if (table.branch_id !== branchId) {
+      return res.status(403).json({ error: 'Access denied: Table belongs to different branch' });
     }
 
     if (format === 'dataurl') {
@@ -384,7 +298,12 @@ router.get('/:id/qr', authenticateToken, authorize('admin', 'manager', 'cashier'
 // Generate QR codes for all tables in a branch
 router.get('/branch/:branchId/qr-sheet', authenticateToken, authorize('admin', 'manager'), async (req, res) => {
   try {
-    const { branchId } = req.params;
+    // Use authenticated user's branch_id for security (ignore path parameter)
+    const branchId = req.user.branch_id;
+    
+    if (!branchId) {
+      return res.status(400).json({ error: 'User is not assigned to a branch' });
+    }
 
     const tables = await db('tables')
       .select('tables.*', 'branches.name as branch_name', 'branches.code as branch_code')
@@ -413,6 +332,22 @@ router.get('/:id/orders', authenticateToken, authorize('admin', 'manager', 'cash
   try {
     const { id } = req.params;
     const { limit = 20, offset = 0 } = req.query;
+    
+    // Use authenticated user's branch_id for security
+    const branchId = req.user.branch_id;
+    
+    if (!branchId) {
+      return res.status(400).json({ error: 'User is not assigned to a branch' });
+    }
+    
+    // Verify the table belongs to the user's branch
+    const table = await db('tables').where({ id }).first();
+    if (!table) {
+      return res.status(404).json({ error: 'Table not found' });
+    }
+    if (table.branch_id !== branchId) {
+      return res.status(403).json({ error: 'Access denied: Table belongs to different branch' });
+    }
 
     const orders = await db('orders')
       .select('orders.*')

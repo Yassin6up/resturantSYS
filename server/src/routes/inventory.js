@@ -8,15 +8,17 @@ const router = express.Router();
 // Get all stock items (admin/manager)
 router.get('/stock', authenticateToken, authorize('admin', 'manager'), async (req, res) => {
   try {
-    const { branchId } = req.query;
-
-    let query = db('stock_items')
-      .select('stock_items.*', 'branches.name as branch_name')
-      .leftJoin('branches', 'stock_items.branch_id', 'branches.id');
-
-    if (branchId) {
-      query = query.where({ 'stock_items.branch_id': branchId });
+    // Use authenticated user's branch_id for security
+    const branchId = req.user.branch_id;
+    
+    if (!branchId) {
+      return res.status(400).json({ error: 'User is not assigned to a branch' });
     }
+
+    const query = db('stock_items')
+      .select('stock_items.*', 'branches.name as branch_name')
+      .leftJoin('branches', 'stock_items.branch_id', 'branches.id')
+      .where({ 'stock_items.branch_id': branchId });
 
     const stockItems = await query.orderBy('stock_items.name');
 
@@ -35,10 +37,17 @@ router.get('/stock', authenticateToken, authorize('admin', 'manager'), async (re
 // Create stock item (admin/manager)
 router.post('/stock', authenticateToken, authorize('admin', 'manager'), async (req, res) => {
   try {
-    const { name, sku, branchId, unit, minStock, maxStock, currentStock, costPrice, supplier, description, isActive } = req.body;
+    const { name, sku, unit, minStock, maxStock, currentStock, costPrice, supplier, description, isActive } = req.body;
+    
+    // Use authenticated user's branch_id for security
+    const branchId = req.user.branch_id;
+    
+    if (!branchId) {
+      return res.status(400).json({ error: 'User is not assigned to a branch' });
+    }
 
-    if (!name || !branchId) {
-      return res.status(400).json({ error: 'Name and branch ID are required' });
+    if (!name) {
+      return res.status(400).json({ error: 'Name is required' });
     }
 
     const [stockItemId] = await db('stock_items').insert({
@@ -80,6 +89,22 @@ router.put('/stock/:id', authenticateToken, authorize('admin', 'manager'), async
   try {
     const { id } = req.params;
     const { name, sku, unit, minThreshold } = req.body;
+    
+    // Use authenticated user's branch_id for security
+    const branchId = req.user.branch_id;
+    
+    if (!branchId) {
+      return res.status(400).json({ error: 'User is not assigned to a branch' });
+    }
+    
+    // Verify the stock item belongs to the user's branch
+    const existingItem = await db('stock_items').where({ id }).first();
+    if (!existingItem) {
+      return res.status(404).json({ error: 'Stock item not found' });
+    }
+    if (existingItem.branch_id !== branchId) {
+      return res.status(403).json({ error: 'Access denied: Stock item belongs to different branch' });
+    }
 
     await db('stock_items')
       .where({ id })
@@ -115,6 +140,22 @@ router.put('/stock/:id', authenticateToken, authorize('admin', 'manager'), async
 router.delete('/stock/:id', authenticateToken, authorize('admin', 'manager'), async (req, res) => {
   try {
     const { id } = req.params;
+    
+    // Use authenticated user's branch_id for security
+    const branchId = req.user.branch_id;
+    
+    if (!branchId) {
+      return res.status(400).json({ error: 'User is not assigned to a branch' });
+    }
+    
+    // Verify the stock item belongs to the user's branch
+    const existingItem = await db('stock_items').where({ id }).first();
+    if (!existingItem) {
+      return res.status(404).json({ error: 'Stock item not found' });
+    }
+    if (existingItem.branch_id !== branchId) {
+      return res.status(403).json({ error: 'Access denied: Stock item belongs to different branch' });
+    }
 
     // Check if stock item is used in recipes
     const recipeCount = await db('recipes').where({ stock_item_id: id }).count('id as count').first();
@@ -144,6 +185,13 @@ router.post('/stock/:id/move', authenticateToken, authorize('admin', 'manager'),
   try {
     const { id } = req.params;
     const { change, reason } = req.body;
+    
+    // Use authenticated user's branch_id for security
+    const branchId = req.user.branch_id;
+    
+    if (!branchId) {
+      return res.status(400).json({ error: 'User is not assigned to a branch' });
+    }
 
     if (!change || !reason) {
       return res.status(400).json({ error: 'Change amount and reason are required' });
@@ -152,6 +200,9 @@ router.post('/stock/:id/move', authenticateToken, authorize('admin', 'manager'),
     const stockItem = await db('stock_items').where({ id }).first();
     if (!stockItem) {
       return res.status(404).json({ error: 'Stock item not found' });
+    }
+    if (stockItem.branch_id !== branchId) {
+      return res.status(403).json({ error: 'Access denied: Stock item belongs to different branch' });
     }
 
     // Update stock quantity
@@ -205,6 +256,22 @@ router.get('/stock/:id/movements', authenticateToken, authorize('admin', 'manage
   try {
     const { id } = req.params;
     const { limit = 50, offset = 0 } = req.query;
+    
+    // Use authenticated user's branch_id for security
+    const branchId = req.user.branch_id;
+    
+    if (!branchId) {
+      return res.status(400).json({ error: 'User is not assigned to a branch' });
+    }
+    
+    // Verify the stock item belongs to the user's branch
+    const stockItem = await db('stock_items').where({ id }).first();
+    if (!stockItem) {
+      return res.status(404).json({ error: 'Stock item not found' });
+    }
+    if (stockItem.branch_id !== branchId) {
+      return res.status(403).json({ error: 'Access denied: Stock item belongs to different branch' });
+    }
 
     const movements = await db('stock_movements')
       .where({ stock_item_id: id })
@@ -222,16 +289,18 @@ router.get('/stock/:id/movements', authenticateToken, authorize('admin', 'manage
 // Get low stock alerts
 router.get('/stock/alerts/low', authenticateToken, authorize('admin', 'manager'), async (req, res) => {
   try {
-    const { branchId } = req.query;
+    // Use authenticated user's branch_id for security
+    const branchId = req.user.branch_id;
+    
+    if (!branchId) {
+      return res.status(400).json({ error: 'User is not assigned to a branch' });
+    }
 
-    let query = db('stock_items')
+    const query = db('stock_items')
       .select('stock_items.*', 'branches.name as branch_name')
       .leftJoin('branches', 'stock_items.branch_id', 'branches.id')
-      .where(db.raw('stock_items.quantity <= stock_items.min_threshold'));
-
-    if (branchId) {
-      query = query.where({ 'stock_items.branch_id': branchId });
-    }
+      .where(db.raw('stock_items.quantity <= stock_items.min_threshold'))
+      .where({ 'stock_items.branch_id': branchId });
 
     const lowStockItems = await query.orderBy('stock_items.name');
 
