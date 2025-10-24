@@ -173,3 +173,7 @@
 {"level":"info","message":"Order 1 status updated to PREPARING by admin","service":"posq-api","timestamp":"2025-10-24T18:52:07.510Z"}
 {"level":"info","message":"Order 1 status updated to PREPARING by admin","service":"posq-api","timestamp":"2025-10-24T18:52:12.434Z"}
 {"level":"info","message":"Order 1 status updated to PREPARING by admin","service":"posq-api","timestamp":"2025-10-24T18:53:03.182Z"}
+{"level":"info","message":"Multiple settings updated by admin","service":"posq-api","timestamp":"2025-10-24T19:48:02.892Z"}
+{"level":"info","message":"Multiple settings updated by admin","service":"posq-api","timestamp":"2025-10-24T19:48:37.311Z"}
+{"level":"info","message":"Multiple settings updated by admin","service":"posq-api","timestamp":"2025-10-24T19:49:09.112Z"}
+{"level":"info","message":"Multiple settings updated by admin","service":"posq-api","timestamp":"2025-10-24T19:51:07.560Z"}

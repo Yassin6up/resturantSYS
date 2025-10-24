@@ -74,20 +74,83 @@ function SettingsPage() {
         type: localSettings.dbType || 'sqlite3',
         host: localSettings.dbHost || 'localhost',
         port: localSettings.dbPort || 3306,
-        database: localSettings.dbName || 'posq',
-        username: localSettings.dbUser || 'posq',
+        name: localSettings.dbName || 'posq',
+        user: localSettings.dbUser || 'posq',
         password: localSettings.dbPassword || 'posqpassword',
         filename: localSettings.dbPath || './data/posq.db'
       })
       
       if (response.data.success) {
-        toast.success('Database connection successful!')
+        toast.success(response.data.message || 'Database connection successful!')
       } else {
-        toast.error('Database connection failed')
+        toast.error(response.data.error || 'Database connection failed')
       }
     } catch (error) {
       console.error('Database connection test failed:', error)
-      toast.error('Database connection test failed')
+      toast.error(error.response?.data?.error || 'Database connection test failed')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const initializeDatabase = async () => {
+    try {
+      setSaving(true)
+      const response = await settingsAPI.initializeDatabase({
+        type: localSettings.dbType || 'sqlite3',
+        host: localSettings.dbHost || 'localhost',
+        port: localSettings.dbPort || 3306,
+        name: localSettings.dbName || 'posq',
+        user: localSettings.dbUser || 'posq',
+        password: localSettings.dbPassword || 'posqpassword',
+        filename: localSettings.dbPath || './data/posq.db'
+      })
+      
+      if (response.data.success) {
+        toast.success(response.data.message || 'Database initialized successfully!')
+      } else {
+        toast.error(response.data.error || 'Database initialization failed')
+      }
+    } catch (error) {
+      console.error('Database initialization failed:', error)
+      toast.error(error.response?.data?.error || 'Database initialization failed')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const exportDatabase = async () => {
+    try {
+      setSaving(true)
+      const response = await settingsAPI.exportDatabase()
+      
+      // Create blob and download
+      const blob = new Blob([response.data])
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      
+      // Get filename from Content-Disposition header or use default
+      const contentDisposition = response.headers['content-disposition']
+      let filename = `posq-backup-${Date.now()}.db`
+      
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename="?(.+)"?/)
+        if (filenameMatch) {
+          filename = filenameMatch[1]
+        }
+      }
+      
+      link.setAttribute('download', filename)
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      window.URL.revokeObjectURL(url)
+      
+      toast.success('Database exported successfully!')
+    } catch (error) {
+      console.error('Database export failed:', error)
+      toast.error('Database export failed')
     } finally {
       setSaving(false)
     }
@@ -615,9 +678,27 @@ function SettingsPage() {
           <div className="card">
             <div className="card-header">
               <h2 className="text-xl font-semibold text-gray-900">Database Settings</h2>
-              <p className="text-gray-600">Configure your database connection</p>
+              <p className="text-gray-600">Configure and manage your database connection</p>
             </div>
             <div className="card-body space-y-6">
+              {/* Information Banner */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div className="flex">
+                  <div className="flex-shrink-0">
+                    <CircleStackIcon className="h-5 w-5 text-blue-400" />
+                  </div>
+                  <div className="ml-3">
+                    <h3 className="text-sm font-medium text-blue-800">Database Management</h3>
+                    <div className="mt-2 text-sm text-blue-700 space-y-1">
+                      <p>• <strong>Local Mode:</strong> Uses SQLite - perfect for single-device setup</p>
+                      <p>• <strong>Cloud Mode:</strong> Uses MySQL - for multi-device/production environments</p>
+                      <p>• <strong>Initialize:</strong> Creates database, tables, and admin user automatically</p>
+                      <p>• <strong>Export:</strong> Download a backup of your entire database</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               {/* Operating Mode Toggle */}
               <div>
                 <label className="form-label">Operating Mode</label>
@@ -745,7 +826,7 @@ function SettingsPage() {
                 />
               </div>
 
-              <div className="flex justify-end">
+              <div className="flex justify-end space-x-3">
                 <button
                   onClick={testDatabaseConnection}
                   disabled={saving}
@@ -760,6 +841,42 @@ function SettingsPage() {
                     <>
                       <CircleStackIcon className="h-5 w-5 mr-2" />
                       Test Connection
+                    </>
+                  )}
+                </button>
+                
+                <button
+                  onClick={initializeDatabase}
+                  disabled={saving}
+                  className="btn-primary"
+                >
+                  {saving ? (
+                    <>
+                      <div className="loading-spinner mr-2"></div>
+                      Initializing...
+                    </>
+                  ) : (
+                    <>
+                      <CircleStackIcon className="h-5 w-5 mr-2" />
+                      Initialize Database
+                    </>
+                  )}
+                </button>
+                
+                <button
+                  onClick={exportDatabase}
+                  disabled={saving}
+                  className="btn-outline"
+                >
+                  {saving ? (
+                    <>
+                      <div className="loading-spinner mr-2"></div>
+                      Exporting...
+                    </>
+                  ) : (
+                    <>
+                      <ArrowDownTrayIcon className="h-5 w-5 mr-2" />
+                      Export Database
                     </>
                   )}
                 </button>

@@ -1,0 +1,45 @@
+SocketContext.jsx:42 Socket connection error: Error: timeout
+    at socket__io-client.js?v=61efdf68:3149:17
+(anonymous) @ SocketContext.jsx:42
+/api/app-settings:1  Failed to load resource: the server responded with a status of 403 (Forbidden)
+7SocketContext.jsx:42 Socket connection error: Error: timeout
+    at socket__io-client.js?v=61efdf68:3149:17
+(anonymous) @ SocketContext.jsx:42
+2SettingsPage.jsx:108 Operating mode change failed: TypeError: settingsAPI.changeOperatingMode is not a function
+    at switchOperatingMode (SettingsPage.jsx:99:42)
+    at onClick (SettingsPage.jsx:638:36)
+    at HTMLUnknownElement.callCallback2 (chunk-PJEEZAML.js?v=61efdf68:3674:22)
+    at Object.invokeGuardedCallbackDev (chunk-PJEEZAML.js?v=61efdf68:3699:24)
+    at invokeGuardedCallback (chunk-PJEEZAML.js?v=61efdf68:3733:39)
+    at invokeGuardedCallbackAndCatchFirstError (chunk-PJEEZAML.js?v=61efdf68:3736:33)
+    at executeDispatch (chunk-PJEEZAML.js?v=61efdf68:7014:11)
+    at processDispatchQueueItemsInOrder (chunk-PJEEZAML.js?v=61efdf68:7034:15)
+    at processDispatchQueue (chunk-PJEEZAML.js?v=61efdf68:7043:13)
+    at dispatchEventsForPlugins (chunk-PJEEZAML.js?v=61efdf68:7051:11)
+switchOperatingMode @ SettingsPage.jsx:108
+2SettingsPage.jsx:108 Operating mode change failed: TypeError: settingsAPI.changeOperatingMode is not a function
+    at switchOperatingMode (SettingsPage.jsx:99:42)
+    at onClick (SettingsPage.jsx:626:36)
+    at HTMLUnknownElement.callCallback2 (chunk-PJEEZAML.js?v=61efdf68:3674:22)
+    at Object.invokeGuardedCallbackDev (chunk-PJEEZAML.js?v=61efdf68:3699:24)
+    at invokeGuardedCallback (chunk-PJEEZAML.js?v=61efdf68:3733:39)
+    at invokeGuardedCallbackAndCatchFirstError (chunk-PJEEZAML.js?v=61efdf68:3736:33)
+    at executeDispatch (chunk-PJEEZAML.js?v=61efdf68:7014:11)
+    at processDispatchQueueItemsInOrder (chunk-PJEEZAML.js?v=61efdf68:7034:15)
+    at processDispatchQueue (chunk-PJEEZAML.js?v=61efdf68:7043:13)
+    at dispatchEventsForPlugins (chunk-PJEEZAML.js?v=61efdf68:7051:11)
+switchOperatingMode @ SettingsPage.jsx:108
+SettingsPage.jsx:108 Operating mode change failed: TypeError: settingsAPI.changeOperatingMode is not a function
+    at switchOperatingMode (SettingsPage.jsx:99:42)
+    at onClick (SettingsPage.jsx:638:36)
+    at HTMLUnknownElement.callCallback2 (chunk-PJEEZAML.js?v=61efdf68:3674:22)
+    at Object.invokeGuardedCallbackDev (chunk-PJEEZAML.js?v=61efdf68:3699:24)
+    at invokeGuardedCallback (chunk-PJEEZAML.js?v=61efdf68:3733:39)
+    at invokeGuardedCallbackAndCatchFirstError (chunk-PJEEZAML.js?v=61efdf68:3736:33)
+    at executeDispatch (chunk-PJEEZAML.js?v=61efdf68:7014:11)
+    at processDispatchQueueItemsInOrder (chunk-PJEEZAML.js?v=61efdf68:7034:15)
+    at processDispatchQueue (chunk-PJEEZAML.js?v=61efdf68:7043:13)
+    at dispatchEventsForPlugins (chunk-PJEEZAML.js?v=61efdf68:7051:11)
+switchOperatingMode @ SettingsPage.jsx:108
+SocketContext.jsx:42 Socket connection error: Error: timeout
+    at socket__io-client.js?v=61efdf68:3149:17

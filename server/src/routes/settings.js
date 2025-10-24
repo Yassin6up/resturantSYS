@@ -268,19 +268,329 @@ router.get('/database/config', authenticateToken, authorize('admin'), async (req
 // Test database connection
 router.post('/database/test', authenticateToken, authorize('admin'), async (req, res) => {
   try {
-    const { type, host, port, name, user, password } = req.body;
-
-    // This would test the connection with provided credentials
-    // For security, we'll just return success for now
-    // In production, you'd want to actually test the connection
+    const { type, host, port, name, user, password, filename } = req.body;
     
-    res.json({ 
-      success: true,
-      message: 'Database connection test successful' 
-    });
+    const knex = require('knex');
+    let testDb;
+
+    try {
+      if (type === 'sqlite3') {
+        // Test SQLite connection
+        testDb = knex({
+          client: 'sqlite3',
+          connection: {
+            filename: filename || './data/posq.db'
+          },
+          useNullAsDefault: true
+        });
+        
+        // Test simple query
+        await testDb.raw('SELECT 1');
+        
+        res.json({ 
+          success: true,
+          message: 'SQLite database connection successful' 
+        });
+      } else if (type === 'mysql2') {
+        // Test MySQL connection
+        testDb = knex({
+          client: 'mysql2',
+          connection: {
+            host: host || 'localhost',
+            port: parseInt(port) || 3306,
+            user: user || 'root',
+            password: password || '',
+            database: name || 'posq'
+          }
+        });
+        
+        // Test connection
+        await testDb.raw('SELECT 1');
+        
+        res.json({ 
+          success: true,
+          message: 'MySQL database connection successful' 
+        });
+      } else if (type === 'pg') {
+        // Test PostgreSQL connection
+        testDb = knex({
+          client: 'pg',
+          connection: {
+            host: host || 'localhost',
+            port: parseInt(port) || 5432,
+            user: user || 'postgres',
+            password: password || '',
+            database: name || 'posq'
+          }
+        });
+        
+        // Test connection
+        await testDb.raw('SELECT 1');
+        
+        res.json({ 
+          success: true,
+          message: 'PostgreSQL database connection successful' 
+        });
+      } else {
+        res.status(400).json({ 
+          success: false,
+          error: 'Unsupported database type' 
+        });
+      }
+    } catch (connError) {
+      logger.error('Database connection test failed:', connError);
+      res.status(400).json({ 
+        success: false,
+        error: connError.message || 'Database connection failed' 
+      });
+    } finally {
+      if (testDb) {
+        await testDb.destroy();
+      }
+    }
   } catch (error) {
     logger.error('Database connection test error:', error);
-    res.status(500).json({ error: 'Database connection test failed' });
+    res.status(500).json({ 
+      success: false,
+      error: 'Database connection test failed' 
+    });
+  }
+});
+
+// Initialize database (create DB, migrate, seed)
+router.post('/database/initialize', authenticateToken, authorize('admin'), async (req, res) => {
+  try {
+    const { type, host, port, name, user, password, filename } = req.body;
+    
+    const knex = require('knex');
+    const path = require('path');
+    const fs = require('fs');
+    const bcrypt = require('bcrypt');
+    
+    let initDb;
+    
+    try {
+      if (type === 'sqlite3') {
+        // Ensure data directory exists
+        const dataDir = path.dirname(filename || './data/posq.db');
+        if (!fs.existsSync(dataDir)) {
+          fs.mkdirSync(dataDir, { recursive: true });
+        }
+        
+        // Create SQLite database
+        initDb = knex({
+          client: 'sqlite3',
+          connection: {
+            filename: filename || './data/posq.db'
+          },
+          useNullAsDefault: true,
+          migrations: {
+            directory: path.join(__dirname, '../migrations')
+          },
+          seeds: {
+            directory: path.join(__dirname, '../seeds')
+          }
+        });
+        
+        // Run migrations
+        await initDb.migrate.latest();
+        logger.info('SQLite migrations completed');
+        
+        // Run minimal seed (admin and owner only)
+        const hashedPassword = await bcrypt.hash('admin123', 12);
+        
+        // Check if admin exists
+        const adminExists = await initDb('users').where({ username: 'admin' }).first();
+        if (!adminExists) {
+          await initDb('users').insert([
+            {
+              username: 'admin',
+              password_hash: hashedPassword,
+              full_name: 'System Administrator',
+              role: 'admin',
+              pin: '1234',
+              is_active: true
+            }
+          ]);
+          
+          logger.info('Admin user created');
+        }
+        
+        // Check if default branch exists
+        const branchExists = await initDb('branches').where({ code: 'MAIN' }).first();
+        if (!branchExists) {
+          await initDb('branches').insert({
+            name: 'Main Branch',
+            code: 'MAIN',
+            address: 'Default Address'
+          });
+          logger.info('Default branch created');
+        }
+        
+        res.json({
+          success: true,
+          message: 'SQLite database initialized successfully'
+        });
+        
+      } else if (type === 'mysql2') {
+        // First connect without database to create it
+        const mysql = require('mysql2/promise');
+        const connection = await mysql.createConnection({
+          host: host || 'localhost',
+          port: parseInt(port) || 3306,
+          user: user || 'root',
+          password: password || ''
+        });
+        
+        // Create database if not exists
+        await connection.query(`CREATE DATABASE IF NOT EXISTS \`${name || 'posq'}\``);
+        await connection.end();
+        
+        logger.info(`MySQL database '${name || 'posq'}' created or already exists`);
+        
+        // Now connect with database
+        initDb = knex({
+          client: 'mysql2',
+          connection: {
+            host: host || 'localhost',
+            port: parseInt(port) || 3306,
+            user: user || 'root',
+            password: password || '',
+            database: name || 'posq'
+          },
+          migrations: {
+            directory: path.join(__dirname, '../migrations')
+          },
+          seeds: {
+            directory: path.join(__dirname, '../seeds')
+          }
+        });
+        
+        // Run migrations
+        await initDb.migrate.latest();
+        logger.info('MySQL migrations completed');
+        
+        // Run minimal seed (admin and owner only)
+        const hashedPassword = await bcrypt.hash('admin123', 12);
+        
+        // Check if admin exists
+        const adminExists = await initDb('users').where({ username: 'admin' }).first();
+        if (!adminExists) {
+          await initDb('users').insert([
+            {
+              username: 'admin',
+              password_hash: hashedPassword,
+              full_name: 'System Administrator',
+              role: 'admin',
+              pin: '1234',
+              is_active: true
+            }
+          ]);
+          logger.info('Admin user created');
+        }
+        
+        // Check if default branch exists
+        const branchExists = await initDb('branches').where({ code: 'MAIN' }).first();
+        if (!branchExists) {
+          await initDb('branches').insert({
+            name: 'Main Branch',
+            code: 'MAIN',
+            address: 'Default Address'
+          });
+          logger.info('Default branch created');
+        }
+        
+        res.json({
+          success: true,
+          message: `MySQL database '${name || 'posq'}' initialized successfully`
+        });
+      }
+    } catch (initError) {
+      logger.error('Database initialization failed:', initError);
+      res.status(500).json({
+        success: false,
+        error: initError.message || 'Database initialization failed'
+      });
+    } finally {
+      if (initDb) {
+        await initDb.destroy();
+      }
+    }
+  } catch (error) {
+    logger.error('Database initialization error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Database initialization failed'
+    });
+  }
+});
+
+// Export database
+router.get('/database/export', authenticateToken, authorize('admin'), async (req, res) => {
+  try {
+    const dbType = process.env.DB_TYPE || 'sqlite3';
+    const path = require('path');
+    const fs = require('fs');
+    const { exec } = require('child_process');
+    const util = require('util');
+    const execPromise = util.promisify(exec);
+    
+    if (dbType === 'sqlite3') {
+      // For SQLite, just send the database file
+      const dbPath = process.env.DB_PATH || './data/posq.db';
+      const absolutePath = path.resolve(dbPath);
+      
+      if (!fs.existsSync(absolutePath)) {
+        return res.status(404).json({ error: 'Database file not found' });
+      }
+      
+      // Set headers for file download
+      res.setHeader('Content-Type', 'application/x-sqlite3');
+      res.setHeader('Content-Disposition', `attachment; filename="posq-backup-${Date.now()}.db"`);
+      
+      // Stream the file
+      const fileStream = fs.createReadStream(absolutePath);
+      fileStream.pipe(res);
+      
+    } else if (dbType === 'mysql2') {
+      // For MySQL, create SQL dump
+      const host = process.env.DB_HOST || 'localhost';
+      const port = process.env.DB_PORT || 3306;
+      const database = process.env.DB_NAME || 'posq';
+      const user = process.env.DB_USER || 'root';
+      const password = process.env.DB_PASSWORD || '';
+      
+      const timestamp = Date.now();
+      const dumpFile = path.join('/tmp', `posq-backup-${timestamp}.sql`);
+      
+      // Create mysqldump command
+      const dumpCmd = `mysqldump -h ${host} -P ${port} -u ${user} ${password ? `-p${password}` : ''} ${database} > ${dumpFile}`;
+      
+      try {
+        await execPromise(dumpCmd);
+        
+        // Set headers for file download
+        res.setHeader('Content-Type', 'application/sql');
+        res.setHeader('Content-Disposition', `attachment; filename="posq-backup-${timestamp}.sql"`);
+        
+        // Stream the file
+        const fileStream = fs.createReadStream(dumpFile);
+        fileStream.pipe(res);
+        
+        // Clean up temp file after sending
+        fileStream.on('end', () => {
+          fs.unlinkSync(dumpFile);
+        });
+      } catch (dumpError) {
+        logger.error('MySQL dump failed:', dumpError);
+        res.status(500).json({ error: 'Failed to export MySQL database' });
+      }
+    } else {
+      res.status(400).json({ error: 'Database export not supported for this database type' });
+    }
+  } catch (error) {
+    logger.error('Database export error:', error);
+    res.status(500).json({ error: 'Failed to export database' });
   }
 });
 
