@@ -169,3 +169,7 @@
 {"level":"info","message":"User admin logged in successfully","service":"posq-api","timestamp":"2025-10-24T18:44:45.447Z"}
 {"level":"info","message":"Order 1 status updated to PREPARING by admin","service":"posq-api","timestamp":"2025-10-24T18:46:15.719Z"}
 {"level":"info","message":"Payment confirmed for order CAS-20251024-0001 - Total: 72.45","service":"posq-api","timestamp":"2025-10-24T18:46:18.836Z"}
+{"level":"info","message":"Order 1 status updated to CONFIRMED by admin","service":"posq-api","timestamp":"2025-10-24T18:51:58.993Z"}
+{"level":"info","message":"Order 1 status updated to PREPARING by admin","service":"posq-api","timestamp":"2025-10-24T18:52:07.510Z"}
+{"level":"info","message":"Order 1 status updated to PREPARING by admin","service":"posq-api","timestamp":"2025-10-24T18:52:12.434Z"}
+{"level":"info","message":"Order 1 status updated to PREPARING by admin","service":"posq-api","timestamp":"2025-10-24T18:53:03.182Z"}
