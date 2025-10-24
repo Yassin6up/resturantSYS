@@ -3,6 +3,46 @@ const config = require('../../knexfile');
 
 const db = knex(config[process.env.NODE_ENV || 'development']);
 
+async function applyMultiTenantSchema() {
+  try {
+    // Check if multi-tenant columns exist, if not add them
+    const branchesInfo = await db.raw("PRAGMA table_info('branches')");
+    const branchesColumns = branchesInfo.map(col => col.name);
+    
+    if (!branchesColumns.includes('owner_id')) {
+      console.log('📦 Applying multi-tenant schema updates...');
+      
+      // Add columns to branches table
+      await db.schema.table('branches', table => {
+        table.integer('owner_id').unsigned();
+        table.string('phone');
+        table.string('email');
+        table.string('logo_url');
+        table.text('settings');
+        table.boolean('is_active').defaultTo(true);
+      });
+      
+      // Add columns to users table
+      const usersInfo = await db.raw("PRAGMA table_info('users')");
+      const usersColumns = usersInfo.map(col => col.name);
+      
+      if (!usersColumns.includes('branch_id')) {
+        await db.schema.table('users', table => {
+          table.integer('branch_id').unsigned();
+          table.string('email');
+          table.string('phone');
+          table.decimal('salary', 10, 2);
+          table.date('hire_date');
+        });
+      }
+      
+      console.log('✅ Multi-tenant schema applied');
+    }
+  } catch (error) {
+    console.log('⚠️ Multi-tenant schema check skipped or already applied');
+  }
+}
+
 async function initializeDatabase() {
   try {
     // Check if migrations table exists (indicating migrations have run before)
@@ -13,8 +53,11 @@ async function initializeDatabase() {
       await db.migrate.latest();
       console.log('✅ Database migrations completed');
     } else {
-      console.log('✅ Database already initialized, skipping migrations');
+      console.log('✅ Database already initialized');
     }
+    
+    // Apply multi-tenant schema updates
+    await applyMultiTenantSchema();
     
     // Run seeds if in development
     // if (process.env.NODE_ENV === 'development') {
