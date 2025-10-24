@@ -50,28 +50,107 @@ The system employs a client-server architecture with a React + Vite frontend and
 
 ## Recent Changes (October 24, 2025)
 
-### API Endpoint for Image Serving ✅
-- **New Endpoint**: `GET /api/upload/image/:filename` serves images with proper headers
-- **Security**: Path validation prevents directory traversal attacks
-- **Performance**: 1-year cache headers for optimal loading
-- **Auto Content-Type**: Detects and sets correct MIME types (jpeg, png, gif, webp)
-- **URL Format**: `https://domain.com/api/upload/image/menu-item-123456.png`
+### ✅ Complete Table-Based Ordering Flow with Cash Payment System
 
-### Cart System Bug Fixed ✅
-- **Problem**: Cart items missing name, image, and price properties causing empty cart display
-- **Solution**: Modified CartContext `addItem()` to extract and store essential item properties
-- **Cart Item Structure**:
-  ```js
-  {
-    menuItemId, name, image, price,  // Essential properties now stored
-    quantity, unitPrice, total, modifiers, note, branchId, tableNumber
-  }
-  ```
-- **Result**: Cart now displays correctly with images, names, and prices
-- **localStorage**: Cart persists properly across page refreshes
+#### Backend Enhancements:
+1. **Cashier Payment Endpoints**:
+   - `GET /api/orders/code/:code` - Lookup orders by order code (for QR scanning)
+   - `PATCH /api/orders/:id/payment` - Confirm payment with automatic kitchen notification
+   - Socket.IO events: `order.paid`, `order.updated`, `revenue.updated`
 
-### Files Modified
-- `server/src/routes/upload.js` - Added image serving API endpoint
-- `frontend/src/contexts/CartContext.jsx` - Fixed addItem to store item properties
-- `frontend/src/components/CartBottomBar.jsx` - Uses direct image URLs
-- `frontend/src/pages/customer/MenuPage.jsx` - Uses direct image URLs
+2. **Order Creation Updates**:
+   - Generates two QR codes: `paymentQrCode` (for cashier) and `trackingQrCode` (for customer)
+   - Payment QR contains order code for cashier scanning
+   - Tracking QR links to real-time order status page
+   - Automatic kitchen notification only after payment confirmation
+
+3. **Secure Public Order Viewing**:
+   - `GET /api/orders/:id` requires either authentication OR high-entropy 8-digit PIN
+   - PIN-based authentication prevents order enumeration attacks
+   - Customers can securely view their order status by providing PIN
+   - Payment details only visible to authenticated admin users
+
+#### Frontend Customer Pages - Complete Redesign:
+1. **MenuPage** (`/menu`):
+   - Modern gradient hero with luxury design
+   - Extracts table number from URL params (`?table=5`)
+   - Stores table in CartContext for entire session
+   - Responsive grid layout with hover effects
+   - Quick add buttons + detailed modal for customization
+
+2. **CartPage** (`/cart`):
+   - Luxury two-column layout with sticky sidebar
+   - Modern gradient cards with smooth animations
+   - Real-time total calculations
+   - Mobile-first responsive design
+
+3. **CheckoutPage** (`/checkout`):
+   - Table number auto-filled from CartContext (readonly)
+   - Modern payment method selector (cash/card)
+   - Shows payment QR code modal for cash orders
+   - Auto-redirect to order status after card payment
+   - Gradient totals breakdown
+
+4. **OrderStatusPage** (`/order-status/:orderId`):
+   - Real-time Socket.IO updates for order status
+   - Visual progress timeline with icons
+   - Shows current status with color coding
+   - Auto-updates when cashier confirms payment
+   - Order details and items display
+
+#### Cashier Dashboard (`/admin/cashier`):
+1. **Features**:
+   - Manual order code search (for QR scanning)
+   - Live list of pending cash payments
+   - One-click payment confirmation
+   - Real-time Socket.IO updates
+   - Modern gradient design matching customer pages
+
+2. **Payment Flow**:
+   - Search order by code (from QR or manual entry)
+   - View order details and total
+   - Confirm payment → Triggers kitchen notification
+   - Order automatically sent to kitchen display
+   - Updates today's revenue
+
+#### Table ID Persistence:
+- Table number captured from QR code URL (`/menu?table=5`)
+- Stored in CartContext with localStorage
+- Persists through: Menu → Cart → Checkout
+- No manual table input required from customer
+
+#### Complete Flow:
+1. Customer scans table QR → Lands on menu with table ID
+2. Browses menu, adds items to cart
+3. Proceeds to checkout (table pre-filled)
+4. Places cash order → Gets payment QR code + unique 8-digit PIN
+5. Shows QR to cashier
+6. Cashier scans/searches → Confirms payment
+7. System auto-sends order to kitchen
+8. Customer redirected to order status page (URL includes secure PIN)
+9. Real-time status updates via Socket.IO
+10. Customer can refresh/share order status URL securely (PIN required)
+
+### Security Implementation:
+**PIN-Based Order Access**:
+- Each order generates a unique 8-digit high-entropy PIN
+- Public order viewing requires PIN verification to prevent enumeration
+- URL format: `/order-status/:orderId?pin=12345678`
+- Prevents unauthorized users from guessing/iterating order IDs
+- Payment details restricted to authenticated users only
+
+### Files Created/Modified:
+**Backend**:
+- `server/src/routes/orders.js` - Added cashier endpoints, payment QR generation, PIN-secured order viewing
+
+**Frontend**:
+- `frontend/src/pages/customer/MenuPage.jsx` - Complete redesign with modern UI
+- `frontend/src/pages/customer/CartPage.jsx` - Luxury redesign with sidebar
+- `frontend/src/pages/customer/CheckoutPage.jsx` - Payment QR modal, readonly table
+- `frontend/src/pages/customer/OrderStatusPage.jsx` - Real-time tracking with Socket.IO
+- `frontend/src/pages/admin/CashierDashboard.jsx` - NEW: Cashier payment management
+- `frontend/src/services/api.js` - Added `getOrderByCode()` and `updatePayment()` methods
+- `frontend/src/App.jsx` - Added `/admin/cashier` route
+
+**No Changes Required**:
+- `frontend/src/contexts/CartContext.jsx` - Already had table persistence

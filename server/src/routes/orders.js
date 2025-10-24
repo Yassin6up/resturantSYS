@@ -111,9 +111,18 @@ router.post('/', orderRateLimiter, validateOrder, async (req, res) => {
 
     await trx.commit();
 
-    // Generate order QR code
-    const orderQr = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/order/${orderId}`;
-    const qrCodeDataURL = await QRCode.toDataURL(orderQr);
+    // Generate order tracking QR code for customer
+    const orderTrackingUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/order-status/${orderId}`;
+    const trackingQrCode = await QRCode.toDataURL(orderTrackingUrl);
+
+    // Generate payment QR code for cashier (cash payments only)
+    let paymentQrCode = null;
+    if (paymentMethod === 'cash' || !paymentMethod) {
+      paymentQrCode = await QRCode.toDataURL(orderCode, {
+        width: 300,
+        margin: 2
+      });
+    }
 
     // Emit real-time event
     const io = req.app.get('io');
@@ -137,21 +146,24 @@ router.post('/', orderRateLimiter, validateOrder, async (req, res) => {
         tableId, 
         customerName, 
         total,
+        paymentMethod,
         ip: req.ip,
         userAgent: req.get('User-Agent')
       })
     });
 
-    logger.info(`Order created: ${orderCode} for table ${tableId}`);
+    logger.info(`Order created: ${orderCode} for table ${tableId} - Payment: ${paymentMethod || 'cash'}`);
 
     res.status(201).json({
       orderId,
       orderCode,
       pin: pin,
-      qr: orderQr,
-      qrCode: qrCodeDataURL,
+      trackingUrl: orderTrackingUrl,
+      trackingQrCode: trackingQrCode,
+      paymentQrCode: paymentQrCode,
       status: order.status,
       total,
+      paymentMethod: order.payment_method,
       message: 'Order created successfully'
     });
 
@@ -297,10 +309,167 @@ router.get('/pin/:pin', async (req, res) => {
   }
 });
 
-// Get single order
-router.get('/:id', authenticateToken, async (req, res) => {
+// Get order by code (cashier endpoint for QR code scanning/search)
+router.get('/code/:code', authenticateToken, authorize('admin', 'manager', 'cashier'), async (req, res) => {
+  try {
+    const { code } = req.params;
+    const branchId = req.user.branch_id;
+
+    if (!branchId) {
+      return res.status(400).json({ error: 'User is not assigned to a branch' });
+    }
+
+    const order = await db('orders')
+      .select(
+        'orders.*',
+        'tables.table_number',
+        'branches.name as branch_name'
+      )
+      .leftJoin('tables', 'orders.table_id', 'tables.id')
+      .leftJoin('branches', 'orders.branch_id', 'branches.id')
+      .where({ 
+        'orders.order_code': code,
+        'orders.branch_id': branchId
+      })
+      .first();
+
+    if (!order) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
+
+    // Get order items
+    const items = await db('order_items')
+      .select(
+        'order_items.*',
+        'menu_items.name as item_name',
+        'menu_items.sku'
+      )
+      .leftJoin('menu_items', 'order_items.menu_item_id', 'menu_items.id')
+      .where({ 'order_items.order_id': order.id });
+
+    // Get modifiers for each item
+    for (const item of items) {
+      const modifiers = await db('order_item_modifiers')
+        .select('modifiers.name', 'order_item_modifiers.extra_price')
+        .leftJoin('modifiers', 'order_item_modifiers.modifier_id', 'modifiers.id')
+        .where({ 'order_item_modifiers.order_item_id': item.id });
+      item.modifiers = modifiers;
+    }
+
+    order.items = items;
+
+    res.json({ success: true, order });
+  } catch (error) {
+    logger.error('Order code lookup error:', error);
+    res.status(500).json({ error: 'Failed to lookup order' });
+  }
+});
+
+// Confirm payment (cashier endpoint)
+router.patch('/:id/payment', authenticateToken, authorize('admin', 'manager', 'cashier'), async (req, res) => {
   try {
     const { id } = req.params;
+    const { paymentStatus, paymentMethod } = req.body;
+    const branchId = req.user.branch_id;
+
+    if (!branchId) {
+      return res.status(400).json({ error: 'User is not assigned to a branch' });
+    }
+
+    // Validate payment status
+    const validPaymentStatuses = ['PAID', 'UNPAID'];
+    if (!validPaymentStatuses.includes(paymentStatus)) {
+      return res.status(400).json({ error: 'Invalid payment status' });
+    }
+
+    // Get current order
+    const currentOrder = await db('orders')
+      .where({ id, branch_id: branchId })
+      .first();
+
+    if (!currentOrder) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
+
+    // Update payment status
+    await db('orders')
+      .where({ id })
+      .update({
+        payment_status: paymentStatus,
+        payment_method: paymentMethod || currentOrder.payment_method,
+        status: paymentStatus === 'PAID' ? 'PREPARING' : currentOrder.status,
+        updated_at: db.raw('CURRENT_TIMESTAMP')
+      });
+
+    // Get updated order with details
+    const order = await db('orders')
+      .select('orders.*', 'tables.table_number', 'branches.name as branch_name')
+      .leftJoin('tables', 'orders.table_id', 'tables.id')
+      .leftJoin('branches', 'orders.branch_id', 'branches.id')
+      .where({ 'orders.id': id })
+      .first();
+
+    // Get order items for kitchen notification
+    const items = await db('order_items')
+      .select('order_items.*', 'menu_items.name as item_name')
+      .leftJoin('menu_items', 'order_items.menu_item_id', 'menu_items.id')
+      .where({ 'order_items.order_id': id });
+
+    order.items = items;
+
+    // Emit real-time events
+    const io = req.app.get('io');
+    
+    if (paymentStatus === 'PAID') {
+      // Notify kitchen to start preparation
+      io.to(`branch:${branchId}:kitchen`).emit('order.paid', order);
+      
+      // Notify cashier dashboard
+      io.to(`branch:${branchId}:cashier`).emit('order.updated', order);
+      
+      // Update revenue
+      io.to(`branch:${branchId}:admin`).emit('revenue.updated', {
+        amount: order.total,
+        orderId: order.id,
+        orderCode: order.order_code
+      });
+
+      logger.info(`Payment confirmed for order ${order.order_code} - Total: ${order.total}`);
+    }
+
+    // Log payment action
+    await db('audit_logs').insert({
+      user_id: req.user.id,
+      action: paymentStatus === 'PAID' ? 'PAYMENT_CONFIRMED' : 'PAYMENT_REVERTED',
+      meta: JSON.stringify({
+        orderId: id,
+        orderCode: order.order_code,
+        paymentStatus,
+        paymentMethod,
+        total: order.total
+      })
+    });
+
+    res.json({
+      success: true,
+      message: `Payment ${paymentStatus === 'PAID' ? 'confirmed' : 'reverted'} successfully`,
+      order
+    });
+  } catch (error) {
+    logger.error('Payment confirmation error:', error);
+    res.status(500).json({ error: 'Failed to update payment status' });
+  }
+});
+
+// Get single order (secured endpoint - requires auth or PIN)
+router.get('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { pin } = req.query;
+    const token = req.headers.authorization;
+
+    // Check if user is authenticated
+    const isAuthenticated = !!token;
 
     const order = await db('orders')
       .select(
@@ -315,6 +484,13 @@ router.get('/:id', authenticateToken, async (req, res) => {
 
     if (!order) {
       return res.status(404).json({ error: 'Order not found' });
+    }
+
+    // For unauthenticated requests, verify PIN
+    if (!isAuthenticated) {
+      if (!pin || pin !== order.pin) {
+        return res.status(403).json({ error: 'Invalid PIN or authentication required' });
+      }
     }
 
     // Get order items
@@ -340,9 +516,11 @@ router.get('/:id', authenticateToken, async (req, res) => {
 
     order.items = items;
 
-    // Get payments
-    const payments = await db('payments').where({ order_id: id });
-    order.payments = payments;
+    // Only include payments for authenticated users
+    if (isAuthenticated) {
+      const payments = await db('payments').where({ order_id: id });
+      order.payments = payments;
+    }
 
     res.json({ order });
   } catch (error) {

@@ -17,6 +17,7 @@ import MenuManagementPage from './pages/admin/MenuManagementPage'
 import TableManagementPage from './pages/admin/TableManagementPage'
 import OrdersPage from './pages/admin/OrdersPage'
 import KitchenDisplayPage from './pages/admin/KitchenDisplayPage'
+import CashierDashboard from './pages/admin/CashierDashboard'
 import InventoryPage from './pages/admin/InventoryPage'
 import ReportsPage from './pages/admin/ReportsPage'
 import SettingsPage from './pages/admin/SettingsPage'
@@ -66,6 +67,7 @@ function App() {
               <Route path="tables" element={<TableManagementPage />} />
               <Route path="orders" element={<OrdersPage />} />
               <Route path="kitchen" element={<KitchenDisplayPage />} />
+              <Route path="cashier" element={<CashierDashboard />} />
               <Route path="inventory" element={<InventoryPage />} />
               <Route path="employees" element={<EmployeesPage />} />
               <Route path="reports" element={<ReportsPage />} />

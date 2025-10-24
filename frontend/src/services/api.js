@@ -134,7 +134,9 @@ export const ordersAPI = {
   getOrders: (params) => api.get('/api/orders', { params }),
   getOrder: (id) => api.get(`/api/orders/${id}`),
   getOrderByPin: (pin) => api.get(`/api/orders/pin/${pin}`),
+  getOrderByCode: (code) => api.get(`/api/orders/code/${code}`),
   updateOrderStatus: (id, status) => api.patch(`/api/orders/${id}/status`, { status }),
+  updatePayment: (id, data) => api.patch(`/api/orders/${id}/payment`, data),
   confirmOrder: (id) => api.post(`/api/orders/${id}/confirm`),
   cancelOrder: (id, reason) => api.post(`/api/orders/${id}/cancel`, { reason }),
 }
