@@ -281,11 +281,21 @@ router.get('/:id/qr', authenticateToken, authorize('admin', 'manager', 'cashier'
       return res.status(403).json({ error: 'Access denied: Table belongs to different branch' });
     }
 
+    // Build QR code URL if not exists
+    const qrCodeUrl = table.qr_code_url || `${process.env.FRONTEND_URL || 'http://localhost:5173'}/menu?table=${table.table_number}&branch=${table.branch_id}`;
+    
+    // Update table with QR code URL if it was null
+    if (!table.qr_code_url) {
+      await db('tables')
+        .where({ id: table.id })
+        .update({ qr_code_url: qrCodeUrl });
+    }
+
     if (format === 'dataurl') {
-      const qrCodeDataURL = await QRCode.toDataURL(table.qr_code_url);
+      const qrCodeDataURL = await QRCode.toDataURL(qrCodeUrl);
       res.json({ success: true, qrCodeUrl: qrCodeDataURL, table });
     } else {
-      const qrCodeBuffer = await QRCode.toBuffer(table.qr_code_url);
+      const qrCodeBuffer = await QRCode.toBuffer(qrCodeUrl);
       res.setHeader('Content-Type', 'image/png');
       res.send(qrCodeBuffer);
     }
@@ -313,7 +323,17 @@ router.get('/branch/:branchId/qr-sheet', authenticateToken, authorize('admin', '
 
     const qrCodes = [];
     for (const table of tables) {
-      const qrCodeDataURL = await QRCode.toDataURL(table.qr_code_url);
+      // Build QR code URL if not exists
+      const qrCodeUrl = table.qr_code_url || `${process.env.FRONTEND_URL || 'http://localhost:5173'}/menu?table=${table.table_number}&branch=${table.branch_id}`;
+      
+      // Update table with QR code URL if it was null
+      if (!table.qr_code_url) {
+        await db('tables')
+          .where({ id: table.id })
+          .update({ qr_code_url: qrCodeUrl });
+      }
+      
+      const qrCodeDataURL = await QRCode.toDataURL(qrCodeUrl);
       qrCodes.push({
         table,
         qrCode: qrCodeDataURL
