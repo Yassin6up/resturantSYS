@@ -72,6 +72,43 @@ Both workflows start automatically and are configured in the Replit workspace.
 ## Recent Changes
 
 ### Latest (October 24, 2025)
+- **Owner Dashboard - Complete Multi-Restaurant Management**: PRODUCTION-READY ✅
+  - **Restaurant Creation/Edit Form** (`frontend/src/pages/owner/RestaurantForm.jsx`):
+    - Full CRUD form for restaurant management
+    - All fields: name, code, address, phone, email, website, description
+    - Settings: currency, tax rate, service charge, timezone, language
+    - Active/inactive status toggle
+    - Comprehensive validation and error handling
+    - Pre-populates data in edit mode
+  - **Restaurant Details Page** (`frontend/src/pages/owner/RestaurantDetails.jsx`):
+    - Detailed analytics dashboard with 4 key metrics (revenue, orders, menu items, employees)
+    - Tabbed interface: Overview, Top Products, Employees, Inventory
+    - Recent orders display with status indicators
+    - Top selling products ranking with sales data
+    - Complete employee list with roles and status
+    - Inventory status with low stock alerts
+    - Quick edit navigation
+  - **Activity Logs Page** (`frontend/src/pages/owner/ActivityLogs.jsx`):
+    - Centralized activity logs across all owned restaurants
+    - Search functionality (actions, users, branches)
+    - Filter by action type (LOGIN, CREATE, UPDATE, DELETE, RESTAURANT)
+    - Date-based filtering
+    - Color-coded action badges
+    - Metadata display for each log entry
+  - **Backend API Enhancements** (`server/src/routes/restaurants.js`):
+    - GET /api/restaurants/:id/analytics - Comprehensive analytics endpoint
+    - GET /api/restaurants/logs - Activity logs for owner's restaurants
+    - Proper route ordering (specific routes before parameterized routes)
+    - API response shape alignment with frontend expectations
+    - Full field support: website, description, isActive handling
+    - Owner-only access with strict authorization checks
+  - **Routing & Navigation**:
+    - /owner/restaurants/new - Create new restaurant
+    - /owner/restaurants/:id - View restaurant details
+    - /owner/restaurants/:id/edit - Edit restaurant
+    - /owner/logs - View all activity logs
+  - **Architect-Verified**: All features tested and approved for production
+
 - **Multi-Tenant Security Hardening**: PRODUCTION-READY ✅
   - **Comprehensive Data Isolation** across all admin/manager/staff endpoints
   - **Menu API**: All routes use `req.user.branch_id` for filtering and verify ownership before mutations
@@ -86,13 +123,9 @@ Both workflows start automatically and are configured in the Replit workspace.
     - Removed all duplicate insecure route handlers
   - **Architect-Verified**: Multi-tenant isolation tested and approved for production
 
-- **Multi-Tenant Restaurant Management**: Full implementation
+- **Multi-Tenant Foundation**: Database schema and authentication
   - Database schema enhancements: branches (restaurants) with owner_id, users with branch_id
   - Owner role support with complete authentication and authorization
-  - Backend API routes (`/api/restaurants`) with full CRUD operations
-  - Security: Role-based access control (owner-only for create/delete, owner/admin for update)
-  - Owner Dashboard with restaurant portfolio overview and statistics
-  - OwnerLayout component with professional UI
   - Role-based login redirects (owner → /owner, others → /admin)
   - Multi-restaurant seed data with 2 demo restaurants
 
