@@ -74,6 +74,7 @@ function cartReducer(state, action) {
       return action.payload
     
     case 'SET_BRANCH_INFO':
+      console.log('CartContext: SET_BRANCH_INFO', action.payload);
       return {
         ...state,
         branchId: action.payload.branchId,
@@ -104,6 +105,7 @@ export function CartProvider({ children }) {
 
   // Save cart to localStorage whenever it changes
   useEffect(() => {
+    console.log('CartContext: Saving to localStorage', state);
     localStorage.setItem('posq_cart', JSON.stringify(state))
   }, [state])
 

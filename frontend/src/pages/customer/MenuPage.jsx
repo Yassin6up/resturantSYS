@@ -30,6 +30,7 @@ function MenuPage() {
   const menuTemplate = getSetting('menu_template') || 'default';
 
   useEffect(() => {
+    console.log('MenuPage: Setting branch info', { branch: parseInt(branch), table });
     setBranchInfo(parseInt(branch), table);
   }, [branch, table]);
 
