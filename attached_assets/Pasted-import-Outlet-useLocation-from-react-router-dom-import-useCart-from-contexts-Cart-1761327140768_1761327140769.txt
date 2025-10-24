@@ -1,4 +1,4 @@
-import { Outlet, useLocation, useNavigate } from "react-router-dom";
+import { Outlet, useLocation } from "react-router-dom";
 import { useCart } from "../../contexts/CartContext";
 import { useTheme } from "../../contexts/ThemeContext";
 import { ShoppingCartIcon } from "@heroicons/react/24/outline";
@@ -6,7 +6,6 @@ import CartBottomBar from "../CartBottomBar";
 
 function CustomerLayout() {
   const location = useLocation();
-  const navigate = useNavigate();
   const { itemCount, total } = useCart();
   const { getAppName, getSetting, getWelcomeMessage } = useTheme();
 
@@ -52,7 +51,7 @@ function CustomerLayout() {
             {!isCartPage && !isCheckoutPage && !isOrderPage && (
               <div className="flex items-center">
                 <button
-                  onClick={() => navigate("/cart")}
+                  onClick={() => navigation.navigate("/cart")}
                   className="relative btn-primary group"
                 >
                   <ShoppingCartIcon className="h-5 w-5 mr-2 group-hover:animate-bounce" />

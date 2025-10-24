@@ -129,13 +129,14 @@ function MenuPage() {
                     <div className="relative overflow-hidden">
                       <img
                         src={
-                          item.image || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&h=300&fit=crop"
+                          ("https://ba89c33a-6fa6-48ea-817e-88d8c16def61-00-2t6yh5v0wxjx3.spock.replit.dev/api",
+                          item.image) || item.image
                         }
                         alt={item.name}
                         className="menu-item-image"
                         onError={(e) => {
-                          e.target.src =
-                            "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&h=300&fit=crop";
+                          console.log("error :", e);
+                          console.log(item.image);
                         }}
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
@@ -245,7 +246,9 @@ function MenuPage() {
                           {parseFloat(modifier.extra_price || 0) > 0 && (
                             <span className="text-primary-600 ml-1">
                               (+
-                              {parseFloat(modifier.extra_price || 0).toFixed(2)}{" "}
+                              {parseFloat(modifier.extra_price || 0).toFixed(
+                                2,
+                              )}{" "}
                               MAD)
                             </span>
                           )}
