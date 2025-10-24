@@ -50,6 +50,19 @@ app.use(rateLimiter);
 // Static files
 app.use('/uploads', express.static('uploads'));
 
+// Serve frontend build in production
+if (process.env.NODE_ENV === 'production') {
+  const path = require('path');
+  app.use(express.static(path.join(__dirname, '../frontend/dist')));
+  
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api')) {
+      return next();
+    }
+    res.sendFile(path.join(__dirname, '../frontend/dist/index.html'));
+  });
+}
+
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/menu', menuRoutes);
@@ -68,7 +81,7 @@ app.get('/health', (req, res) => {
   res.json({ 
     status: 'OK', 
     timestamp: new Date().toISOString(),
-    mode: process.env.OPERATING_MODE || 'LOCAL'
+    mode: process.env.MODE || 'LOCAL'
   });
 });
 
@@ -92,9 +105,9 @@ async function startServer() {
     
     server.listen(PORT, () => {
       console.log(`🚀 POSQ Server running on port ${PORT}`);
-      console.log(`📱 Frontend URL: ${process.env.FRONTEND_URL || 'http://localhost:5173'}`);
+      console.log(`📱 Frontend URL: ${process.env.FRONTEND_URL || 'http://localhost:5000'}`);
       console.log(`🗄️  Database: ${process.env.DB_TYPE || 'sqlite'}`);
-      console.log(`⚙️  Mode: ${process.env.OPERATING_MODE || 'LOCAL'}`);
+      console.log(`⚙️  Mode: ${process.env.MODE || 'LOCAL'}`);
     });
   } catch (error) {
     console.error('Failed to start server:', error);
