@@ -72,6 +72,20 @@ Both workflows start automatically and are configured in the Replit workspace.
 ## Recent Changes
 
 ### Latest (October 24, 2025)
+- **Multi-Tenant Security Hardening**: PRODUCTION-READY ✅
+  - **Comprehensive Data Isolation** across all admin/manager/staff endpoints
+  - **Menu API**: All routes use `req.user.branch_id` for filtering and verify ownership before mutations
+  - **Tables API**: Complete security overhaul - all CRUD operations enforce branch isolation, QR generation secured
+  - **Orders API**: Filtered by authenticated user's branch only
+  - **Inventory API**: Full ownership verification on all stock operations, movements, and alerts
+  - **Security Measures**:
+    - Zero tolerance for client-supplied `branchId` in admin/manager/staff endpoints
+    - All queries filter by `req.user.branch_id` automatically
+    - All mutations verify resource ownership before execution
+    - 403/404 responses for cross-branch access attempts
+    - Removed all duplicate insecure route handlers
+  - **Architect-Verified**: Multi-tenant isolation tested and approved for production
+
 - **Multi-Tenant Restaurant Management**: Full implementation
   - Database schema enhancements: branches (restaurants) with owner_id, users with branch_id
   - Owner role support with complete authentication and authorization
@@ -81,7 +95,6 @@ Both workflows start automatically and are configured in the Replit workspace.
   - OwnerLayout component with professional UI
   - Role-based login redirects (owner → /owner, others → /admin)
   - Multi-restaurant seed data with 2 demo restaurants
-  - Security audit passed: All routes properly protected from unauthorized access
 
 - **Employee Management System**: Full CRUD implementation
   - Backend API routes (`/api/employees`) with role-based access control
