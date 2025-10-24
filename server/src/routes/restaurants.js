@@ -35,6 +35,40 @@ router.get('/', authenticateToken, authorize('owner'), async (req, res) => {
   }
 });
 
+// Get activity logs (owner only) - MUST be before /:id route
+router.get('/logs', authenticateToken, authorize('owner'), async (req, res) => {
+  try {
+    const { limit = 100 } = req.query;
+    
+    // Get all branches owned by this user
+    const branches = await db('branches')
+      .select('id')
+      .where('owner_id', req.user.id);
+    
+    const branchIds = branches.map(b => b.id);
+
+    // Get audit logs for all owned branches
+    const logs = await db('audit_logs')
+      .select(
+        'audit_logs.*',
+        'users.username',
+        'users.full_name',
+        'branches.name as branch_name'
+      )
+      .leftJoin('users', 'audit_logs.user_id', 'users.id')
+      .leftJoin('branches', 'users.branch_id', 'branches.id')
+      .whereIn('users.branch_id', branchIds)
+      .orWhere('audit_logs.user_id', req.user.id)
+      .orderBy('audit_logs.created_at', 'desc')
+      .limit(parseInt(limit));
+
+    res.json({ logs });
+  } catch (error) {
+    logger.error('Error fetching activity logs:', error);
+    res.status(500).json({ error: 'Failed to fetch logs' });
+  }
+});
+
 // Get single restaurant details (owner/admin/manager only)
 router.get('/:id', authenticateToken, authorize('owner', 'admin', 'manager'), async (req, res) => {
   try {
@@ -76,9 +110,11 @@ router.get('/:id', authenticateToken, authorize('owner', 'admin', 'manager'), as
       .first();
 
     res.json({
-      ...restaurant,
-      settings: restaurant.settings ? JSON.parse(restaurant.settings) : {},
-      stats
+      restaurant: {
+        ...restaurant,
+        settings: restaurant.settings ? JSON.parse(restaurant.settings) : {},
+        stats
+      }
     });
   } catch (error) {
     logger.error('Error fetching restaurant:', error);
@@ -89,7 +125,7 @@ router.get('/:id', authenticateToken, authorize('owner', 'admin', 'manager'), as
 // Create new restaurant (owner only)
 router.post('/', authenticateToken, authorize('owner'), async (req, res) => {
   try {
-    const { name, code, address, phone, email, logo_url, settings } = req.body;
+    const { name, code, address, phone, email, website, description, logo_url, settings, isActive, is_active } = req.body;
 
     // Validate required fields
     if (!name || !code) {
@@ -109,6 +145,8 @@ router.post('/', authenticateToken, authorize('owner'), async (req, res) => {
       address,
       phone,
       email,
+      website,
+      description,
       logo_url,
       owner_id: req.user.id,
       settings: settings ? JSON.stringify(settings) : JSON.stringify({
@@ -118,7 +156,7 @@ router.post('/', authenticateToken, authorize('owner'), async (req, res) => {
         timezone: 'Africa/Casablanca',
         language: 'en'
       }),
-      is_active: true
+      is_active: isActive !== undefined ? isActive : (is_active !== undefined ? is_active : true)
     });
 
     // Create default categories for new restaurant
@@ -153,7 +191,7 @@ router.post('/', authenticateToken, authorize('owner'), async (req, res) => {
 router.put('/:id', authenticateToken, authorize('owner', 'admin'), async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, code, address, phone, email, logo_url, settings, is_active } = req.body;
+    const { name, code, address, phone, email, website, description, logo_url, settings, is_active, isActive } = req.body;
 
     const restaurant = await db('branches').where({ id }).first();
     if (!restaurant) {
@@ -175,12 +213,16 @@ router.put('/:id', authenticateToken, authorize('owner', 'admin'), async (req, r
     if (address !== undefined) updates.address = address;
     if (phone !== undefined) updates.phone = phone;
     if (email !== undefined) updates.email = email;
+    if (website !== undefined) updates.website = website;
+    if (description !== undefined) updates.description = description;
     if (logo_url !== undefined) updates.logo_url = logo_url;
     
     // Only owner can change code and active status
     if (req.user.role === 'owner') {
       if (code) updates.code = code.toUpperCase();
-      if (is_active !== undefined) updates.is_active = is_active;
+      // Handle both isActive and is_active
+      if (isActive !== undefined) updates.is_active = isActive;
+      else if (is_active !== undefined) updates.is_active = is_active;
     }
     
     if (settings) {
@@ -363,6 +405,101 @@ router.get('/:id/dashboard', authenticateToken, authorize('owner', 'admin', 'man
   } catch (error) {
     logger.error('Error fetching restaurant dashboard:', error);
     res.status(500).json({ error: 'Failed to fetch dashboard stats' });
+  }
+});
+
+// Get detailed analytics for a restaurant
+router.get('/:id/analytics', authenticateToken, authorize('owner', 'admin', 'manager'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const restaurant = await db('branches').where('id', id).first();
+    if (!restaurant) {
+      return res.status(404).json({ error: 'Restaurant not found' });
+    }
+
+    // Check authorization
+    if (req.user.role === 'owner' && restaurant.owner_id !== req.user.id) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+    if (['admin', 'manager'].includes(req.user.role) && restaurant.id !== req.user.branch_id) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    // Get comprehensive analytics
+    const analytics = {
+      // Total revenue
+      totalRevenue: await db('orders')
+        .where('branch_id', id)
+        .whereIn('status', ['CONFIRMED', 'PREPARING', 'READY', 'SERVED', 'COMPLETED'])
+        .sum('total as total')
+        .first()
+        .then(r => r.total || 0),
+      
+      // Total orders
+      totalOrders: await db('orders')
+        .where('branch_id', id)
+        .count('id as count')
+        .first()
+        .then(r => r.count || 0),
+      
+      // Total menu items
+      totalMenuItems: await db('menu_items')
+        .where('branch_id', id)
+        .count('id as count')
+        .first()
+        .then(r => r.count || 0),
+      
+      // Total employees
+      totalEmployees: await db('users')
+        .where('branch_id', id)
+        .count('id as count')
+        .first()
+        .then(r => r.count || 0),
+      
+      // Recent orders (last 10)
+      recentOrders: await db('orders')
+        .select('orders.*')
+        .where('branch_id', id)
+        .orderBy('created_at', 'desc')
+        .limit(10),
+      
+      // Top selling products
+      topProducts: await db('order_items')
+        .select(
+          'menu_items.id',
+          'menu_items.name',
+          'menu_items.price',
+          'categories.name as category_name',
+          db.raw('COUNT(order_items.id) as total_sold'),
+          db.raw('SUM(order_items.quantity) as quantity_sold')
+        )
+        .leftJoin('menu_items', 'order_items.menu_item_id', 'menu_items.id')
+        .leftJoin('categories', 'menu_items.category_id', 'categories.id')
+        .leftJoin('orders', 'order_items.order_id', 'orders.id')
+        .where('menu_items.branch_id', id)
+        .groupBy('menu_items.id', 'menu_items.name', 'menu_items.price', 'categories.name')
+        .orderBy('quantity_sold', 'desc')
+        .limit(10),
+      
+      // Employees
+      employees: await db('users')
+        .select('id', 'full_name', 'role', 'email', 'is_active', 'hire_date')
+        .where('branch_id', id)
+        .orderBy('full_name'),
+      
+      // Inventory status
+      inventory: await db('stock_items')
+        .select('id', 'name', 'sku', 'current_stock', 'min_stock', 'unit')
+        .where('branch_id', id)
+        .orderBy('name')
+        .limit(20)
+    };
+
+    res.json(analytics);
+  } catch (error) {
+    logger.error('Error fetching restaurant analytics:', error);
+    res.status(500).json({ error: 'Failed to fetch analytics' });
   }
 });
 

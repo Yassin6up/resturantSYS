@@ -108,13 +108,22 @@ export default function OwnerDashboard() {
         {/* Action Bar */}
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-2xl font-bold text-white">Your Restaurants</h2>
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-xl hover:from-purple-700 hover:to-blue-700 transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
-          >
-            <FaPlus />
-            <span>Add New Restaurant</span>
-          </button>
+          <div className="flex gap-3">
+            <button
+              onClick={() => navigate('/owner/logs')}
+              className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl hover:from-indigo-700 hover:to-purple-700 transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+            >
+              <FaChartLine />
+              <span>Activity Logs</span>
+            </button>
+            <button
+              onClick={() => navigate('/owner/restaurants/new')}
+              className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-xl hover:from-purple-700 hover:to-blue-700 transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+            >
+              <FaPlus />
+              <span>Add New Restaurant</span>
+            </button>
+          </div>
         </div>
 
         {/* Restaurants Grid */}
@@ -129,7 +138,7 @@ export default function OwnerDashboard() {
             <h3 className="text-xl font-semibold text-white mb-2">No Restaurants Yet</h3>
             <p className="text-gray-400 mb-6">Get started by creating your first restaurant</p>
             <button
-              onClick={() => setShowCreateModal(true)}
+              onClick={() => navigate('/owner/restaurants/new')}
               className="px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-xl hover:from-purple-700 hover:to-blue-700 transition-all"
             >
               Create Restaurant

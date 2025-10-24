@@ -24,6 +24,9 @@ import EmployeesPage from './pages/admin/EmployeesPage'
 
 // Owner routes (Multi-tenant Management)
 import OwnerDashboard from './pages/owner/OwnerDashboard'
+import RestaurantForm from './pages/owner/RestaurantForm'
+import RestaurantDetails from './pages/owner/RestaurantDetails'
+import ActivityLogs from './pages/owner/ActivityLogs'
 
 // Layout components
 import CustomerLayout from './components/layout/CustomerLayout'
@@ -77,6 +80,10 @@ function App() {
             }>
               <Route index element={<OwnerDashboard />} />
               <Route path="dashboard" element={<OwnerDashboard />} />
+              <Route path="restaurants/new" element={<RestaurantForm />} />
+              <Route path="restaurants/:id" element={<RestaurantDetails />} />
+              <Route path="restaurants/:id/edit" element={<RestaurantForm />} />
+              <Route path="logs" element={<ActivityLogs />} />
             </Route>
 
             {/* Catch all route */}
