@@ -182,6 +182,7 @@ export const inventoryAPI = {
   recordStockMovement: (id, data) => api.post(`/api/inventory/stock/${id}/move`, data),
   getStockMovements: (id, params) => api.get(`/api/inventory/stock/${id}/movements`, { params }),
   getLowStockAlerts: (params) => api.get('/api/inventory/stock/alerts/low', { params }),
+  getLowStockItems: (params) => api.get('/api/inventory/stock/alerts/low', { params }),
   getRecipes: (params) => api.get('/api/inventory/recipes', { params }),
   createRecipe: (data) => api.post('/api/inventory/recipes', data),
   updateRecipe: (id, data) => api.put(`/api/inventory/recipes/${id}`, data),
