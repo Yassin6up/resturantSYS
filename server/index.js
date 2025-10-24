@@ -39,6 +39,9 @@ const io = new Server(server, {
 // Store io instance for use in routes
 app.set('io', io);
 
+// Trust proxy for Replit environment
+app.set('trust proxy', true);
+
 // Middleware
 app.use(helmet());
 app.use(cors({
