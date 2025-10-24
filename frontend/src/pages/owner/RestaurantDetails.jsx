@@ -334,8 +334,8 @@ export default function RestaurantDetails() {
                           <p className="text-sm text-slate-500">{item.sku || 'No SKU'}</p>
                         </div>
                         <div className="text-right">
-                          <p className="font-bold text-slate-900">{item.current_stock || 0} {item.unit}</p>
-                          {item.current_stock <= item.min_stock && (
+                          <p className="font-bold text-slate-900">{item.quantity || 0} {item.unit}</p>
+                          {item.quantity <= item.min_threshold && (
                             <span className="text-xs text-red-600 font-medium">Low Stock</span>
                           )}
                         </div>

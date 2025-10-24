@@ -72,6 +72,22 @@ Both workflows start automatically and are configured in the Replit workspace.
 ## Recent Changes
 
 ### Latest (October 24, 2025)
+
+- **Bug Fixes & Database Enhancements**: ✅
+  - Fixed analytics endpoint inventory query (changed `current_stock` to `quantity`, `min_stock` to `min_threshold`)
+  - Fixed WebSocket connection issue (updated frontend .env to use correct API URL instead of localhost)
+  - Added `website` and `description` columns to branches table
+  - Frontend inventory display now uses correct column names
+  - Created comprehensive restaurant seed with 3 additional demo restaurants
+
+- **Enhanced Restaurant Seed Data**: ✅
+  - **Marrakech Medina (MRK)**: Traditional Moroccan cuisine with sample menu, staff, and inventory
+  - **Tangier Seaside (TNG)**: Mediterranean fusion restaurant
+  - **Fes Heritage (FES)**: Authentic Fassi cuisine
+  - Each restaurant includes: admin user, manager, 10 tables, categories, menu items, and stock items
+  - All restaurants owned by the main owner account for testing multi-restaurant management
+
+### Previous Updates
 - **Owner Dashboard - Complete Multi-Restaurant Management**: PRODUCTION-READY ✅
   - **Restaurant Creation/Edit Form** (`frontend/src/pages/owner/RestaurantForm.jsx`):
     - Full CRUD form for restaurant management

@@ -490,7 +490,7 @@ router.get('/:id/analytics', authenticateToken, authorize('owner', 'admin', 'man
       
       // Inventory status
       inventory: await db('stock_items')
-        .select('id', 'name', 'sku', 'current_stock', 'min_stock', 'unit')
+        .select('id', 'name', 'sku', 'quantity', 'min_threshold', 'unit')
         .where('branch_id', id)
         .orderBy('name')
         .limit(20)

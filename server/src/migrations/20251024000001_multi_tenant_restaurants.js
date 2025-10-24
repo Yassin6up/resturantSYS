@@ -5,6 +5,8 @@ exports.up = function(knex) {
       table.integer('owner_id').unsigned();
       table.string('phone');
       table.string('email');
+      table.string('website');
+      table.text('description');
       table.string('logo_url');
       table.text('settings'); // JSON settings for restaurant-specific config
       table.boolean('is_active').defaultTo(true);
@@ -37,6 +39,8 @@ exports.down = function(knex) {
       table.dropColumn('owner_id');
       table.dropColumn('phone');
       table.dropColumn('email');
+      table.dropColumn('website');
+      table.dropColumn('description');
       table.dropColumn('logo_url');
       table.dropColumn('settings');
       table.dropColumn('is_active');
