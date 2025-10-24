@@ -61,7 +61,18 @@ Both workflows start automatically and are configured in the Replit workspace.
 - JWT authentication with role-based permissions
 - File uploads handled via Multer
 
-## Recent Changes (Replit Setup)
+## Recent Changes
+
+### Latest (October 24, 2025)
+- **Backup & Restore System**: Complete implementation
+  - Backend API routes (`/api/backup`) with admin authentication
+  - Security: Path traversal protection, filename validation, audit logging
+  - Frontend UI in Settings page with create/restore/delete functionality
+  - Supports SQLite, MySQL, and PostgreSQL backups
+- **QR Code System**: Verified table QR codes use user-friendly table numbers
+- **API Integration**: Added backupAPI to frontend services
+
+### Replit Setup
 - Configured Vite to run on port 5000 with allowed hosts for Replit proxy
 - Updated CORS to allow all origins in development
 - Set up proper workflows for both frontend and backend
