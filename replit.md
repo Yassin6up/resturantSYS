@@ -113,11 +113,12 @@ The system employs a client-server architecture with a React + Vite frontend and
    - Order automatically sent to kitchen display
    - Updates today's revenue
 
-#### Table ID Persistence:
-- Table number captured from QR code URL (`/menu?table=5`)
-- Stored in CartContext with localStorage
+#### Table & Branch ID Persistence:
+- Table number and branch ID captured from QR code URL (`/menu?table=5&branch=1`)
+- Both values stored in CartContext with localStorage
 - Persists through: Menu → Cart → Checkout
-- No manual table input required from customer
+- No manual table or branch input required from customer
+- QR codes automatically generated with both parameters when creating/updating tables
 
 #### Complete Flow:
 1. Customer scans table QR → Lands on menu with table ID
@@ -142,15 +143,14 @@ The system employs a client-server architecture with a React + Vite frontend and
 ### Files Created/Modified:
 **Backend**:
 - `server/src/routes/orders.js` - Added cashier endpoints, payment QR generation, PIN-secured order viewing
+- `server/src/routes/tables.js` - Updated QR code generation to include both table and branch parameters
 
 **Frontend**:
-- `frontend/src/pages/customer/MenuPage.jsx` - Complete redesign with modern UI
+- `frontend/src/pages/customer/MenuPage.jsx` - Complete redesign with modern UI, extracts both table & branch from URL
 - `frontend/src/pages/customer/CartPage.jsx` - Luxury redesign with sidebar
-- `frontend/src/pages/customer/CheckoutPage.jsx` - Payment QR modal, readonly table
+- `frontend/src/pages/customer/CheckoutPage.jsx` - Payment QR modal, readonly table, uses branch from cart
 - `frontend/src/pages/customer/OrderStatusPage.jsx` - Real-time tracking with Socket.IO
 - `frontend/src/pages/admin/CashierDashboard.jsx` - NEW: Cashier payment management
 - `frontend/src/services/api.js` - Added `getOrderByCode()` and `updatePayment()` methods
 - `frontend/src/App.jsx` - Added `/admin/cashier` route
-
-**No Changes Required**:
-- `frontend/src/contexts/CartContext.jsx` - Already had table persistence
+- `frontend/src/contexts/CartContext.jsx` - Already supports both table & branch persistence in localStorage

@@ -78,7 +78,7 @@ router.post('/', authenticateToken, authorize('admin', 'manager'), async (req, r
       location: location || '',
       branch_id: branchId,
       is_active: isActive !== false,
-      qr_code_url: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/menu?table=${number}`
+      qr_code_url: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/menu?table=${number}&branch=${branchId}`
     });
 
     const table = await db('tables').where({ id: tableId }).first();
@@ -141,7 +141,7 @@ router.put('/:id', authenticateToken, authorize('admin', 'manager'), async (req,
         capacity: capacity ? parseInt(capacity) : existingTable.capacity,
         location: location !== undefined ? location : existingTable.location,
         is_active: isActive !== undefined ? isActive : existingTable.is_active,
-        qr_code_url: number ? `${process.env.FRONTEND_URL || 'http://localhost:5173'}/menu?table=${number}` : existingTable.qr_code_url,
+        qr_code_url: number ? `${process.env.FRONTEND_URL || 'http://localhost:5173'}/menu?table=${number}&branch=${existingTable.branch_id}` : existingTable.qr_code_url,
         updated_at: db.raw('CURRENT_TIMESTAMP')
       });
 
