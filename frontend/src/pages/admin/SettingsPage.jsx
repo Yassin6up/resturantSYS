@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { settingsAPI, appSettingsAPI } from '../../services/api'
+import { settingsAPI, appSettingsAPI, backupAPI } from '../../services/api'
 import { useTheme } from '../../contexts/ThemeContext'
 import { 
   CogIcon, 
@@ -12,7 +12,10 @@ import {
   EyeSlashIcon,
   BuildingOfficeIcon,
   PhotoIcon,
-  AdjustmentsHorizontalIcon
+  AdjustmentsHorizontalIcon,
+  ArrowDownTrayIcon,
+  ArrowUpTrayIcon,
+  TrashIcon
 } from '@heroicons/react/24/outline'
 import toast from 'react-hot-toast'
 
@@ -22,6 +25,9 @@ function SettingsPage() {
   const [saving, setSaving] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [localSettings, setLocalSettings] = useState({})
+  const [backups, setBackups] = useState([])
+  const [loadingBackups, setLoadingBackups] = useState(false)
+  const [creatingBackup, setCreatingBackup] = useState(false)
 
   useEffect(() => {
     // Initialize local settings with current theme settings
@@ -105,6 +111,85 @@ function SettingsPage() {
     }
   }
 
+  const loadBackups = async () => {
+    try {
+      setLoadingBackups(true)
+      const response = await backupAPI.listBackups()
+      if (response.data.success) {
+        setBackups(response.data.backups || [])
+      }
+    } catch (error) {
+      console.error('Failed to load backups:', error)
+      toast.error('Failed to load backups')
+    } finally {
+      setLoadingBackups(false)
+    }
+  }
+
+  const createBackup = async () => {
+    try {
+      setCreatingBackup(true)
+      const response = await backupAPI.createBackup()
+      if (response.data.success) {
+        toast.success('Backup created successfully!')
+        await loadBackups()
+      } else {
+        toast.error('Failed to create backup')
+      }
+    } catch (error) {
+      console.error('Failed to create backup:', error)
+      toast.error('Failed to create backup')
+    } finally {
+      setCreatingBackup(false)
+    }
+  }
+
+  const restoreBackup = async (filename) => {
+    if (!confirm(`Are you sure you want to restore from ${filename}? This will replace all current data!`)) {
+      return
+    }
+
+    try {
+      setSaving(true)
+      const response = await backupAPI.restoreBackup(filename)
+      if (response.data.success) {
+        toast.success('Backup restored successfully! Please refresh the page.')
+      } else {
+        toast.error('Failed to restore backup')
+      }
+    } catch (error) {
+      console.error('Failed to restore backup:', error)
+      toast.error('Failed to restore backup')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const deleteBackup = async (filename) => {
+    if (!confirm(`Are you sure you want to delete ${filename}?`)) {
+      return
+    }
+
+    try {
+      const response = await backupAPI.deleteBackup(filename)
+      if (response.data.success) {
+        toast.success('Backup deleted successfully!')
+        await loadBackups()
+      } else {
+        toast.error('Failed to delete backup')
+      }
+    } catch (error) {
+      console.error('Failed to delete backup:', error)
+      toast.error('Failed to delete backup')
+    }
+  }
+
+  useEffect(() => {
+    if (activeTab === 'backup') {
+      loadBackups()
+    }
+  }, [activeTab])
+
   const tabs = [
     { id: 'general', name: 'General', icon: CogIcon },
     { id: 'branding', name: 'Branding', icon: BuildingOfficeIcon },
@@ -113,6 +198,7 @@ function SettingsPage() {
     { id: 'ui_text', name: 'UI Text', icon: PhotoIcon },
     { id: 'payment', name: 'Payment', icon: CloudIcon },
     { id: 'database', name: 'Database', icon: CloudIcon },
+    { id: 'backup', name: 'Backup', icon: ArrowDownTrayIcon },
     { id: 'printer', name: 'Printer', icon: ComputerDesktopIcon }
   ]
 
@@ -819,6 +905,120 @@ function SettingsPage() {
                     </button>
                   </div>
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Backup Settings */}
+        {activeTab === 'backup' && (
+          <div className="card">
+            <div className="card-header">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-xl font-semibold text-gray-900">Backup & Restore</h2>
+                  <p className="text-gray-600">Create and manage database backups</p>
+                </div>
+                <button
+                  onClick={createBackup}
+                  disabled={creatingBackup}
+                  className="btn-primary flex items-center space-x-2"
+                >
+                  <ArrowDownTrayIcon className="h-5 w-5" />
+                  <span>{creatingBackup ? 'Creating...' : 'Create Backup'}</span>
+                </button>
+              </div>
+            </div>
+            <div className="card-body">
+              {loadingBackups ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="text-center">
+                    <div className="loading-spinner mb-4"></div>
+                    <p className="text-gray-600">Loading backups...</p>
+                  </div>
+                </div>
+              ) : backups.length === 0 ? (
+                <div className="text-center py-12">
+                  <ArrowDownTrayIcon className="h-16 w-16 mx-auto text-gray-400 mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">No backups available</h3>
+                  <p className="text-gray-600 mb-4">Create your first backup to get started</p>
+                  <button
+                    onClick={createBackup}
+                    disabled={creatingBackup}
+                    className="btn-primary"
+                  >
+                    {creatingBackup ? 'Creating...' : 'Create Backup'}
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="mb-4">
+                    <h3 className="text-sm font-medium text-gray-700 mb-2">
+                      Available Backups ({backups.length})
+                    </h3>
+                    <p className="text-sm text-gray-500">
+                      Click restore to revert your database to a previous state. 
+                      <span className="text-red-600 font-medium"> Warning: This will replace all current data!</span>
+                    </p>
+                  </div>
+                  
+                  {backups.map((backup) => (
+                    <div
+                      key={backup.filename}
+                      className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200 hover:border-gray-300 transition-colors"
+                    >
+                      <div className="flex-1">
+                        <h4 className="font-medium text-gray-900">{backup.filename}</h4>
+                        <div className="flex items-center space-x-4 mt-1 text-sm text-gray-500">
+                          <span className="flex items-center">
+                            <span className="font-medium mr-1">Type:</span>
+                            <span className="capitalize">{backup.type}</span>
+                          </span>
+                          <span className="flex items-center">
+                            <span className="font-medium mr-1">Size:</span>
+                            {(backup.size / 1024).toFixed(2)} KB
+                          </span>
+                          <span className="flex items-center">
+                            <span className="font-medium mr-1">Created:</span>
+                            {new Date(backup.created).toLocaleString()}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-2 ml-4">
+                        <button
+                          onClick={() => restoreBackup(backup.filename)}
+                          disabled={saving}
+                          className="btn-secondary flex items-center space-x-1 text-sm"
+                          title="Restore this backup"
+                        >
+                          <ArrowUpTrayIcon className="h-4 w-4" />
+                          <span>Restore</span>
+                        </button>
+                        <button
+                          onClick={() => deleteBackup(backup.filename)}
+                          className="btn-danger flex items-center space-x-1 text-sm"
+                          title="Delete this backup"
+                        >
+                          <TrashIcon className="h-4 w-4" />
+                          <span>Delete</span>
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              
+              <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                <h4 className="font-medium text-blue-900 mb-2 flex items-center">
+                  <span className="inline-block w-2 h-2 bg-blue-500 rounded-full mr-2"></span>
+                  Backup Information
+                </h4>
+                <ul className="text-sm text-blue-800 space-y-1">
+                  <li>• Backups include all database tables, settings, and configurations</li>
+                  <li>• Regular backups help protect against data loss</li>
+                  <li>• Restore operations will replace ALL current data</li>
+                  <li>• Keep multiple backups for different restore points</li>
+                </ul>
               </div>
             </div>
           </div>
