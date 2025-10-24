@@ -17,6 +17,7 @@ const { router: syncRoutes } = require('./src/routes/sync');
 const reportRoutes = require('./src/routes/reports');
 const uploadRoutes = require('./src/routes/upload');
 const appSettingsRoutes = require('./src/routes/app-settings');
+const backupRoutes = require('./src/routes/backup');
 
 const { initializeDatabase } = require('./src/database/init');
 const { setupSocketHandlers } = require('./src/socket/handlers');
@@ -75,6 +76,7 @@ app.use('/api/sync', syncRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/app-settings', appSettingsRoutes);
+app.use('/api/backup', backupRoutes);
 
 // Health check
 app.get('/health', (req, res) => {

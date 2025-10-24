@@ -183,4 +183,12 @@ export const appSettingsAPI = {
   resetSettings: (category) => api.post('/api/app-settings/reset', { category }),
 }
 
+// Backup API
+export const backupAPI = {
+  createBackup: () => api.post('/api/backup/create'),
+  listBackups: () => api.get('/api/backup/list'),
+  restoreBackup: (filename) => api.post('/api/backup/restore', { filename }),
+  deleteBackup: (filename) => api.delete(`/api/backup/${filename}`),
+}
+
 export default api

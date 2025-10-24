@@ -116,3 +116,7 @@
 {"level":"info","message":"Socket disconnected: MjnxK03Vd4DRYIfaAAAJ","service":"posq-api","timestamp":"2025-10-03T21:54:06.579Z"}
 {"level":"info","message":"Order created: CAS-20251003-0001 for table 8","service":"posq-api","timestamp":"2025-10-03T21:54:45.475Z"}
 {"level":"info","message":"Order created: CAS-20251004-0001 for table 5","service":"posq-api","timestamp":"2025-10-04T16:11:02.976Z"}
+{"level":"info","message":"User admin logged in successfully","service":"posq-api","timestamp":"2025-10-24T00:22:49.193Z"}
+{"level":"info","message":"User admin logged in successfully","service":"posq-api","timestamp":"2025-10-24T00:27:40.835Z"}
+{"level":"info","message":"User admin logged in successfully","service":"posq-api","timestamp":"2025-10-24T00:27:48.576Z"}
+{"level":"info","message":"User admin logged in successfully","service":"posq-api","timestamp":"2025-10-24T00:27:56.992Z"}
