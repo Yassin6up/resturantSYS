@@ -24,8 +24,16 @@ A comprehensive restaurant Point of Sale (POS) and QR ordering system with luxur
 - Seeded with demo data including admin user and sample menu
 
 ### Default Credentials
+
+**Restaurant Admin:**
 - **Username**: `admin`
 - **Password**: `admin123`
+- **Access**: Single restaurant management
+
+**Restaurant Owner (Multi-tenant):**
+- **Username**: `owner`
+- **Password**: `owner123`
+- **Access**: Multiple restaurant portfolio management
 
 ## Development Workflow
 
@@ -64,6 +72,17 @@ Both workflows start automatically and are configured in the Replit workspace.
 ## Recent Changes
 
 ### Latest (October 24, 2025)
+- **Multi-Tenant Restaurant Management**: Full implementation
+  - Database schema enhancements: branches (restaurants) with owner_id, users with branch_id
+  - Owner role support with complete authentication and authorization
+  - Backend API routes (`/api/restaurants`) with full CRUD operations
+  - Security: Role-based access control (owner-only for create/delete, owner/admin for update)
+  - Owner Dashboard with restaurant portfolio overview and statistics
+  - OwnerLayout component with professional UI
+  - Role-based login redirects (owner → /owner, others → /admin)
+  - Multi-restaurant seed data with 2 demo restaurants
+  - Security audit passed: All routes properly protected from unauthorized access
+
 - **Employee Management System**: Full CRUD implementation
   - Backend API routes (`/api/employees`) with role-based access control
   - Create, update, deactivate, and reactivate employees
