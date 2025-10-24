@@ -290,7 +290,7 @@ router.get('/items', authenticateToken, authorize('admin', 'manager'), async (re
 // Create menu item (admin)
 router.post('/items', authenticateToken, authorize('admin', 'manager'), upload.single('image'), async (req, res) => {
   try {
-    const { name, description, price, categoryId, sku, modifiers } = req.body;
+    const { name, description, price, categoryId, sku, modifiers, image } = req.body;
     
     // Use authenticated user's branch_id for security
     const branchId = req.user.branch_id;
@@ -304,8 +304,8 @@ router.post('/items', authenticateToken, authorize('admin', 'manager'), upload.s
       return res.status(400).json({ error: 'Name, price, and category are required' });
     }
 
-    // Get image path if uploaded
-    const imagePath = req.file ? `/uploads/${req.file.filename}` : null;
+    // Get image path - either from file upload or from body (pre-uploaded via /api/upload/image)
+    const imagePath = req.file ? `/uploads/${req.file.filename}` : (image || null);
 
     const [itemId] = await db('menu_items').insert({
       name,
@@ -359,7 +359,7 @@ router.post('/items', authenticateToken, authorize('admin', 'manager'), upload.s
 router.put('/items/:id', authenticateToken, authorize('admin', 'manager'), upload.single('image'), async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, description, price, categoryId, sku, isAvailable, modifiers } = req.body;
+    const { name, description, price, categoryId, sku, isAvailable, modifiers, image } = req.body;
     
     // Use authenticated user's branch_id for security
     const branchId = req.user.branch_id;
@@ -388,12 +388,23 @@ router.put('/items/:id', authenticateToken, authorize('admin', 'manager'), uploa
       updated_at: db.raw('CURRENT_TIMESTAMP')
     };
 
-    // Update image if new one uploaded
+    // Update image if new one uploaded via file or pre-uploaded via /api/upload/image
     if (req.file) {
       updateData.image = `/uploads/${req.file.filename}`;
       
       // Delete old image if exists
       if (existingItem.image) {
+        const oldImagePath = path.join(__dirname, '../../', existingItem.image);
+        if (fs.existsSync(oldImagePath)) {
+          fs.unlinkSync(oldImagePath);
+        }
+      }
+    } else if (image && image !== existingItem.image) {
+      // Image URL provided from separate upload
+      updateData.image = image;
+      
+      // Delete old image if exists
+      if (existingItem.image && existingItem.image !== image) {
         const oldImagePath = path.join(__dirname, '../../', existingItem.image);
         if (fs.existsSync(oldImagePath)) {
           fs.unlinkSync(oldImagePath);

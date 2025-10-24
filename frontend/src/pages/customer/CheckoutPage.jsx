@@ -14,7 +14,7 @@ import QRCode from 'qrcode.react'
 import toast from 'react-hot-toast'
 
 function CheckoutPage() {
-  const { cartItems, total, clearCart } = useCart()
+  const { cartItems, total, clearCart, branchId, tableNumber: cartTableNumber } = useCart()
   const { getSetting } = useTheme()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
@@ -22,7 +22,7 @@ function CheckoutPage() {
   const [orderData, setOrderData] = useState(null)
   const [paymentMethod, setPaymentMethod] = useState('cash')
   const [customerName, setCustomerName] = useState('')
-  const [tableNumber, setTableNumber] = useState('')
+  const [tableNumber, setTableNumber] = useState(cartTableNumber || '')
   const [showQRCode, setShowQRCode] = useState(false)
   const [orderCode, setOrderCode] = useState('')
   const [pinCode, setPinCode] = useState('')
@@ -31,13 +31,15 @@ function CheckoutPage() {
   const availablePaymentMethods = getSetting('payment_methods') || ['cash', 'card']
   const cashOnlyMode = getSetting('cash_only_mode') || false
 
-  // Auto-detect table from URL
+  // Auto-detect table from URL or cart
   useEffect(() => {
     const tableFromUrl = searchParams.get('table')
     if (tableFromUrl) {
       setTableNumber(tableFromUrl)
+    } else if (cartTableNumber) {
+      setTableNumber(cartTableNumber)
     }
-  }, [searchParams])
+  }, [searchParams, cartTableNumber])
 
   useEffect(() => {
     if (cartItems.length === 0) {
@@ -79,7 +81,7 @@ function CheckoutPage() {
       const totals = calculateTotals()
       
       const orderData = {
-        branchId: 1,
+        branchId: branchId || 1,
         tableId: parseInt(tableNumber) || 1,
         customerName: customerName,
         items: cartItems.map(item => ({

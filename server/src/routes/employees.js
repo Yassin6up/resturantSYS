@@ -7,6 +7,13 @@ const { logger } = require('../middleware/errorHandler');
 
 router.get('/', authenticateToken, authorize('admin', 'manager'), async (req, res) => {
   try {
+    // Use authenticated user's branch_id for security
+    const branchId = req.user.branch_id;
+    
+    if (!branchId) {
+      return res.status(400).json({ error: 'User is not assigned to a branch' });
+    }
+
     const employees = await db('users')
       .select(
         'id',
@@ -19,8 +26,10 @@ router.get('/', authenticateToken, authorize('admin', 'manager'), async (req, re
         'email',
         'hire_date',
         'is_active',
+        'branch_id',
         'created_at'
       )
+      .where({ branch_id: branchId })
       .orderBy('created_at', 'desc');
 
     res.json({
@@ -37,6 +46,13 @@ router.get('/:id', authenticateToken, authorize('admin', 'manager'), async (req,
   try {
     const { id } = req.params;
     
+    // Use authenticated user's branch_id for security
+    const branchId = req.user.branch_id;
+    
+    if (!branchId) {
+      return res.status(400).json({ error: 'User is not assigned to a branch' });
+    }
+    
     const employee = await db('users')
       .select(
         'id',
@@ -49,9 +65,10 @@ router.get('/:id', authenticateToken, authorize('admin', 'manager'), async (req,
         'email',
         'hire_date',
         'is_active',
+        'branch_id',
         'created_at'
       )
-      .where({ id })
+      .where({ id, branch_id: branchId })
       .first();
 
     if (!employee) {
@@ -81,6 +98,13 @@ router.post('/', authenticateToken, authorize('admin'), async (req, res) => {
       email,
       hire_date
     } = req.body;
+
+    // Use authenticated user's branch_id for security
+    const branchId = req.user.branch_id;
+    
+    if (!branchId) {
+      return res.status(400).json({ error: 'User is not assigned to a branch' });
+    }
 
     if (!username || !password || !full_name || !role) {
       return res.status(400).json({ error: 'Missing required fields' });
@@ -112,7 +136,8 @@ router.post('/', authenticateToken, authorize('admin'), async (req, res) => {
       phone: phone || null,
       email: email || null,
       hire_date: hire_date || new Date().toISOString().split('T')[0],
-      is_active: true
+      is_active: true,
+      branch_id: branchId
     });
 
     await db('audit_logs').insert({

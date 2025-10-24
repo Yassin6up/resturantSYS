@@ -9,7 +9,7 @@ import toast from 'react-hot-toast'
 function MenuPage() {
   const [searchParams] = useSearchParams()
   const table = searchParams.get('table')
-  const branch = searchParams.get('branch')
+  const branch = searchParams.get('branch') || '1'
   
   const [menu, setMenu] = useState([])
   const [loading, setLoading] = useState(true)
@@ -18,7 +18,12 @@ function MenuPage() {
   const [selectedModifiers, setSelectedModifiers] = useState([])
   const [note, setNote] = useState('')
   
-  const { addItem } = useCart()
+  const { addItem, setBranchInfo } = useCart()
+
+  useEffect(() => {
+    // Set branch info in cart when page loads
+    setBranchInfo(parseInt(branch), table)
+  }, [branch, table])
 
   useEffect(() => {
     loadMenu()
@@ -27,7 +32,7 @@ function MenuPage() {
   const loadMenu = async () => {
     try {
       setLoading(true)
-      const response = await menuAPI.getMenu({ branchId: 1 }) // Default branch
+      const response = await menuAPI.getMenu({ branchId: parseInt(branch) })
       setMenu(response.data.categories)
     } catch (error) {
       toast.error('Failed to load menu')
@@ -41,7 +46,7 @@ function MenuPage() {
     if (!selectedItem) return
 
     console.log("item : " , selectedItem)
-    addItem(selectedItem, quantity, selectedModifiers, note)
+    addItem(selectedItem, quantity, selectedModifiers, note, parseInt(branch), table)
     
     toast.success(`${quantity}x ${selectedItem.name} added to cart`)
     setSelectedItem(null)

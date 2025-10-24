@@ -5,7 +5,9 @@ const CartContext = createContext()
 const initialState = {
   items: [],
   total: 0,
-  itemCount: 0
+  itemCount: 0,
+  branchId: null,
+  tableNumber: null
 }
 
 function cartReducer(state, action) {
@@ -70,6 +72,13 @@ function cartReducer(state, action) {
 
     case 'SET_CART':
       return action.payload
+    
+    case 'SET_BRANCH_INFO':
+      return {
+        ...state,
+        branchId: action.payload.branchId,
+        tableNumber: action.payload.tableNumber
+      }
 
     default:
       return state
@@ -98,7 +107,7 @@ export function CartProvider({ children }) {
     localStorage.setItem('posq_cart', JSON.stringify(state))
   }, [state])
 
-  const addItem = (menuItem, quantity = 1, modifiers = [], note = '') => {
+  const addItem = (menuItem, quantity = 1, modifiers = [], note = '', branchId = null, tableNumber = null) => {
     const modifierTotal = modifiers.reduce((sum, modifier) => sum + modifier.extra_price, 0)
     const unitPrice = menuItem.price + modifierTotal
     const total = unitPrice * quantity
@@ -111,8 +120,17 @@ export function CartProvider({ children }) {
         unitPrice,
         total,
         modifiers,
-        note
+        note,
+        branchId,
+        tableNumber
       }
+    })
+  }
+  
+  const setBranchInfo = (branchId, tableNumber) => {
+    dispatch({ 
+      type: 'SET_BRANCH_INFO', 
+      payload: { branchId, tableNumber } 
     })
   }
 
@@ -151,6 +169,7 @@ export function CartProvider({ children }) {
     updateQuantity,
     clearCart,
     setCart,
+    setBranchInfo,
     getCartTotal,
     getItemCount
   }
