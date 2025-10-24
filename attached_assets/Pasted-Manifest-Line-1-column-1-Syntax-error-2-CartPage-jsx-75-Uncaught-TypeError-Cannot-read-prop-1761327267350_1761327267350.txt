@@ -1,0 +1,32 @@
+Manifest: Line: 1, column: 1, Syntax error.
+2
+CartPage.jsx:75 Uncaught TypeError: Cannot read properties of undefined (reading 'name')
+    at CartPage.jsx:75:76
+    at Array.map (<anonymous>)
+    at CartPage (CartPage.jsx:70:17)
+chunk-PJEEZAML.js?v=61efdf68:14032 The above error occurred in the <CartPage> component:
+
+    at CartPage (https://ba89c33a-6fa6-48ea-817e-88d8c16def61-00-2t6yh5v0wxjx3.spock.replit.dev/src/pages/customer/CartPage.jsx?t=1761326456327:24:20)
+    at RenderedRoute (https://ba89c33a-6fa6-48ea-817e-88d8c16def61-00-2t6yh5v0wxjx3.spock.replit.dev/node_modules/.vite/deps/react-router-dom.js?v=61efdf68:4088:5)
+    at Outlet (https://ba89c33a-6fa6-48ea-817e-88d8c16def61-00-2t6yh5v0wxjx3.spock.replit.dev/node_modules/.vite/deps/react-router-dom.js?v=61efdf68:4494:26)
+    at div
+    at main
+    at div
+    at CustomerLayout (https://ba89c33a-6fa6-48ea-817e-88d8c16def61-00-2t6yh5v0wxjx3.spock.replit.dev/src/components/layout/CustomerLayout.jsx?t=1761327190694:25:20)
+    at RenderedRoute (https://ba89c33a-6fa6-48ea-817e-88d8c16def61-00-2t6yh5v0wxjx3.spock.replit.dev/node_modules/.vite/deps/react-router-dom.js?v=61efdf68:4088:5)
+    at Routes (https://ba89c33a-6fa6-48ea-817e-88d8c16def61-00-2t6yh5v0wxjx3.spock.replit.dev/node_modules/.vite/deps/react-router-dom.js?v=61efdf68:4558:5)
+    at CartProvider (https://ba89c33a-6fa6-48ea-817e-88d8c16def61-00-2t6yh5v0wxjx3.spock.replit.dev/src/contexts/CartContext.jsx?t=1761326456327:86:32)
+    at SocketProvider (https://ba89c33a-6fa6-48ea-817e-88d8c16def61-00-2t6yh5v0wxjx3.spock.replit.dev/src/contexts/SocketContext.jsx?t=1761324967985:23:34)
+    at AuthProvider (https://ba89c33a-6fa6-48ea-817e-88d8c16def61-00-2t6yh5v0wxjx3.spock.replit.dev/src/contexts/AuthContext.jsx?t=1761324967985:66:32)
+    at ThemeProvider (https://ba89c33a-6fa6-48ea-817e-88d8c16def61-00-2t6yh5v0wxjx3.spock.replit.dev/src/contexts/ThemeContext.jsx?t=1761324967985:21:33)
+    at App
+    at Router (https://ba89c33a-6fa6-48ea-817e-88d8c16def61-00-2t6yh5v0wxjx3.spock.replit.dev/node_modules/.vite/deps/react-router-dom.js?v=61efdf68:4501:15)
+    at BrowserRouter (https://ba89c33a-6fa6-48ea-817e-88d8c16def61-00-2t6yh5v0wxjx3.spock.replit.dev/node_modules/.vite/deps/react-router-dom.js?v=61efdf68:5247:5)
+    at QueryClientProvider2 (https://ba89c33a-6fa6-48ea-817e-88d8c16def61-00-2t6yh5v0wxjx3.spock.replit.dev/node_modules/.vite/deps/react-query.js?v=61efdf68:2664:21)
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://reactjs.org/link/error-boundaries to learn more about error boundaries.
+chunk-PJEEZAML.js?v=61efdf68:9129 Uncaught TypeError: Cannot read properties of undefined (reading 'name')
+    at CartPage.jsx:75:76
+    at Array.map (<anonymous>)
+    at CartPage (CartPage.jsx:70:17)

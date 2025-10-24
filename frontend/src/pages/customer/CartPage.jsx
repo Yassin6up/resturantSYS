@@ -70,11 +70,23 @@ function CartPage() {
         {items?.map((item) => (
           <div key={item.id} className="card">
             <div className="card-body">
-              <div className="flex justify-between items-start">
+              <div className="flex items-start space-x-4">
+                {/* Item Image */}
+                {item.image && (
+                  <img
+                    src={item.image}
+                    alt={item.name}
+                    className="w-20 h-20 object-cover rounded-lg"
+                    onError={(e) => {
+                      e.target.src = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=100&h=100&fit=crop';
+                    }}
+                  />
+                )}
+                
                 <div className="flex-1">
-                  <h3 className="font-medium text-gray-900">{item.menuItem.name}</h3>
+                  <h3 className="font-medium text-gray-900">{item.name}</h3>
                   <p className="text-sm text-gray-600">
-                    {item?.total?.toFixed(2)|| 0 } MAD each
+                    {item?.unitPrice?.toFixed(2) || 0} MAD each
                   </p>
                   
                   {/* Modifiers */}
