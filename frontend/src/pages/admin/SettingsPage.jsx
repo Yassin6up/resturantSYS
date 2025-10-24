@@ -163,6 +163,14 @@ function SettingsPage() {
       
       if (response.data.success) {
         handleSettingChange('operatingMode', mode)
+        
+        // Automatically set the correct database type based on mode
+        if (mode === 'LOCAL') {
+          handleSettingChange('dbType', 'sqlite3')
+        } else if (mode === 'CLOUD') {
+          handleSettingChange('dbType', 'mysql2')
+        }
+        
         toast.success(`Operating mode changed to ${mode}`)
       } else {
         toast.error('Failed to change operating mode')

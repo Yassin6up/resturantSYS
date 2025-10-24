@@ -186,3 +186,5 @@
 {"level":"info","message":"Operating mode changed from LOCAL to CLOUD by admin","service":"posq-api","timestamp":"2025-10-24T20:44:31.768Z"}
 {"level":"info","message":"Operating mode changed from CLOUD to LOCAL by admin","service":"posq-api","timestamp":"2025-10-24T20:50:24.691Z"}
 {"level":"info","message":"Operating mode changed from LOCAL to CLOUD by admin","service":"posq-api","timestamp":"2025-10-24T20:50:28.689Z"}
+{"level":"info","message":"Operating mode changed from CLOUD to LOCAL by admin","service":"posq-api","timestamp":"2025-10-24T21:31:26.290Z"}
+{"level":"info","message":"Operating mode changed from LOCAL to CLOUD by admin","service":"posq-api","timestamp":"2025-10-24T21:31:27.575Z"}
