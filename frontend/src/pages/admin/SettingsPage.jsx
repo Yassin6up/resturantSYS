@@ -669,11 +669,11 @@ function SettingsPage() {
                       Testing...
                     </>
                   ) : (
-                    <>
-                      <DatabaseIcon className="h-5 w-5 mr-2" />
-                      Test Connection
-                    </>
-                  )}
+                      <>
+                        <CloudIcon className="h-5 w-5 mr-2" />
+                        Test Connection
+                      </>
+                    )}
                 </button>
               </div>
             </div>

@@ -8,6 +8,8 @@ import {
   ExclamationTriangleIcon
 } from '@heroicons/react/24/outline'
 import toast from 'react-hot-toast'
+import { formatCurrency } from '../../utils/format'
+import { useNavigate } from 'react-router-dom'
 
 function OrderStatusPage() {
   const [pin, setPin] = useState('')
@@ -232,13 +234,8 @@ function OrderStatusPage() {
 
             {/* Back to Menu */}
             <div className="text-center">
-              <button
-                onClick={() => window.location.href = '/menu'}
-                className="btn-outline w-full"
-              >
-                Back to Menu
-              </button>
-            </div>
+                      <BackToMenu />
+                    </div>
           </div>
         </div>
       </div>
@@ -247,3 +244,15 @@ function OrderStatusPage() {
 }
 
 export default OrderStatusPage
+
+        function BackToMenu() {
+          const navigate = useNavigate()
+          return (
+            <button
+              onClick={() => navigate('/menu')}
+              className="btn-outline w-full"
+            >
+              Back to Menu
+            </button>
+          )
+        }

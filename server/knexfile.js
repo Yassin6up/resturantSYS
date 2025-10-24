@@ -2,16 +2,14 @@ require('dotenv').config();
 
 const config = {
   development: {
-    client: process.env.DB_TYPE || 'sqlite3',
-    connection: process.env.DB_TYPE === 'sqlite3' 
-      ? { filename: process.env.DB_PATH || './data/posq.db' }
-      : {
-          host: process.env.DB_HOST || 'localhost',
-          port: process.env.DB_PORT || 3306,
-          user: process.env.DB_USER || 'posq',
-          password: process.env.DB_PASSWORD || '',
-          database: process.env.DB_NAME || 'posq'
-        },
+          client: 'mysql2',
+          connection: {
+            host: 'localhost',
+            port: 3306,
+            user: 'root',
+            password: '',
+            database: 'resturant'
+          },
     migrations: {
       directory: './src/migrations'
     },
@@ -22,16 +20,14 @@ const config = {
   },
 
   production: {
-    client: process.env.DB_TYPE || 'sqlite3',
-    connection: process.env.DB_TYPE === 'sqlite3' 
-      ? { filename: process.env.DB_PATH || './data/posq.db' }
-      : {
-          host: process.env.DB_HOST,
-          port: process.env.DB_PORT,
-          user: process.env.DB_USER,
-          password: process.env.DB_PASSWORD,
-          database: process.env.DB_NAME
-        },
+          client: 'mysql2',
+          connection: {
+            host: 'localhost',
+            port: 3306,
+            user: 'root',
+            password: '',
+            database: 'resturant'
+          },
     migrations: {
       directory: './src/migrations'
     },

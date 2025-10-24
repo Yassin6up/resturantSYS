@@ -110,6 +110,12 @@ function MenuManagementPage() {
     }
   }
 
+  // Safe currency formatter: handles strings, nulls, and non-numeric values
+  const formatCurrency = (value) => {
+    const n = parseFloat(value)
+    return (Number.isFinite(n) ? n : 0).toFixed(2)
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -278,7 +284,7 @@ function MenuManagementPage() {
                           {item.category_name}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {item.price.toFixed(2)} MAD
+                          {formatCurrency(item.price)} MAD
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span className={`badge ${item.is_available ? 'badge-success' : 'badge-danger'}`}>

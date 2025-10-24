@@ -1,4 +1,5 @@
 import { useCart } from '../../contexts/CartContext'
+import { formatCurrency } from '../../utils/format'
 import { useNavigate } from 'react-router-dom'
 import { PlusIcon, MinusIcon, TrashIcon } from '@heroicons/react/24/outline'
 import toast from 'react-hot-toast'
@@ -74,7 +75,7 @@ function CartPage() {
                 <div className="flex-1">
                   <h3 className="font-medium text-gray-900">{item.menuItem.name}</h3>
                   <p className="text-sm text-gray-600">
-                    {item?.total?.toFixed(2)|| 0 } MAD each
+                    {formatCurrency(item?.total) } MAD each
                   </p>
                   
                   {/* Modifiers */}
@@ -86,7 +87,7 @@ function CartPage() {
                           • {modifier.name}
                           {modifier.extra_price > 0 && (
                             <span className="text-primary-600">
-                              {' '}(+{modifier.extra_price.toFixed(2)} MAD)
+                              {' '}(+{formatCurrency(modifier.extra_price)} MAD)
                             </span>
                           )}
                         </p>
@@ -126,7 +127,7 @@ function CartPage() {
                   {/* Item Total */}
                   <div className="text-right">
                     <p className="font-medium text-gray-900">
-                      {item.total.toFixed(2)} MAD
+                      {formatCurrency(item.total)} MAD
                     </p>
                   </div>
 
@@ -150,7 +151,7 @@ function CartPage() {
 
       {/* Cart Summary */}
       <div className="card">
-        <div className="card-body">
+            <div className="card-body">
           <div className="flex justify-between items-center mb-4">
             <span className="text-lg font-semibold text-gray-900">Total:</span>
             <span className="text-2xl font-bold text-primary-600">
@@ -158,7 +159,7 @@ function CartPage() {
             </span>
           </div>
           
-          <div className="space-y-3">
+            <div className="space-y-3">
             <button
               onClick={handleCheckout}
               className="btn-primary w-full btn-lg"

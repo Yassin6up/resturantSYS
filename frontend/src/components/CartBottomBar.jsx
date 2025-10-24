@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useCart } from '../contexts/CartContext'
+import { formatCurrency } from '../utils/format'
 import { ShoppingCartIcon, CreditCardIcon, QrCodeIcon } from '@heroicons/react/24/outline'
 import { useNavigate } from 'react-router-dom'
 
@@ -38,7 +39,7 @@ function CartBottomBar() {
             </div>
             <div className="text-left">
               <p className="text-sm font-medium text-white">{itemCount} items</p>
-              <p className="text-lg font-bold text-yellow-400">{total.toFixed(2)} MAD</p>
+              <p className="text-lg font-bold text-yellow-400">{formatCurrency(total)} MAD</p>
             </div>
           </button>
           
@@ -82,9 +83,9 @@ function CartBottomBar() {
                     <div className="flex-1">
                       <h3 className="font-medium text-white">{item.name}</h3>
                       <p className="text-sm text-gray-300">Qty: {item.quantity}</p>
-                      <p className="text-sm font-semibold text-yellow-400">
-                        {(item.price * item.quantity)?.toFixed(2)} MAD
-                      </p>
+                            <p className="text-sm font-semibold text-yellow-400">
+                              {formatCurrency(item.price * item.quantity)} MAD
+                            </p>
                     </div>
                   </div>
                 </div>
@@ -94,7 +95,7 @@ function CartBottomBar() {
             <div className="p-4 border-t border-yellow-400/30">
               <div className="flex items-center justify-between mb-4">
                 <span className="text-lg font-semibold text-white">Total:</span>
-                <span className="text-2xl font-bold text-yellow-400">{total.toFixed(2)} MAD</span>
+                <span className="text-2xl font-bold text-yellow-400">{formatCurrency(total)} MAD</span>
               </div>
               
               <div className="space-y-3">

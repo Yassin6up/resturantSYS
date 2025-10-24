@@ -41,6 +41,7 @@ function StockItemForm({
         min_stock: parseFloat(data.minStock),
         max_stock: parseFloat(data.maxStock),
         cost_price: parseFloat(data.costPrice),
+        branchId: data.branchId ? parseInt(data.branchId) : 0,
         is_active: data.isActive
       }
 

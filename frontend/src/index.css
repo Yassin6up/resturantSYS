@@ -68,21 +68,29 @@ body {
   
   .btn-primary {
     @apply text-white;
-    background: var(--primary-color);
-    border: 1px solid var(--primary-color);
-    box-shadow: var(--shadow-sm);
+    background: linear-gradient(90deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+    border: none;
+    box-shadow: 0 6px 18px rgba(59, 130, 246, 0.18);
+    padding: 0.65rem 1rem;
+    border-radius: 12px;
+    font-weight: 600;
+    transition: transform 160ms ease, box-shadow 160ms ease, opacity 160ms ease;
   }
   
   .btn-primary:hover {
-    background: var(--secondary-color);
-    border-color: var(--secondary-color);
-    box-shadow: var(--shadow-md);
-    transform: translateY(-1px);
+    transform: translateY(-3px) scale(1.01);
+    box-shadow: 0 14px 32px rgba(59, 130, 246, 0.16);
+    opacity: 0.98;
   }
-  
+
+  .btn-primary:active {
+    transform: translateY(0) scale(0.995);
+    box-shadow: 0 6px 18px rgba(59, 130, 246, 0.12);
+  }
+
   .btn-primary:focus {
     outline: none;
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    box-shadow: 0 0 0 6px rgba(59, 130, 246, 0.12);
   }
   
   .btn-secondary {
@@ -103,14 +111,18 @@ body {
   .btn-outline {
     color: var(--text-primary);
     background: transparent;
-    border: 1px solid var(--border-color);
+    border: 1px solid rgba(31,41,55,0.08);
+    box-shadow: none;
+    transition: background 150ms ease, border-color 150ms ease, color 150ms ease, transform 160ms ease;
+    padding: 0.5rem 0.9rem;
+    border-radius: 10px;
   }
   
   .btn-outline:hover {
-    background: var(--surface-color);
-    border-color: var(--primary-color);
+    background: rgba(59,130,246,0.06);
+    border-color: rgba(59,130,246,0.16);
     color: var(--primary-color);
-    box-shadow: var(--shadow-sm);
+    transform: translateY(-2px);
   }
   
   .btn-success {
@@ -143,12 +155,14 @@ body {
   
   .btn-sm {
     @apply px-3 py-1.5 text-xs;
-    border-radius: calc(var(--border-radius) * 0.75);
+    border-radius: 8px;
+    padding: 0.35rem 0.6rem;
   }
   
   .btn-lg {
     @apply px-6 py-3 text-base;
-    border-radius: calc(var(--border-radius) * 1.25);
+    border-radius: 14px;
+    padding: 0.9rem 1.25rem;
   }
   
   /* Airbnb-style Cards */

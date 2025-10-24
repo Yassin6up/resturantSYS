@@ -7,7 +7,7 @@ function TableForm({
   table = null, 
   onSave, 
   onCancel,
-  branchId = 1 
+  branchId = 0 
 }) {
   const [loading, setLoading] = useState(false)
   

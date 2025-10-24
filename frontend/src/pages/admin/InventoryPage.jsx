@@ -9,6 +9,7 @@ import {
   
 } from '@heroicons/react/24/outline'
 import StockItemForm from '../../components/StockItemForm'
+import { formatCurrency } from '../../utils/format'
 import toast from 'react-hot-toast'
 
 function InventoryPage() {
@@ -288,7 +289,7 @@ function InventoryPage() {
                             {item.min_stock} / {item.max_stock} {item.unit}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {item.cost_price?.toFixed(2) || '0.00'} MAD
+                            {formatCurrency(item.cost_price)} MAD
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <span className={`badge ${stockStatus.bgColor} ${stockStatus.color}`}>

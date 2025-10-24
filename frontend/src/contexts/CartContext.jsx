@@ -146,6 +146,8 @@ export function CartProvider({ children }) {
 
   const value = {
     ...state,
+    // Backwards-compatible alias: some components expect `cartItems` instead of `items`
+    cartItems: state.items,
     addItem,
     removeItem,
     updateQuantity,

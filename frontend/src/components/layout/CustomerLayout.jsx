@@ -1,4 +1,4 @@
-import { Outlet, useLocation } from 'react-router-dom'
+import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useCart } from '../../contexts/CartContext'
 import { useTheme } from '../../contexts/ThemeContext'
 import { ShoppingCartIcon } from '@heroicons/react/24/outline'
@@ -7,6 +7,7 @@ import CartBottomBar from '../CartBottomBar'
 function CustomerLayout() {
   const location = useLocation()
   const { itemCount, total } = useCart()
+  const navigate = useNavigate()
   const { getAppName, getSetting, getWelcomeMessage } = useTheme()
 
   const isCartPage = location.pathname === '/cart'
@@ -49,11 +50,12 @@ function CustomerLayout() {
             {!isCartPage && !isCheckoutPage && !isOrderPage && (
               <div className="flex items-center">
                 <button
-                  onClick={() => window.location.href = '/cart'}
-                  className="relative btn-primary group"
+                  onClick={() => navigate('/cart')}
+                  className="relative btn-primary group flex items-center"
+                  aria-label="Open cart"
                 >
-                  <ShoppingCartIcon className="h-5 w-5 mr-2 group-hover:animate-bounce" />
-                  Cart
+                  <ShoppingCartIcon className="h-5 w-5 mr-2 group-hover:animate-bounce" aria-hidden />
+                  <span>Cart</span>
                   {itemCount > 0 && (
                     <span className="absolute -top-2 -right-2 bg-gradient-to-r from-red-500 to-pink-500 text-white text-xs rounded-full h-6 w-6 flex items-center justify-center font-semibold shadow-lg animate-bounce">
                       {itemCount}

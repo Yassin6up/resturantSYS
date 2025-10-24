@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useCart } from '../../contexts/CartContext'
 import { menuAPI } from '../../services/api'
+import { formatCurrency } from '../../utils/format'
 import { PlusIcon, MinusIcon } from '@heroicons/react/24/outline'
 import CartBottomBar from '../../components/CartBottomBar'
 import toast from 'react-hot-toast'
@@ -120,7 +121,7 @@ function MenuPage() {
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                       <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm rounded-full px-3 py-1 text-sm font-semibold text-gray-800 shadow-lg">
-                        {parseFloat(item?.price || 0).toFixed(2)} MAD
+                        {formatCurrency(item?.price)} MAD
                       </div>
                     </div>
                     
@@ -162,8 +163,8 @@ function MenuPage() {
                 }}
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent"></div>
-              <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm rounded-full px-4 py-2 text-lg font-bold text-gray-800 shadow-lg">
-                {parseFloat(selectedItem.price || 0).toFixed(2)} MAD
+                <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm rounded-full px-4 py-2 text-lg font-bold text-gray-800 shadow-lg">
+                {formatCurrency(selectedItem.price)} MAD
               </div>
             </div>
             

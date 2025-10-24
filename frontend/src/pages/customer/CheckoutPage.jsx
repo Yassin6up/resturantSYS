@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useCart } from '../../contexts/CartContext'
+import { formatCurrency } from '../../utils/format'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { ordersAPI } from '../../services/api'
@@ -34,7 +35,8 @@ function CheckoutPage() {
   // Auto-detect table from URL
   useEffect(() => {
     const tableFromUrl = searchParams.get('table')
-    if (tableFromUrl) {
+    // ignore literal 'undefined' value if the link was copied incorrectly
+    if (tableFromUrl && tableFromUrl !== 'undefined') {
       setTableNumber(tableFromUrl)
     }
   }, [searchParams])
@@ -154,7 +156,7 @@ function CheckoutPage() {
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">Total:</span>
-                    <span className="font-semibold text-blue-600">{totals.grandTotal.toFixed(2)} MAD</span>
+                    <span className="font-semibold text-blue-600">{formatCurrency(totals.grandTotal)} MAD</span>
                   </div>
                 </div>
               </div>

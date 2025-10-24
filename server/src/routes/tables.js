@@ -355,29 +355,38 @@ router.delete('/:id', authenticateToken, authorize('admin', 'manager'), async (r
 router.get('/:id/qr', authenticateToken, authorize('admin', 'manager', 'cashier'), async (req, res) => {
   try {
     const { id } = req.params;
-    const { format = 'png' } = req.query;
-
-    const table = await db('tables')
-      .select('tables.*', 'branches.name as branch_name', 'branches.code as branch_code')
-      .leftJoin('branches', 'tables.branch_id', 'branches.id')
-      .where({ 'tables.id': id })
-      .first();
-
-    if (!table) {
-      return res.status(404).json({ error: 'Table not found' });
+    const table = await db('tables').where({ id }).first();
+    if (!table || !table.qr_code_url) {
+      return res.status(404).json({ error: 'Table or QR code URL not found' });
     }
-
-    if (format === 'dataurl') {
-      const qrCodeDataURL = await QRCode.toDataURL(table.qr_code);
-      res.json({ success: true, qrCodeUrl: qrCodeDataURL, table });
-    } else {
-      const qrCodeBuffer = await QRCode.toBuffer(table.qr_code);
-      res.setHeader('Content-Type', 'image/png');
-      res.send(qrCodeBuffer);
-    }
+    // Return direct link to QR code image
+    const qrImageLink = `${req.protocol}://${req.get('host')}/api/tables/${id}/qrcode`;
+    res.json({ success: true, qrImage: qrImageLink });
   } catch (error) {
-    logger.error('QR code generation error:', error);
-    res.status(500).json({ error: 'Failed to generate QR code' });
+    logger.error('QR code link error:', error);
+    res.status(500).json({ error: 'Failed to generate QR code link' });
+  }
+});
+// Get QR code PNG for a table
+router.get('/:id/qrcode', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const table = await db('tables').where({ id }).first();
+    if (!table || !table.qr_code_url) {
+      return res.status(404).json({ error: 'Table or QR code URL not found' });
+    }
+    // Generate QR code PNG
+    QRCode.toBuffer(table.qr_code_url, { type: 'png' }, (err, buffer) => {
+      if (err) {
+        logger.error('QR code generation error:', err);
+        return res.status(500).json({ error: 'Failed to generate QR code' });
+      }
+      res.set('Content-Type', 'image/png');
+      res.send(buffer);
+    });
+  } catch (error) {
+    logger.error('QR code fetch error:', error);
+    res.status(500).json({ error: 'Failed to fetch QR code' });
   }
 });
 
