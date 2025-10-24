@@ -20,6 +20,7 @@ import KitchenDisplayPage from './pages/admin/KitchenDisplayPage'
 import InventoryPage from './pages/admin/InventoryPage'
 import ReportsPage from './pages/admin/ReportsPage'
 import SettingsPage from './pages/admin/SettingsPage'
+import EmployeesPage from './pages/admin/EmployeesPage'
 
 // Layout components
 import CustomerLayout from './components/layout/CustomerLayout'
@@ -59,6 +60,7 @@ function App() {
               <Route path="orders" element={<OrdersPage />} />
               <Route path="kitchen" element={<KitchenDisplayPage />} />
               <Route path="inventory" element={<InventoryPage />} />
+              <Route path="employees" element={<EmployeesPage />} />
               <Route path="reports" element={<ReportsPage />} />
               <Route path="settings" element={<SettingsPage />} />
             </Route>

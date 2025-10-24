@@ -18,6 +18,7 @@ const reportRoutes = require('./src/routes/reports');
 const uploadRoutes = require('./src/routes/upload');
 const appSettingsRoutes = require('./src/routes/app-settings');
 const backupRoutes = require('./src/routes/backup');
+const employeesRoutes = require('./src/routes/employees');
 
 const { initializeDatabase } = require('./src/database/init');
 const { setupSocketHandlers } = require('./src/socket/handlers');
@@ -77,6 +78,7 @@ app.use('/api/reports', reportRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/app-settings', appSettingsRoutes);
 app.use('/api/backup', backupRoutes);
+app.use('/api/employees', employeesRoutes);
 
 // Health check
 app.get('/health', (req, res) => {

@@ -13,7 +13,7 @@ import {
   ArrowRightOnRectangleIcon,
   BellIcon,
   WifiIcon,
-  
+  UserGroupIcon
 } from '@heroicons/react/24/outline'
 import { useState } from 'react'
 
@@ -24,6 +24,7 @@ const navigation = [
   { name: 'Orders', href: '/admin/orders', icon: QueueListIcon, roles: ['admin', 'manager', 'cashier'] },
   { name: 'Kitchen', href: '/admin/kitchen', icon: BeakerIcon, roles: ['admin', 'manager', 'kitchen'] },
   { name: 'Inventory', href: '/admin/inventory', icon: ChartBarIcon, roles: ['admin', 'manager'] },
+  { name: 'Employees', href: '/admin/employees', icon: UserGroupIcon, roles: ['admin', 'manager'] },
   { name: 'Reports', href: '/admin/reports', icon: ChartBarIcon, roles: ['admin', 'manager'] },
   { name: 'Settings', href: '/admin/settings', icon: CogIcon, roles: ['admin'] },
 ]

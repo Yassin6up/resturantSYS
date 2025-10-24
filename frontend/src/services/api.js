@@ -257,4 +257,14 @@ export const backupAPI = {
   deleteBackup: (filename) => api.delete(`/api/backup/${filename}`),
 }
 
+// Employees API
+export const employeesAPI = {
+  getEmployees: () => api.get('/api/employees'),
+  getEmployee: (id) => api.get(`/api/employees/${id}`),
+  createEmployee: (data) => api.post('/api/employees', data),
+  updateEmployee: (id, data) => api.put(`/api/employees/${id}`, data),
+  deleteEmployee: (id) => api.delete(`/api/employees/${id}`),
+  activateEmployee: (id) => api.post(`/api/employees/${id}/activate`),
+}
+
 export default api
