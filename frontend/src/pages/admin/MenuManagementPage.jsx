@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { menuAPI } from '../../services/api'
+import { menuAPI, getImageUrl } from '../../services/api'
 import { PlusIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/outline'
 import MenuItemForm from '../../components/MenuItemForm'
 import CategoryForm from '../../components/CategoryForm'
@@ -249,6 +249,9 @@ function MenuManagementPage() {
                   <thead className="bg-gray-50">
                     <tr>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Image
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Item
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -268,6 +271,16 @@ function MenuManagementPage() {
                   <tbody className="bg-white divide-y divide-gray-200">
                     {menuItems.map((item) => (
                       <tr key={item.id}>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <img 
+                            src={item.image ? getImageUrl(item.image) : 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=100&h=100&fit=crop'} 
+                            alt={item.name}
+                            className="h-12 w-12 rounded-lg object-cover"
+                            onError={(e) => {
+                              e.target.src = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=100&h=100&fit=crop';
+                            }}
+                          />
+                        </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div>
                             <div className="text-sm font-medium text-gray-900">{item.name}</div>
