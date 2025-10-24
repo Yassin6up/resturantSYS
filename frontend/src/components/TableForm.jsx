@@ -19,10 +19,9 @@ function TableForm({
     watch
   } = useForm({
     defaultValues: {
-      number: table?.number || '',
+      number: table?.table_number || '',
       capacity: table?.capacity || 4,
       location: table?.location || '',
-      branchId: branchId,
       isActive: table?.is_active !== false
     }
   })
@@ -32,8 +31,9 @@ function TableForm({
       setLoading(true)
       
       const tableData = {
-        ...data,
-        branchId: parseInt(data.branchId),
+        number: data.number,
+        capacity: parseInt(data.capacity),
+        location: data.location || '',
         isActive: data.isActive
       }
 

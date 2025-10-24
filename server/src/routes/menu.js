@@ -1,10 +1,44 @@
 const express = require('express');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 const { db } = require('../database/init');
 const { authenticateToken, authorize } = require('../middleware/auth');
 const { validateMenuItem } = require('../middleware/validation');
 const { logger } = require('../middleware/errorHandler');
 
 const router = express.Router();
+
+// Multer configuration for image uploads
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    const uploadDir = path.join(__dirname, '../../uploads');
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    cb(null, uploadDir);
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, 'menu-item-' + uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+const upload = multer({ 
+  storage: storage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+  fileFilter: function (req, file, cb) {
+    const allowedTypes = /jpeg|jpg|png|gif|webp/;
+    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+    const mimetype = allowedTypes.test(file.mimetype);
+    
+    if (mimetype && extname) {
+      return cb(null, true);
+    } else {
+      cb(new Error('Only image files are allowed!'));
+    }
+  }
+});
 
 // Get menu for a specific branch (public endpoint)
 router.get('/', async (req, res) => {
@@ -254,7 +288,7 @@ router.get('/items', authenticateToken, authorize('admin', 'manager'), async (re
 });
 
 // Create menu item (admin)
-router.post('/items', authenticateToken, authorize('admin', 'manager'), validateMenuItem, async (req, res) => {
+router.post('/items', authenticateToken, authorize('admin', 'manager'), upload.single('image'), async (req, res) => {
   try {
     const { name, description, price, categoryId, sku, modifiers } = req.body;
     
@@ -265,13 +299,22 @@ router.post('/items', authenticateToken, authorize('admin', 'manager'), validate
       return res.status(400).json({ error: 'User is not assigned to a branch' });
     }
 
+    // Validate required fields
+    if (!name || !price || !categoryId) {
+      return res.status(400).json({ error: 'Name, price, and category are required' });
+    }
+
+    // Get image path if uploaded
+    const imagePath = req.file ? `/uploads/${req.file.filename}` : null;
+
     const [itemId] = await db('menu_items').insert({
       name,
       description,
       price,
       category_id: categoryId,
       branch_id: branchId,
-      sku
+      sku,
+      image: imagePath
     });
 
     // Add modifiers if provided
@@ -313,7 +356,7 @@ router.post('/items', authenticateToken, authorize('admin', 'manager'), validate
 });
 
 // Update menu item (admin)
-router.put('/items/:id', authenticateToken, authorize('admin', 'manager'), async (req, res) => {
+router.put('/items/:id', authenticateToken, authorize('admin', 'manager'), upload.single('image'), async (req, res) => {
   try {
     const { id } = req.params;
     const { name, description, price, categoryId, sku, isAvailable, modifiers } = req.body;
@@ -334,17 +377,33 @@ router.put('/items/:id', authenticateToken, authorize('admin', 'manager'), async
       return res.status(403).json({ error: 'Access denied: Item belongs to different branch' });
     }
 
+    // Prepare update data
+    const updateData = {
+      name,
+      description,
+      price,
+      category_id: categoryId,
+      sku,
+      is_available: isAvailable,
+      updated_at: db.raw('CURRENT_TIMESTAMP')
+    };
+
+    // Update image if new one uploaded
+    if (req.file) {
+      updateData.image = `/uploads/${req.file.filename}`;
+      
+      // Delete old image if exists
+      if (existingItem.image) {
+        const oldImagePath = path.join(__dirname, '../../', existingItem.image);
+        if (fs.existsSync(oldImagePath)) {
+          fs.unlinkSync(oldImagePath);
+        }
+      }
+    }
+
     await db('menu_items')
       .where({ id })
-      .update({
-        name,
-        description,
-        price,
-        category_id: categoryId,
-        sku,
-        is_available: isAvailable,
-        updated_at: db.raw('CURRENT_TIMESTAMP')
-      });
+      .update(updateData);
 
     // Update modifiers if provided
     if (modifiers) {

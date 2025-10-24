@@ -125,7 +125,7 @@ router.get('/:id', authenticateToken, authorize('owner', 'admin', 'manager'), as
 // Create new restaurant (owner only)
 router.post('/', authenticateToken, authorize('owner'), async (req, res) => {
   try {
-    const { name, code, address, phone, email, website, description, logo_url, settings, isActive, is_active } = req.body;
+    const { name, code, address, phone, email, website, description, logo_url, settings, isActive, is_active, createAdmin, adminEmployee } = req.body;
 
     // Validate required fields
     if (!name || !code) {
@@ -136,6 +136,19 @@ router.post('/', authenticateToken, authorize('owner'), async (req, res) => {
     const existing = await db('branches').where({ code }).first();
     if (existing) {
       return res.status(400).json({ error: 'Restaurant code already exists' });
+    }
+
+    // If creating admin, validate admin data
+    if (createAdmin && adminEmployee) {
+      if (!adminEmployee.username || !adminEmployee.password || !adminEmployee.full_name) {
+        return res.status(400).json({ error: 'Admin username, password, and full name are required' });
+      }
+
+      // Check if username already exists
+      const existingUser = await db('users').where({ username: adminEmployee.username }).first();
+      if (existingUser) {
+        return res.status(400).json({ error: 'Admin username already exists' });
+      }
     }
 
     // Create restaurant
@@ -166,6 +179,30 @@ router.post('/', authenticateToken, authorize('owner'), async (req, res) => {
       { branch_id: id, name: 'Desserts', position: 3 },
       { branch_id: id, name: 'Beverages', position: 4 }
     ]);
+
+    // Create admin employee if requested
+    if (createAdmin && adminEmployee) {
+      const hashedPassword = await bcrypt.hash(adminEmployee.password, 10);
+      const [userId] = await db('users').insert({
+        username: adminEmployee.username,
+        password: hashedPassword,
+        full_name: adminEmployee.full_name,
+        email: adminEmployee.email || null,
+        phone: adminEmployee.phone || null,
+        role: 'admin',
+        branch_id: id,
+        is_active: true
+      });
+
+      logger.info(`Created admin user ${adminEmployee.username} for restaurant ${name}`);
+
+      // Log admin creation
+      await db('audit_logs').insert({
+        user_id: req.user.id,
+        action: 'CREATE_EMPLOYEE',
+        meta: JSON.stringify({ employee_id: userId, username: adminEmployee.username, role: 'admin', branch_id: id })
+      });
+    }
 
     // Log the action
     await db('audit_logs').insert({

@@ -29,7 +29,7 @@ function TableManagementPage() {
   const loadTables = async () => {
     try {
       setLoading(true)
-      const response = await tablesAPI.getTables({ branchId: 1 })
+      const response = await tablesAPI.getTables()
       if (response.data.success) {
         setTables(response.data.tables)
       }
@@ -51,16 +51,9 @@ function TableManagementPage() {
     setShowTableForm(true)
   }
 
-  const handleSaveTable = (savedTable) => {
-    if (editingTable) {
-      // Update existing table
-      setTables(prev => prev.map(table => 
-        table.id === savedTable.id ? savedTable : table
-      ))
-    } else {
-      // Add new table
-      setTables(prev => [savedTable, ...prev])
-    }
+  const handleSaveTable = async (savedTable) => {
+    // Reload all tables to get fresh data with activeOrder fields
+    await loadTables()
     setShowTableForm(false)
     setEditingTable(null)
   }
@@ -101,14 +94,14 @@ function TableManagementPage() {
 
   const handlePrintQR = async (table) => {
     try {
-      const response = await tablesAPI.getTableQR(table.id)
+      const response = await tablesAPI.getTableQR(table.id, 'dataurl')
       if (response.data.success) {
         // Open QR code in new window for printing
         const printWindow = window.open('', '_blank')
         printWindow.document.write(`
           <html>
             <head>
-              <title>Table ${table.number} QR Code</title>
+              <title>Table ${table.table_number} QR Code</title>
               <style>
                 body { 
                   font-family: Arial, sans-serif; 
@@ -135,12 +128,12 @@ function TableManagementPage() {
             </head>
             <body>
               <div class="table-info">
-                <h1>Table ${table.number}</h1>
+                <h1>Table ${table.table_number}</h1>
                 <p>Capacity: ${table.capacity} people</p>
                 <p>Location: ${table.location || 'Main Hall'}</p>
               </div>
               <div class="qr-container">
-                <img src="${response.data.qrCodeUrl}" alt="Table ${table.number} QR Code" />
+                <img src="${response.data.qrCodeUrl}" alt="Table ${table.table_number} QR Code" />
               </div>
               <div class="no-print">
                 <button onclick="window.print()">Print QR Code</button>
@@ -159,7 +152,7 @@ function TableManagementPage() {
 
   const handleCopyLink = async (table) => {
     try {
-      const tableUrl = `${window.location.origin}/menu?table=${table.number}`
+      const tableUrl = `${window.location.origin}/menu?table=${table.table_number}`
       await navigator.clipboard.writeText(tableUrl)
       toast.success('Table link copied to clipboard!')
     } catch (error) {
@@ -170,7 +163,7 @@ function TableManagementPage() {
 
   const getTableStatus = (table) => {
     // Check if table has active orders
-    const hasActiveOrder = table.active_order_id !== null
+    const hasActiveOrder = table.activeOrder !== null && table.activeOrder !== undefined
     return hasActiveOrder ? 'busy' : 'free'
   }
 
@@ -222,7 +215,7 @@ function TableManagementPage() {
               <div className="card-body">
                 <div className="flex justify-between items-start mb-4">
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-900">Table {table.number}</h3>
+                    <h3 className="text-lg font-semibold text-gray-900">Table {table.table_number}</h3>
                     <p className="text-sm text-gray-600">Capacity: {table.capacity} people</p>
                     {table.location && (
                       <p className="text-sm text-gray-500">{table.location}</p>
@@ -327,7 +320,7 @@ function TableManagementPage() {
             <div className="p-6">
               <div className="flex justify-between items-center mb-6">
                 <h2 className="text-xl font-semibold text-gray-900">
-                  Table {selectedTable.number} QR Code
+                  Table {selectedTable.table_number} QR Code
                 </h2>
                 <button
                   onClick={() => setShowQRModal(false)}
@@ -344,14 +337,14 @@ function TableManagementPage() {
                 <div className="bg-white border-2 border-gray-200 rounded-xl p-6">
                   <img
                     src={qrCodeUrl}
-                    alt={`Table ${selectedTable.number} QR Code`}
+                    alt={`Table ${selectedTable.table_number} QR Code`}
                     className="mx-auto"
                   />
                 </div>
                 
                 <div className="text-sm text-gray-600">
                   <p>Customers can scan this QR code to view the menu</p>
-                  <p>and place orders for Table {selectedTable.number}</p>
+                  <p>and place orders for Table {selectedTable.table_number}</p>
                 </div>
 
                 <div className="space-y-3">

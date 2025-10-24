@@ -38,8 +38,38 @@ async function applyMultiTenantSchema() {
       
       console.log('✅ Multi-tenant schema applied');
     }
+    
+    // Check for additional branch fields (website, description)
+    if (!branchesColumns.includes('website')) {
+      await db.schema.table('branches', table => {
+        table.string('website');
+        table.text('description');
+      });
+      console.log('✅ Branch extended fields applied');
+    }
   } catch (error) {
     console.log('⚠️ Multi-tenant schema check skipped or already applied');
+  }
+}
+
+async function applyCategorySchema() {
+  try {
+    // Check if category columns exist, if not add them
+    const categoriesInfo = await db.raw("PRAGMA table_info('categories')");
+    const categoriesColumns = categoriesInfo.map(col => col.name);
+    
+    if (!categoriesColumns.includes('description')) {
+      console.log('📦 Applying category schema updates...');
+      
+      await db.schema.table('categories', table => {
+        table.text('description');
+        table.boolean('is_active').defaultTo(true);
+      });
+      
+      console.log('✅ Category schema applied');
+    }
+  } catch (error) {
+    console.log('⚠️ Category schema check skipped or already applied:', error.message);
   }
 }
 
@@ -58,6 +88,9 @@ async function initializeDatabase() {
     
     // Apply multi-tenant schema updates
     await applyMultiTenantSchema();
+    
+    // Apply category schema updates
+    await applyCategorySchema();
     
     // Run seeds if in development
     // if (process.env.NODE_ENV === 'development') {

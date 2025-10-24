@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Building2, MapPin, Phone, Mail, Globe, Save, X, ArrowLeft } from 'lucide-react';
+import { Building2, MapPin, Phone, Mail, Globe, Save, X, ArrowLeft, UserPlus, User, Lock } from 'lucide-react';
 import api from '../../services/api';
 
 export default function RestaurantForm() {
@@ -22,7 +22,13 @@ export default function RestaurantForm() {
     serviceCharge: 5,
     timezone: 'Africa/Casablanca',
     language: 'en',
-    isActive: true
+    isActive: true,
+    createAdmin: false,
+    adminUsername: '',
+    adminPassword: '',
+    adminFullName: '',
+    adminEmail: '',
+    adminPhone: ''
   });
 
   useEffect(() => {
@@ -82,6 +88,23 @@ export default function RestaurantForm() {
         },
         isActive: formData.isActive
       };
+
+      // Add admin employee data if creating new restaurant and option is selected
+      if (!isEditMode && formData.createAdmin) {
+        if (!formData.adminUsername || !formData.adminPassword || !formData.adminFullName) {
+          alert('Please fill in all required admin employee fields');
+          setLoading(false);
+          return;
+        }
+        payload.createAdmin = true;
+        payload.adminEmployee = {
+          username: formData.adminUsername,
+          password: formData.adminPassword,
+          full_name: formData.adminFullName,
+          email: formData.adminEmail,
+          phone: formData.adminPhone
+        };
+      }
 
       if (isEditMode) {
         await api.put(`/api/restaurants/${id}`, payload);
@@ -229,6 +252,105 @@ export default function RestaurantForm() {
               </div>
             </div>
           </div>
+
+          {/* Admin Employee Creation (only for new restaurants) */}
+          {!isEditMode && (
+            <div className="border-t pt-8">
+              <div className="mb-4">
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.createAdmin}
+                    onChange={(e) => setFormData({ ...formData, createAdmin: e.target.checked })}
+                    className="w-5 h-5 rounded border-slate-300 text-blue-600 focus:ring-2 focus:ring-blue-500"
+                  />
+                  <span className="text-lg font-semibold text-slate-900 flex items-center gap-2">
+                    <UserPlus className="w-5 h-5 text-blue-600" />
+                    Create Admin Employee for this Restaurant
+                  </span>
+                </label>
+                <p className="text-sm text-slate-600 mt-2 ml-8">
+                  Create the first admin user who will manage this restaurant
+                </p>
+              </div>
+
+              {formData.createAdmin && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6 p-6 bg-blue-50 rounded-xl">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                      <User className="w-4 h-4 inline mr-1" />
+                      Username *
+                    </label>
+                    <input
+                      type="text"
+                      required={formData.createAdmin}
+                      value={formData.adminUsername}
+                      onChange={(e) => setFormData({ ...formData, adminUsername: e.target.value })}
+                      className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                      placeholder="admin_username"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                      <Lock className="w-4 h-4 inline mr-1" />
+                      Password *
+                    </label>
+                    <input
+                      type="password"
+                      required={formData.createAdmin}
+                      value={formData.adminPassword}
+                      onChange={(e) => setFormData({ ...formData, adminPassword: e.target.value })}
+                      className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                      placeholder="Secure password"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                      Full Name *
+                    </label>
+                    <input
+                      type="text"
+                      required={formData.createAdmin}
+                      value={formData.adminFullName}
+                      onChange={(e) => setFormData({ ...formData, adminFullName: e.target.value })}
+                      className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                      placeholder="John Doe"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                      <Mail className="w-4 h-4 inline mr-1" />
+                      Email
+                    </label>
+                    <input
+                      type="email"
+                      value={formData.adminEmail}
+                      onChange={(e) => setFormData({ ...formData, adminEmail: e.target.value })}
+                      className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                      placeholder="admin@example.com"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                      <Phone className="w-4 h-4 inline mr-1" />
+                      Phone
+                    </label>
+                    <input
+                      type="tel"
+                      value={formData.adminPhone}
+                      onChange={(e) => setFormData({ ...formData, adminPhone: e.target.value })}
+                      className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                      placeholder="+212-XXX-XXXXXX"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Settings */}
           <div className="border-t pt-8">
