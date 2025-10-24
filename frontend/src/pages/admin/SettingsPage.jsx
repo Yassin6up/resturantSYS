@@ -815,16 +815,19 @@ function SettingsPage() {
                 </div>
               </div>
 
-              <div>
-                <label className="form-label">Database Path (SQLite only)</label>
-                <input
-                  type="text"
-                  value={localSettings.dbPath || './data/posq.db'}
-                  onChange={(e) => handleSettingChange('dbPath', e.target.value)}
-                  className="form-input"
-                  placeholder="./data/posq.db"
-                />
-              </div>
+              {/* Show Database Path only in LOCAL mode */}
+              {localSettings.operatingMode === 'LOCAL' && (
+                <div>
+                  <label className="form-label">Database Path (SQLite only)</label>
+                  <input
+                    type="text"
+                    value={localSettings.dbPath || './data/posq.db'}
+                    onChange={(e) => handleSettingChange('dbPath', e.target.value)}
+                    className="form-input"
+                    placeholder="./data/posq.db"
+                  />
+                </div>
+              )}
 
               <div className="flex justify-end space-x-3">
                 <button
