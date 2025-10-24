@@ -22,9 +22,13 @@ import ReportsPage from './pages/admin/ReportsPage'
 import SettingsPage from './pages/admin/SettingsPage'
 import EmployeesPage from './pages/admin/EmployeesPage'
 
+// Owner routes (Multi-tenant Management)
+import OwnerDashboard from './pages/owner/OwnerDashboard'
+
 // Layout components
 import CustomerLayout from './components/layout/CustomerLayout'
 import AdminLayout from './components/layout/AdminLayout'
+import OwnerLayout from './components/layout/OwnerLayout'
 import ProtectedRoute from './components/auth/ProtectedRoute'
 
 function App() {
@@ -63,6 +67,16 @@ function App() {
               <Route path="employees" element={<EmployeesPage />} />
               <Route path="reports" element={<ReportsPage />} />
               <Route path="settings" element={<SettingsPage />} />
+            </Route>
+
+            {/* Protected Owner Routes (Multi-tenant Management) */}
+            <Route path="/owner" element={
+              <ProtectedRoute requiredRoles={['owner']}>
+                <OwnerLayout />
+              </ProtectedRoute>
+            }>
+              <Route index element={<OwnerDashboard />} />
+              <Route path="dashboard" element={<OwnerDashboard />} />
             </Route>
 
             {/* Catch all route */}

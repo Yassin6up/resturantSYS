@@ -267,4 +267,15 @@ export const employeesAPI = {
   activateEmployee: (id) => api.post(`/api/employees/${id}/activate`),
 }
 
+// Restaurants API (Multi-tenant)
+export const restaurantsAPI = {
+  getRestaurants: () => api.get('/api/restaurants'),
+  getRestaurant: (id) => api.get(`/api/restaurants/${id}`),
+  createRestaurant: (data) => api.post('/api/restaurants', data),
+  updateRestaurant: (id, data) => api.put(`/api/restaurants/${id}`, data),
+  deleteRestaurant: (id) => api.delete(`/api/restaurants/${id}`),
+  activateRestaurant: (id) => api.post(`/api/restaurants/${id}/activate`),
+  getRestaurantDashboard: (id) => api.get(`/api/restaurants/${id}/dashboard`),
+}
+
 export default api

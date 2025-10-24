@@ -35,8 +35,8 @@ router.get('/', authenticateToken, authorize('owner'), async (req, res) => {
   }
 });
 
-// Get single restaurant details
-router.get('/:id', authenticateToken, async (req, res) => {
+// Get single restaurant details (owner/admin/manager only)
+router.get('/:id', authenticateToken, authorize('owner', 'admin', 'manager'), async (req, res) => {
   try {
     const { id } = req.params;
     
@@ -149,8 +149,8 @@ router.post('/', authenticateToken, authorize('owner'), async (req, res) => {
   }
 });
 
-// Update restaurant
-router.put('/:id', authenticateToken, async (req, res) => {
+// Update restaurant (owner/admin only - manager cannot modify)
+router.put('/:id', authenticateToken, authorize('owner', 'admin'), async (req, res) => {
   try {
     const { id } = req.params;
     const { name, code, address, phone, email, logo_url, settings, is_active } = req.body;
@@ -274,8 +274,8 @@ router.post('/:id/activate', authenticateToken, authorize('owner'), async (req, 
   }
 });
 
-// Get restaurant dashboard stats (for owner dashboard)
-router.get('/:id/dashboard', authenticateToken, async (req, res) => {
+// Get restaurant dashboard stats (for owner/admin/manager dashboard)
+router.get('/:id/dashboard', authenticateToken, authorize('owner', 'admin', 'manager'), async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -286,6 +286,11 @@ router.get('/:id/dashboard', authenticateToken, async (req, res) => {
 
     // Check authorization
     if (req.user.role === 'owner' && restaurant.owner_id !== req.user.id) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+    
+    // Admin/manager can only view their own restaurant
+    if (['admin', 'manager'].includes(req.user.role) && restaurant.id !== req.user.branch_id) {
       return res.status(403).json({ error: 'Access denied' });
     }
 

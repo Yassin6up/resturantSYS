@@ -45,7 +45,19 @@ function LoginPage() {
       }
 
       if (result.success) {
-        navigate(from, { replace: true })
+        // Get user from localStorage to check role
+        const userStr = localStorage.getItem('user')
+        if (userStr) {
+          const user = JSON.parse(userStr)
+          // Redirect based on role
+          if (user.role === 'owner') {
+            navigate('/owner/dashboard', { replace: true })
+          } else {
+            navigate(from, { replace: true })
+          }
+        } else {
+          navigate(from, { replace: true })
+        }
       }
     } catch (error) {
       console.error('Login error:', error)
