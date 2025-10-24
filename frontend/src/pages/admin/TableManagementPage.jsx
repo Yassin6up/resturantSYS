@@ -152,7 +152,7 @@ function TableManagementPage() {
 
   const handleCopyLink = async (table) => {
     try {
-      const tableUrl = `${window.location.origin}/menu?table=${table.table_number}`
+      const tableUrl = `${window.location.origin}/menu?table=${table.table_number}&branch=${table.branch_id}`
       await navigator.clipboard.writeText(tableUrl)
       toast.success('Table link copied to clipboard!')
     } catch (error) {
