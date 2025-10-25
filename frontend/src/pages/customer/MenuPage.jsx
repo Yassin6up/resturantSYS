@@ -185,7 +185,7 @@ function MenuPage() {
                           checked={selectedModifiers.some(
                             (m) => m.id === modifier.id,
                           )}
-                          onChange={() => toggleModifier(modifier)}
+                           onChange={() => toggleModifier(modifier)}
                           className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
                         />
                         <span className="ml-2 text-sm text-gray-700">
