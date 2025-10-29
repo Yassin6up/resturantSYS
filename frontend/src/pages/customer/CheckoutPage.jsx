@@ -180,7 +180,9 @@ function CheckoutPage() {
                 </button>
                 
                 <button
-                  onClick={() => navigate(`/menu?table=${table}&branch=${branch}`)}
+                  onClick={() =>{
+                   navigate(`/menu?table=${table}&branch=${branch}`)
+                   clearCart()}}
                   className="w-full py-4 px-6 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold rounded-xl transition-all active:scale-95 flex items-center justify-center gap-2"
                 >
                   <ArrowLeftIcon className="h-5 w-5" />
