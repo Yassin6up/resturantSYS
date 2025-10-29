@@ -233,7 +233,7 @@ export const reportsAPI = {
   getInventoryUsage: (params) => api.get('/api/reports/inventory/usage', { params }),
   getPaymentMethods: (params) => api.get('/api/reports/payments/methods', { params }),
   getCashReconciliation: (params) => api.get('/api/reports/cash/reconciliation', { params }),
-  exportReport: (reportType, params) => api.get(`/api/reports/export/${reportType}`, { params }),
+  exportReport: (reportType, params) => api.get(`/api/reports/export/${reportType}`, { params, responseType: 'blob' }),
 }
 
 // Upload API

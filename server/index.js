@@ -22,6 +22,7 @@ const employeesRoutes = require('./src/routes/employees');
 const restaurantsRoutes = require('./src/routes/restaurants');
 
 const { initializeDatabase } = require('./src/database/init');
+const { ensureVariantsTable } = require('./src/utils/ensure-variants-table');
 const { setupSocketHandlers } = require('./src/socket/handlers');
 const { errorHandler } = require('./src/middleware/errorHandler');
 const { rateLimiter } = require('./src/middleware/rateLimiter');
@@ -111,6 +112,9 @@ async function startServer() {
   try {
     // Initialize database
     await initializeDatabase();
+    
+    // Ensure product variants table exists
+    await ensureVariantsTable();
     
     server.listen(PORT, () => {
       console.log(`🚀 POSQ Server running on port ${PORT}`);

@@ -36,6 +36,7 @@ The system employs a client-server architecture with a React + Vite frontend and
 - **Employee Management:** CRUD operations for employees with role assignments, PINs, and audit logging.
 - **Backup & Restore:** System for creating, restoring, and exporting database backups.
 - **Cashier Dashboard:** Dedicated interface for manual order code search, managing pending cash payments, and one-click payment confirmation with real-time updates.
+- **POS Management:** Comprehensive Point of Sale interface with support for three order types (dine-in with table selection, delivery with address, take-out), menu browsing with active items only, product variants (e.g., small/medium/large sizes with price adjustments), cart management with quantity controls, cash payment processing with change calculation, bill printing, and Excel export for reports filtered by date/time range. Orders are saved with full payment tracking including amount paid, change amount, order type, and customer details.
 
 ## External Dependencies
 - **Frontend:**
