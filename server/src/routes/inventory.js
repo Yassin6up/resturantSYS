@@ -217,7 +217,9 @@ router.post('/stock/:id/move', authenticateToken, authorize('admin', 'manager'),
     await db('stock_movements').insert({
       stock_item_id: id,
       change,
-      reason
+      reason,
+      user_id: req.user.id,
+      type: 'manual'
     });
 
     const updatedStockItem = await db('stock_items')
@@ -274,8 +276,16 @@ router.get('/stock/:id/movements', authenticateToken, authorize('admin', 'manage
     }
 
     const movements = await db('stock_movements')
+      .select(
+        'stock_movements.*',
+        'users.username as user_name',
+        'users.full_name',
+        'orders.order_code'
+      )
+      .leftJoin('users', 'stock_movements.user_id', 'users.id')
+      .leftJoin('orders', 'stock_movements.order_id', 'orders.id')
       .where({ stock_item_id: id })
-      .orderBy('created_at', 'desc')
+      .orderBy('stock_movements.created_at', 'desc')
       .limit(parseInt(limit))
       .offset(parseInt(offset));
 
@@ -283,6 +293,102 @@ router.get('/stock/:id/movements', authenticateToken, authorize('admin', 'manage
   } catch (error) {
     logger.error('Stock movements fetch error:', error);
     res.status(500).json({ error: 'Failed to fetch stock movements' });
+  }
+});
+
+// Get all inventory history across all stock items (admin/manager)
+router.get('/history', authenticateToken, authorize('admin', 'manager'), async (req, res) => {
+  try {
+    const branchId = req.user.branch_id;
+    
+    if (!branchId) {
+      return res.status(400).json({ error: 'User is not assigned to a branch' });
+    }
+
+    const { limit = 100, offset = 0, stockItemId, type } = req.query;
+
+    let query = db('stock_movements')
+      .select(
+        'stock_movements.*',
+        'stock_items.name as stock_item_name',
+        'stock_items.unit',
+        'stock_items.sku',
+        'users.username as user_name',
+        'users.full_name',
+        'orders.order_code'
+      )
+      .leftJoin('stock_items', 'stock_movements.stock_item_id', 'stock_items.id')
+      .leftJoin('users', 'stock_movements.user_id', 'users.id')
+      .leftJoin('orders', 'stock_movements.order_id', 'orders.id')
+      .where({ 'stock_items.branch_id': branchId });
+
+    if (stockItemId) {
+      query = query.where({ 'stock_movements.stock_item_id': stockItemId });
+    }
+
+    if (type) {
+      query = query.where({ 'stock_movements.type': type });
+    }
+
+    const history = await query
+      .orderBy('stock_movements.created_at', 'desc')
+      .limit(parseInt(limit))
+      .offset(parseInt(offset));
+
+    res.json({ success: true, history });
+  } catch (error) {
+    logger.error('Inventory history fetch error:', error);
+    res.status(500).json({ error: 'Failed to fetch inventory history' });
+  }
+});
+
+// Get active low stock alerts (admin/manager)
+router.get('/alerts', authenticateToken, authorize('admin', 'manager'), async (req, res) => {
+  try {
+    const branchId = req.user.branch_id;
+    
+    if (!branchId) {
+      return res.status(400).json({ error: 'User is not assigned to a branch' });
+    }
+
+    const alerts = await db('low_stock_alerts')
+      .select(
+        'low_stock_alerts.*',
+        'stock_items.name as stock_item_name',
+        'stock_items.sku',
+        'stock_items.unit',
+        'stock_items.quantity as current_stock'
+      )
+      .leftJoin('stock_items', 'low_stock_alerts.stock_item_id', 'stock_items.id')
+      .where({ 
+        'low_stock_alerts.branch_id': branchId,
+        'low_stock_alerts.is_resolved': false 
+      })
+      .orderBy('low_stock_alerts.created_at', 'desc');
+
+    res.json({ success: true, alerts, count: alerts.length });
+  } catch (error) {
+    logger.error('Low stock alerts fetch error:', error);
+    res.status(500).json({ error: 'Failed to fetch low stock alerts' });
+  }
+});
+
+// Resolve low stock alert (admin/manager)
+router.patch('/alerts/:id/resolve', authenticateToken, authorize('admin', 'manager'), async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    await db('low_stock_alerts')
+      .where({ id })
+      .update({
+        is_resolved: true,
+        resolved_at: db.raw('CURRENT_TIMESTAMP')
+      });
+
+    res.json({ success: true, message: 'Alert resolved successfully' });
+  } catch (error) {
+    logger.error('Alert resolution error:', error);
+    res.status(500).json({ error: 'Failed to resolve alert' });
   }
 });
 

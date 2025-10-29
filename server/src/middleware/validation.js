@@ -19,7 +19,6 @@ const validateLogin = [
 
 const validateOrder = [
   body('branchId').isInt().withMessage('Branch ID must be a valid integer'),
-  body('tableId').isInt().withMessage('Table ID must be a valid integer'),
   body('customerName').optional().isString().withMessage('Customer name must be a string'),
   body('items').isArray({ min: 1 }).withMessage('At least one item is required'),
   body('items.*.menuItemId').isInt().withMessage('Menu item ID must be a valid integer'),

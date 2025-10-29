@@ -2,7 +2,7 @@ const path = require('path');
 require('dotenv').config({ path: path.resolve(process.cwd(), 'server/.env') });
 
 const mode = process.env.MODE || 'LOCAL';
-
+console.log("Current mode:", mode);
 const common = {
   migrations: { 
     directory: path.resolve(process.cwd(), 'src/migrations'),

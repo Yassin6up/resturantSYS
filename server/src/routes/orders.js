@@ -8,28 +8,93 @@ const { logger } = require('../middleware/errorHandler');
 
 const router = express.Router();
 
-// Create new order (public endpoint for customers)
 router.post('/', orderRateLimiter, validateOrder, async (req, res) => {
   const trx = await db.transaction();
   
   try {
-    const { branchId, tableId, customerName, items, paymentMethod, clientMeta } = req.body;
+    const { branchId, tableId, tableNumber, customerName, items, paymentMethod, clientMeta } = req.body;
+
+    console.log('🔵 BACKEND - Received order data:', { branchId, tableId, tableNumber, customerName });
+
+    // USE WHICHEVER FIELD HAS THE TABLE DATA (tableId OR tableNumber)
+    let tableIdentifier;
+    
+    if (tableNumber) {
+      tableIdentifier = tableNumber;
+      console.log('🔍 Using tableNumber as identifier:', tableIdentifier);
+    } else if (tableId) {
+      tableIdentifier = tableId;
+      console.log('🔍 Using tableId as identifier:', tableIdentifier);
+    } else {
+      await trx.rollback();
+      return res.status(400).json({ error: 'Table information is required. Please provide tableNumber or tableId.' });
+    }
+
+    // RESOLVE TABLE ID FROM TABLE IDENTIFIER
+    let actualTableId;
+    let actualTableNumber;
+
+    console.log('🔍 Looking up table by identifier:', { tableIdentifier, branchId });
+    
+    const table = await trx('tables')
+      .where({ 
+        table_number: tableIdentifier.toString(),
+        branch_id: branchId 
+      })
+      .first();
+    
+    if (!table) {
+      await trx.rollback();
+      
+      // Get available tables for better error message
+      const availableTables = await trx('tables')
+        .where({ branch_id: branchId })
+        .select('table_number');
+      const tableList = availableTables.map(t => t.table_number).join(', ');
+      
+      return res.status(400).json({ 
+        error: `Table "${tableIdentifier}" not found in branch ${branchId}. Available tables: ${tableList || 'None'}`
+      });
+    }
+    
+    actualTableId = table.id;
+    actualTableNumber = table.table_number;
+    console.log('✅ Resolved table:', { actualTableId, actualTableNumber });
 
     // Generate order code
     const branch = await trx('branches').where({ id: branchId }).first();
+    if (!branch) {
+      await trx.rollback();
+      return res.status(400).json({ error: `Branch ${branchId} not found` });
+    }
+
     const timestamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-    const orderCount = await trx('orders').where({ branch_id: branchId }).count('id as count').first();
-    const orderCode = `${branch.code}-${timestamp}-${String(orderCount.count + 1).padStart(4, '0')}`;
+    const orderCount = await trx('orders')
+      .where({ branch_id: branchId })
+      .andWhere('created_at', '>=', new Date().toISOString().slice(0, 10))
+      .count('id as count')
+      .first();
+    
+    const orderCode = `${branch.code}-${timestamp}-${String(parseInt(orderCount.count) + 1).padStart(4, '0')}`;
 
     // Generate unique 8-digit PIN
     let pin;
     let isUnique = false;
-    while (!isUnique) {
+    let attempts = 0;
+    const maxAttempts = 10;
+
+    while (!isUnique && attempts < maxAttempts) {
       pin = Math.floor(10000000 + Math.random() * 90000000).toString();
       const existingOrder = await trx('orders').where({ pin }).first();
       if (!existingOrder) {
         isUnique = true;
       }
+      attempts++;
+    }
+
+    if (!isUnique) {
+      await trx.rollback();
+      return res.status(500).json({ error: 'Failed to generate unique PIN' });
     }
 
     // Calculate totals
@@ -38,8 +103,14 @@ router.post('/', orderRateLimiter, validateOrder, async (req, res) => {
 
     for (const item of items) {
       const menuItem = await trx('menu_items').where({ id: item.menuItemId }).first();
-      if (!menuItem || !menuItem.is_available) {
-        throw new Error(`Menu item ${item.menuItemId} not available`);
+      if (!menuItem) {
+        await trx.rollback();
+        return res.status(400).json({ error: `Menu item ${item.menuItemId} not found` });
+      }
+
+      if (!menuItem.is_available) {
+        await trx.rollback();
+        return res.status(400).json({ error: `Menu item "${menuItem.name}" is not available` });
       }
 
       let itemTotal = menuItem.price * item.quantity;
@@ -62,7 +133,8 @@ router.post('/', orderRateLimiter, validateOrder, async (req, res) => {
         quantity: item.quantity,
         unitPrice: menuItem.price,
         note: item.note,
-        modifiers
+        modifiers,
+        itemTotal // This is just for calculation, not for database storage
       });
     }
 
@@ -70,8 +142,11 @@ router.post('/', orderRateLimiter, validateOrder, async (req, res) => {
     const taxRate = await trx('settings').where({ key: 'tax_rate' }).first();
     const serviceChargeRate = await trx('settings').where({ key: 'service_charge_rate' }).first();
     
-    const tax = subtotal * (parseFloat(taxRate?.value || 0) / 100);
-    const serviceCharge = subtotal * (parseFloat(serviceChargeRate?.value || 0) / 100);
+    const taxRateValue = parseFloat(taxRate?.value || 10);
+    const serviceChargeRateValue = parseFloat(serviceChargeRate?.value || 5);
+    
+    const tax = subtotal * (taxRateValue / 100);
+    const serviceCharge = subtotal * (serviceChargeRateValue / 100);
     const total = subtotal + tax + serviceCharge;
 
     // Create order
@@ -79,17 +154,17 @@ router.post('/', orderRateLimiter, validateOrder, async (req, res) => {
       branch_id: branchId,
       order_code: orderCode,
       pin: pin,
-      table_id: tableId,
+      table_id: actualTableId,
       customer_name: customerName,
-      total,
-      tax,
-      service_charge: serviceCharge,
+      total: parseFloat(total.toFixed(2)),
+      tax: parseFloat(tax.toFixed(2)),
+      service_charge: parseFloat(serviceCharge.toFixed(2)),
       status: paymentMethod === 'CARD' ? 'AWAITING_PAYMENT' : 'PENDING',
       payment_status: 'UNPAID',
       payment_method: paymentMethod || 'cash'
     });
 
-    // Create order items
+    // Create order items - FIXED: removed total_price column
     for (const orderItem of orderItems) {
       const [orderItemId] = await trx('order_items').insert({
         order_id: orderId,
@@ -97,6 +172,7 @@ router.post('/', orderRateLimiter, validateOrder, async (req, res) => {
         quantity: orderItem.quantity,
         unit_price: orderItem.unitPrice,
         note: orderItem.note
+        // Removed total_price since it doesn't exist in your table
       });
 
       // Create order item modifiers
@@ -112,13 +188,19 @@ router.post('/', orderRateLimiter, validateOrder, async (req, res) => {
     await trx.commit();
 
     // Generate order tracking QR code for customer
-    const orderTrackingUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/order-status/${orderId}`;
+    const orderTrackingUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/order-status/${orderId}?pin=${pin}`;
     const trackingQrCode = await QRCode.toDataURL(orderTrackingUrl);
 
     // Generate payment QR code for cashier (cash payments only)
     let paymentQrCode = null;
     if (paymentMethod === 'cash' || !paymentMethod) {
-      paymentQrCode = await QRCode.toDataURL(orderCode, {
+      const paymentData = JSON.stringify({
+        orderCode,
+        orderId,
+        total: total.toFixed(2),
+        tableNumber: actualTableNumber
+      });
+      paymentQrCode = await QRCode.toDataURL(paymentData, {
         width: 300,
         margin: 2
       });
@@ -133,8 +215,10 @@ router.post('/', orderRateLimiter, validateOrder, async (req, res) => {
       .where({ 'orders.id': orderId })
       .first();
 
-    io.to(`branch:${branchId}:kitchen`).emit('order.created', order);
-    io.to(`branch:${branchId}:cashier`).emit('order.created', order);
+    if (io) {
+      io.to(`branch:${branchId}:kitchen`).emit('order.created', order);
+      io.to(`branch:${branchId}:cashier`).emit('order.created', order);
+    }
 
     // Log order creation
     await db('audit_logs').insert({
@@ -143,7 +227,8 @@ router.post('/', orderRateLimiter, validateOrder, async (req, res) => {
       meta: JSON.stringify({ 
         orderId, 
         orderCode, 
-        tableId, 
+        tableId: actualTableId, 
+        tableNumber: actualTableNumber,
         customerName, 
         total,
         paymentMethod,
@@ -152,18 +237,19 @@ router.post('/', orderRateLimiter, validateOrder, async (req, res) => {
       })
     });
 
-    logger.info(`Order created: ${orderCode} for table ${tableId} - Payment: ${paymentMethod || 'cash'}`);
+    logger.info(`Order created: ${orderCode} for table ${actualTableNumber} - Payment: ${paymentMethod || 'cash'}`);
 
     res.status(201).json({
       orderId,
       orderCode,
       pin: pin,
+      tableNumber: actualTableNumber,
       trackingUrl: orderTrackingUrl,
       trackingQrCode: trackingQrCode,
       paymentQrCode: paymentQrCode,
-      status: order.status,
-      total,
-      paymentMethod: order.payment_method,
+      status: 'PENDING',
+      total: parseFloat(total.toFixed(2)),
+      paymentMethod: paymentMethod || 'cash',
       message: 'Order created successfully'
     });
 
@@ -173,7 +259,6 @@ router.post('/', orderRateLimiter, validateOrder, async (req, res) => {
     res.status(500).json({ error: error.message || 'Failed to create order' });
   }
 });
-
 // Get orders (admin/cashier)
 router.get('/', authenticateToken, authorize('admin', 'manager', 'cashier'), async (req, res) => {
   try {
@@ -255,16 +340,10 @@ router.get('/pin/:pin', async (req, res) => {
 
     const order = await db('orders')
       .select(
-        'orders.id',
-        'orders.order_code',
-        'orders.pin',
-        'orders.status',
-        'orders.payment_status',
-        'orders.total',
-        'orders.created_at',
-        'orders.updated_at',
+        'orders.*',
         'tables.table_number',
-        'branches.name as branch_name'
+        'branches.name as branch_name',
+        'branches.code as branch_code'
       )
       .leftJoin('tables', 'orders.table_id', 'tables.id')
       .leftJoin('branches', 'orders.branch_id', 'branches.id')
@@ -275,40 +354,152 @@ router.get('/pin/:pin', async (req, res) => {
       return res.status(404).json({ error: 'Order not found' });
     }
 
-    // Get order items (only basic info for customer view)
+    // Get order items with full details
     const items = await db('order_items')
       .select(
-        'order_items.quantity',
-        'menu_items.name as item_name',
-        'menu_items.price'
+        'order_items.*',
+        'menu_items.name as menu_item_name',
+        'menu_items.sku',
+        'menu_items.image as menu_item_image'
+        // Removed description if it doesn't exist
       )
       .leftJoin('menu_items', 'order_items.menu_item_id', 'menu_items.id')
       .where({ 'order_items.order_id': order.id });
 
+    // Get modifiers for each item - FIXED: removed description column
+    for (const item of items) {
+      const modifiers = await db('order_item_modifiers')
+        .select(
+          'modifiers.name',
+          // 'modifiers.description', // Remove this if column doesn't exist
+          'order_item_modifiers.extra_price'
+        )
+        .leftJoin('modifiers', 'order_item_modifiers.modifier_id', 'modifiers.id')
+        .where({ 'order_item_modifiers.order_item_id': item.id });
+      item.modifiers = modifiers;
+    }
+
     order.items = items;
 
     res.json({ 
-      success: true,
+      success: true, 
       order: {
         id: order.id,
-        orderCode: order.order_code,
-        pin: order.pin,
-        status: order.status,
-        paymentStatus: order.payment_status,
+        branch_id: order.branch_id,
+        order_code: order.order_code,
+        table_id: order.table_id,
+        table_number: order.table_number,
+        customer_name: order.customer_name,
         total: order.total,
-        tableNumber: order.table_number,
-        branchName: order.branch_name,
-        createdAt: order.created_at,
-        updatedAt: order.updated_at,
+        tax: order.tax,
+        service_charge: order.service_charge,
+        status: order.status,
+        payment_status: order.payment_status,
+        payment_method: order.payment_method,
+        pin: order.pin,
+        branch_name: order.branch_name,
+        branch_code: order.branch_code,
+        created_at: order.created_at,
+        updated_at: order.updated_at,
         items: items
       }
     });
   } catch (error) {
     logger.error('Order PIN lookup error:', error);
-    res.status(500).json({ error: 'Failed to lookup order' });
+    res.status(500).json({ error: 'Failed to lookup order: ' + error.message });
   }
 });
 
+
+// Search order by PIN (admin/cashier endpoint for internal search)
+router.get('/search/pin/:pin', authenticateToken, authorize('admin', 'manager', 'cashier'), async (req, res) => {
+  try {
+    const { pin } = req.params;
+    const branchId = req.user.branch_id;
+
+    console.log('PIN search request:', { pin, branchId, user: req.user });
+
+    if (!pin || pin.length !== 8) {
+      return res.status(400).json({ error: 'Invalid PIN format' });
+    }
+
+    if (!branchId) {
+      return res.status(400).json({ error: 'User is not assigned to a branch' });
+    }
+
+    const order = await db('orders')
+      .select(
+        'orders.*',
+        'tables.table_number',
+        'branches.name as branch_name',
+        'branches.code as branch_code'
+      )
+      .leftJoin('tables', 'orders.table_id', 'tables.id')
+      .leftJoin('branches', 'orders.branch_id', 'branches.id')
+      .where({ 
+        'orders.pin': pin,
+        'orders.branch_id': branchId
+      })
+      .first();
+
+    console.log('Found order:', order);
+
+    if (!order) {
+      // Check if order exists in other branches
+      const orderInOtherBranch = await db('orders')
+        .select('branch_id')
+        .where({ pin: pin })
+        .first();
+        
+      if (orderInOtherBranch) {
+        return res.status(403).json({ 
+          error: `Order found but belongs to different branch (ID: ${orderInOtherBranch.branch_id})` 
+        });
+      }
+      return res.status(404).json({ error: 'Order not found with this PIN' });
+    }
+
+    // Get order items with full details
+    const items = await db('order_items')
+      .select(
+        'order_items.*',
+        'menu_items.name as menu_item_name',
+        'menu_items.sku',
+        'menu_items.image as menu_item_image'
+        // Removed description if it doesn't exist
+      )
+      .leftJoin('menu_items', 'order_items.menu_item_id', 'menu_items.id')
+      .where({ 'order_items.order_id': order.id });
+
+    console.log('Found items:', items.length);
+
+    // Get modifiers for each item - FIXED: removed description column
+    for (const item of items) {
+      const modifiers = await db('order_item_modifiers')
+        .select(
+          'modifiers.name',
+          // 'modifiers.description', // Remove this if column doesn't exist
+          'order_item_modifiers.extra_price'
+        )
+        .leftJoin('modifiers', 'order_item_modifiers.modifier_id', 'modifiers.id')
+        .where({ 'order_item_modifiers.order_item_id': item.id });
+      item.modifiers = modifiers;
+      console.log(`Item ${item.id} modifiers:`, modifiers);
+    }
+
+    order.items = items;
+
+    res.json({
+      success: true,
+      order: order
+    });
+
+  } catch (error) {
+    console.error('PIN search error:', error);
+    logger.error('PIN search error:', error);
+    res.status(500).json({ error: 'Failed to search order by PIN: ' + error.message });
+  }
+});
 // Get order by code (cashier endpoint for QR code scanning/search)
 router.get('/code/:code', authenticateToken, authorize('admin', 'manager', 'cashier'), async (req, res) => {
   try {
@@ -323,7 +514,8 @@ router.get('/code/:code', authenticateToken, authorize('admin', 'manager', 'cash
       .select(
         'orders.*',
         'tables.table_number',
-        'branches.name as branch_name'
+        'branches.name as branch_name',
+        'branches.code as branch_code'
       )
       .leftJoin('tables', 'orders.table_id', 'tables.id')
       .leftJoin('branches', 'orders.branch_id', 'branches.id')
@@ -337,20 +529,26 @@ router.get('/code/:code', authenticateToken, authorize('admin', 'manager', 'cash
       return res.status(404).json({ error: 'Order not found' });
     }
 
-    // Get order items
+    // Get order items with full details
     const items = await db('order_items')
       .select(
         'order_items.*',
-        'menu_items.name as item_name',
-        'menu_items.sku'
+        'menu_items.name as menu_item_name',
+        'menu_items.sku',
+        'menu_items.image as menu_item_image'
+        // Removed description if it doesn't exist
       )
       .leftJoin('menu_items', 'order_items.menu_item_id', 'menu_items.id')
       .where({ 'order_items.order_id': order.id });
 
-    // Get modifiers for each item
+    // Get modifiers for each item - FIXED: removed description column
     for (const item of items) {
       const modifiers = await db('order_item_modifiers')
-        .select('modifiers.name', 'order_item_modifiers.extra_price')
+        .select(
+          'modifiers.name',
+          // 'modifiers.description', // Remove this if column doesn't exist
+          'order_item_modifiers.extra_price'
+        )
         .leftJoin('modifiers', 'order_item_modifiers.modifier_id', 'modifiers.id')
         .where({ 'order_item_modifiers.order_item_id': item.id });
       item.modifiers = modifiers;
@@ -361,7 +559,7 @@ router.get('/code/:code', authenticateToken, authorize('admin', 'manager', 'cash
     res.json({ success: true, order });
   } catch (error) {
     logger.error('Order code lookup error:', error);
-    res.status(500).json({ error: 'Failed to lookup order' });
+    res.status(500).json({ error: 'Failed to lookup order: ' + error.message });
   }
 });
 
@@ -725,10 +923,12 @@ router.post('/:id/cancel', authenticateToken, authorize('admin', 'manager', 'cas
 // Helper function to consume inventory
 async function consumeInventoryForOrder(orderId) {
   try {
+    const order = await db('orders').where({ id: orderId }).first();
     const orderItems = await db('order_items').where({ order_id: orderId });
     
     for (const item of orderItems) {
       const recipes = await db('recipes').where({ menu_item_id: item.menu_item_id });
+      const menuItem = await db('menu_items').where({ id: item.menu_item_id }).first();
       
       for (const recipe of recipes) {
         const quantityToConsume = recipe.qty_per_serving * item.quantity;
@@ -738,12 +938,33 @@ async function consumeInventoryForOrder(orderId) {
           .where({ id: recipe.stock_item_id })
           .decrement('quantity', quantityToConsume);
 
-        // Log stock movement
+        // Log stock movement with order tracking
         await db('stock_movements').insert({
           stock_item_id: recipe.stock_item_id,
           change: -quantityToConsume,
-          reason: `Order ${orderId} - ${item.quantity}x menu item ${item.menu_item_id}`
+          reason: `Order ${order.order_code} - ${item.quantity}x ${menuItem?.name || 'item'}`,
+          order_id: orderId,
+          type: 'order'
         });
+
+        // Check for low stock and create alert
+        const stockItem = await db('stock_items').where({ id: recipe.stock_item_id }).first();
+        if (stockItem && stockItem.quantity <= stockItem.min_threshold) {
+          // Check if there's already an unresolved alert for this item
+          const existingAlert = await db('low_stock_alerts')
+            .where({ stock_item_id: stockItem.id, is_resolved: false })
+            .first();
+
+          if (!existingAlert) {
+            await db('low_stock_alerts').insert({
+              stock_item_id: stockItem.id,
+              branch_id: stockItem.branch_id,
+              current_quantity: stockItem.quantity,
+              min_threshold: stockItem.min_threshold
+            });
+            logger.warn(`⚠️ Low stock alert: ${stockItem.name} (${stockItem.quantity} ${stockItem.unit} remaining, min: ${stockItem.min_threshold})`);
+          }
+        }
       }
     }
   } catch (error) {

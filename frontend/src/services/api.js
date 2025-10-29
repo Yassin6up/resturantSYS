@@ -133,6 +133,9 @@ export const ordersAPI = {
   createOrder: (data) => api.post('/api/orders', data),
   getOrders: (params) => api.get('/api/orders', { params }),
   getOrder: (id) => api.get(`/api/orders/${id}`),
+    searchOrderByPin: (pin) => {
+    return api.get(`/api/orders/search/pin/${pin}`);
+  },
   getOrderByPin: (pin) => api.get(`/api/orders/pin/${pin}`),
   getOrderByCode: (code) => api.get(`/api/orders/code/${code}`),
   updateOrderStatus: (id, status) => api.patch(`/api/orders/${id}/status`, { status }),
@@ -181,8 +184,11 @@ export const inventoryAPI = {
   deleteStockItem: (id) => api.delete(`/api/inventory/stock/${id}`),
   recordStockMovement: (id, data) => api.post(`/api/inventory/stock/${id}/move`, data),
   getStockMovements: (id, params) => api.get(`/api/inventory/stock/${id}/movements`, { params }),
+  getInventoryHistory: (params) => api.get('/api/inventory/history', { params }),
   getLowStockAlerts: (params) => api.get('/api/inventory/stock/alerts/low', { params }),
   getLowStockItems: (params) => api.get('/api/inventory/stock/alerts/low', { params }),
+  getAlerts: (params) => api.get('/api/inventory/alerts', { params }),
+  resolveAlert: (id) => api.patch(`/api/inventory/alerts/${id}/resolve`),
   getRecipes: (params) => api.get('/api/inventory/recipes', { params }),
   createRecipe: (data) => api.post('/api/inventory/recipes', data),
   updateRecipe: (id, data) => api.put(`/api/inventory/recipes/${id}`, data),

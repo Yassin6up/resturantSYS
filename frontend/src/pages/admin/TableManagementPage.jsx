@@ -199,7 +199,7 @@ function TableManagementPage() {
         </div>
         <button
           onClick={handleAddTable}
-          className="btn-primary"
+          className="btn-primary relative flex items-center justify-center h-10 px-4 rounded-md"
         >
           <PlusIcon className="h-5 w-5 mr-2" />
           Add Table
@@ -229,7 +229,7 @@ function TableManagementPage() {
                 <div className="space-y-2">
                   <button
                     onClick={() => handleShowQR(table)}
-                    className="w-full btn-outline btn-sm"
+                    className="w-full btn-outline btn-sm relative flex items-center justify-center h-10 px-4 rounded-md"
                   >
                     <EyeIcon className="h-4 w-4 mr-2" />
                     View QR Code
@@ -237,7 +237,7 @@ function TableManagementPage() {
                   
                   <button
                     onClick={() => handlePrintQR(table)}
-                    className="w-full btn-secondary btn-sm"
+                    className="w-full btn-secondary btn-sm relative flex items-center justify-center h-10 px-4 rounded-md"
                   >
                     <PrinterIcon className="h-4 w-4 mr-2" />
                     Print QR
@@ -351,14 +351,14 @@ function TableManagementPage() {
                   <div className="flex space-x-3">
                     <button
                       onClick={() => handlePrintQR(selectedTable)}
-                      className="flex-1 btn-primary"
+                      className="flex-1 btn-primary relative flex items-center justify-center h-10 px-4 rounded-md"
                     >
                       <PrinterIcon className="h-5 w-5 mr-2" />
                       Print QR Code
                     </button>
                     <button
                       onClick={() => handleCopyLink(selectedTable)}
-                      className="flex-1 btn-secondary"
+                      className="flex-1 btn-secondary relative flex items-center justify-center h-10 px-4 rounded-md"
                     >
                       <ClipboardDocumentIcon className="h-5 w-5 mr-2" />
                       Copy Link
@@ -366,7 +366,7 @@ function TableManagementPage() {
                   </div>
                   <button
                     onClick={() => setShowQRModal(false)}
-                    className="w-full btn-outline"
+                    className="w-full btn-outline relative flex items-center justify-center h-10 px-4 rounded-md"
                   >
                     Close
                   </button>

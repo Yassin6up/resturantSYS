@@ -37,6 +37,7 @@ function SettingsPage() {
       Object.keys(settings).forEach(key => {
         initialSettings[key] = settings[key].value
       })
+      console.log('Initializing local settings:', initialSettings)
       setLocalSettings(initialSettings)
     }
   }, [settings])
@@ -76,7 +77,7 @@ function SettingsPage() {
         port: localSettings.dbPort || 3306,
         name: localSettings.dbName || 'posq',
         user: localSettings.dbUser || 'posq',
-        password: localSettings.dbPassword || 'posqpassword',
+        password: localSettings.dbPassword || '',
         filename: localSettings.dbPath || './data/posq.db'
       })
       
@@ -102,7 +103,7 @@ function SettingsPage() {
         port: localSettings.dbPort || 3306,
         name: localSettings.dbName || 'posq',
         user: localSettings.dbUser || 'posq',
-        password: localSettings.dbPassword || 'posqpassword',
+        password: localSettings.dbPassword || '',
         filename: localSettings.dbPath || './data/posq.db'
       })
       
@@ -337,79 +338,123 @@ function SettingsPage() {
       <div className="space-y-6">
         {/* General Settings */}
         {activeTab === 'general' && (
-          <div className="card">
-            <div className="card-header">
-              <h2 className="text-xl font-semibold text-gray-900">General Settings</h2>
-              <p className="text-gray-600">Basic application configuration</p>
-            </div>
-            <div className="card-body space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="form-label">Application Name</label>
-                  <input
-                    type="text"
-                    value={localSettings.app_name || ''}
-                    onChange={(e) => handleSettingChange('app_name', e.target.value)}
-                    className="form-input"
-                    placeholder="Enter application name"
-                  />
-                </div>
-                <div>
-                  <label className="form-label">Currency</label>
-                  <select
-                    value={localSettings.currency || 'MAD'}
-                    onChange={(e) => handleSettingChange('currency', e.target.value)}
-                    className="form-input"
-                  >
-                    <option value="MAD">MAD (Moroccan Dirham)</option>
-                    <option value="USD">USD (US Dollar)</option>
-                    <option value="EUR">EUR (Euro)</option>
-                    <option value="GBP">GBP (British Pound)</option>
-                  </select>
-                </div>
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="form-label">Tax Rate (%)</label>
-                  <input
-                    type="number"
-                    min="0"
-                    max="100"
-                    step="0.1"
-                    value={localSettings.tax_rate || 10}
-                    onChange={(e) => handleSettingChange('tax_rate', parseFloat(e.target.value))}
-                    className="form-input"
-                    placeholder="10"
-                  />
-                </div>
-                <div>
-                  <label className="form-label">Service Charge (%)</label>
-                  <input
-                    type="number"
-                    min="0"
-                    max="100"
-                    step="0.1"
-                    value={localSettings.service_charge || 5}
-                    onChange={(e) => handleSettingChange('service_charge', parseFloat(e.target.value))}
-                    className="form-input"
-                    placeholder="5"
-                  />
-                </div>
-              </div>
+  <div className="card">
+    <div className="card-header">
+      <h2 className="text-xl font-semibold text-gray-900">General Settings</h2>
+      <p className="text-gray-600">Basic application configuration</p>
+    </div>
+    <div className="card-body space-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div>
+          <label className="form-label">Application Name</label>
+          <input
+            type="text"
+            value={localSettings.app_name || ''}
+            onChange={(e) => handleSettingChange('app_name', e.target.value)}
+            className="form-input"
+            placeholder="Enter application name"
+          />
+        </div>
+        <div>
+          <label className="form-label">Currency</label>
+          <select
+            value={localSettings.currency || 'MAD'}
+            onChange={(e) => handleSettingChange('currency', e.target.value)}
+            className="form-input"
+          >
+            <option value="MAD">MAD (Moroccan Dirham)</option>
+            <option value="USD">USD (US Dollar)</option>
+            <option value="EUR">EUR (Euro)</option>
+            <option value="GBP">GBP (British Pound)</option>
+          </select>
+        </div>
+      </div>
+      
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div>
+          <label className="form-label">Tax Rate (%)</label>
+          <input
+            type="number"
+            min="0"
+            max="100"
+            step="0.1"
+            value={localSettings.tax_rate || 10}
+            onChange={(e) => handleSettingChange('tax_rate', parseFloat(e.target.value))}
+            className="form-input"
+            placeholder="10"
+          />
+        </div>
+        <div>
+          <label className="form-label">Service Charge (%)</label>
+          <input
+            type="number"
+            min="0"
+            max="100"
+            step="0.1"
+            value={localSettings.service_charge || 5}
+            onChange={(e) => handleSettingChange('service_charge', parseFloat(e.target.value))}
+            className="form-input"
+            placeholder="5"
+          />
+        </div>
+      </div>
 
-              <div>
-                <label className="form-label">Welcome Message</label>
-                <textarea
-                  value={localSettings.welcome_message || ''}
-                  onChange={(e) => handleSettingChange('welcome_message', e.target.value)}
-                  className="form-input"
-                  rows={3}
-                  placeholder="Welcome to our restaurant!"
-                />
-              </div>
+      {/* Contact Information Section */}
+      <div className="border-t border-gray-200 pt-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Contact Information</h3>
+        <div className="grid grid-cols-1 gap-6">
+          <div>
+            <label className="form-label">Restaurant Address</label>
+            <textarea
+              value={localSettings.restaurant_address || ''}
+              onChange={(e) => handleSettingChange('restaurant_address', e.target.value)}
+              className="form-input"
+              rows={2}
+              placeholder="Enter your restaurant address"
+            />
+            <p className="text-sm text-gray-500 mt-1">This address will appear on invoices and receipts</p>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="form-label">Phone Number</label>
+              <input
+                type="text"
+                value={localSettings.restaurant_phone || ''}
+                onChange={(e) => handleSettingChange('restaurant_phone', e.target.value)}
+                className="form-input"
+                placeholder="+1 234 567 8900"
+              />
+              <p className="text-sm text-gray-500 mt-1">Your restaurant's contact number</p>
+            </div>
+            
+            <div>
+              <label className="form-label">Email Address</label>
+              <input
+                type="email"
+                value={localSettings.restaurant_email || ''}
+                onChange={(e) => handleSettingChange('restaurant_email', e.target.value)}
+                className="form-input"
+                placeholder="info@restaurant.com"
+              />
+              <p className="text-sm text-gray-500 mt-1">Your restaurant's email address</p>
             </div>
           </div>
+        </div>
+      </div>
+
+      <div>
+        <label className="form-label">Welcome Message</label>
+        <textarea
+          value={localSettings.welcome_message || ''}
+          onChange={(e) => handleSettingChange('welcome_message', e.target.value)}
+          className="form-input"
+          rows={3}
+          placeholder="Welcome to our restaurant!"
+        />
+      </div>
+    </div>
+  </div>
         )}
 
         {/* Branding Settings */}

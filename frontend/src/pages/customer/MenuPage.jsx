@@ -246,13 +246,13 @@ function MenuPage() {
               <div className="flex space-x-3">
                 <button
                   onClick={() => setSelectedItem(null)}
-                  className="btn-outline flex-1"
+                  className="btn-outline flex-1   transition-transform duration-200 rounded-md h-10 flex items-center justify-center  "
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleAddToCart}
-                  className="btn-primary flex-1"
+                  className="btn-primary flex-1 transition-transform duration-200 rounded-md h-10 flex items-center justify-center"
                 >
                   Add to Cart
                 </button>

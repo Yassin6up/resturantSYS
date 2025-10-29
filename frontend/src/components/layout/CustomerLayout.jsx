@@ -3,12 +3,15 @@ import { useCart } from "../../contexts/CartContext";
 import { useTheme } from "../../contexts/ThemeContext";
 import { ShoppingCartIcon } from "@heroicons/react/24/outline";
 import CartBottomBar from "../CartBottomBar";
-
+import { useSearchParams } from "react-router-dom";
 function CustomerLayout() {
   const location = useLocation();
   const navigate = useNavigate();
   const { itemCount, total } = useCart();
   const { getAppName, getSetting, getWelcomeMessage } = useTheme();
+  const [searchParams] = useSearchParams();
+   const table = searchParams.get("table");
+   const branch = searchParams.get("branch") || "1";
 
   const isCartPage = location.pathname === "/cart";
   const isCheckoutPage = location.pathname === "/checkout";
@@ -52,8 +55,8 @@ function CustomerLayout() {
             {!isCartPage && !isCheckoutPage && !isOrderPage && (
               <div className="flex items-center">
                 <button
-                  onClick={() => navigate("/cart")}
-                  className="relative btn-primary group"
+                  onClick={() => navigate(`/cart?table=${table}&branch=${branch}`)}
+                  className="relative btn-primary group rounded-lg px-4 py-2 flex items-center shadow-lg hover:shadow-xl transition"
                 >
                   <ShoppingCartIcon className="h-5 w-5 mr-2 group-hover:animate-bounce" />
                   Cart

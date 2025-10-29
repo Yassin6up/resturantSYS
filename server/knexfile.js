@@ -1,5 +1,4 @@
 require('dotenv').config();
-
 const config = {
   development: {
     client: process.env.DB_TYPE || 'sqlite3',

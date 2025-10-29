@@ -9,6 +9,8 @@ import {
   
 } from '@heroicons/react/24/outline'
 import StockItemForm from '../../components/StockItemForm'
+import RecipesManagementTab from './RecipesManagementTab'
+import InventoryHistoryTab from './InventoryHistoryTab'
 import toast from 'react-hot-toast'
 
 function InventoryPage() {
@@ -204,7 +206,17 @@ function InventoryPage() {
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
             }`}
           >
-            Recipes ({recipes.length})
+            Recipes
+          </button>
+          <button
+            onClick={() => setActiveTab('history')}
+            className={`py-2 px-1 border-b-2 font-medium text-sm ${
+              activeTab === 'history'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            History
           </button>
         </nav>
       </div>
@@ -322,60 +334,10 @@ function InventoryPage() {
       )}
 
       {/* Recipes Tab */}
-      {activeTab === 'recipes' && (
-        <div className="card">
-          <div className="card-header">
-            <div className="flex justify-between items-center">
-              <h2 className="text-lg font-semibold text-gray-900">Recipes</h2>
-              <button className="btn-primary btn-sm">
-                <PlusIcon className="h-4 w-4 mr-1" />
-                Add Recipe
-              </button>
-            </div>
-          </div>
-          <div className="card-body">
-            {recipes.length === 0 ? (
-              <div className="text-center py-8">
-                <p className="text-gray-500">No recipes found</p>
-                <button className="btn-primary mt-4">
-                  Add First Recipe
-                </button>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {recipes.map((recipe) => (
-                  <div key={recipe.id} className="border border-gray-200 rounded-lg p-4">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <h3 className="text-lg font-medium text-gray-900">{recipe.name}</h3>
-                        <p className="text-sm text-gray-600">{recipe.description}</p>
-                        <div className="mt-2">
-                          <span className="text-sm font-medium text-gray-700">Ingredients:</span>
-                          <div className="mt-1 space-y-1">
-                            {recipe.ingredients?.map((ingredient, index) => (
-                              <div key={index} className="text-sm text-gray-600">
-                                {ingredient.quantity} {ingredient.unit} {ingredient.stock_item?.name}
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex space-x-2">
-                        <button className="text-blue-600 hover:text-blue-900">
-                          <PencilIcon className="h-4 w-4" />
-                        </button>
-                        <button className="text-red-600 hover:text-red-900">
-                          <TrashIcon className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+      {activeTab === 'recipes' && <RecipesManagementTab />}
+
+      {/* History Tab */}
+      {activeTab === 'history' && <InventoryHistoryTab />}
 
       {/* Stock Item Form Modal */}
       {showStockForm && (

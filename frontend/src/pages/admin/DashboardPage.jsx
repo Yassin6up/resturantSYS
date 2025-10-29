@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useSocket } from '../../contexts/SocketContext'
-import { ordersAPI, reportsAPI } from '../../services/api'
+import { ordersAPI, reportsAPI, inventoryAPI } from '../../services/api'
 import { 
   QueueListIcon, 
   CurrencyDollarIcon, 
@@ -8,6 +8,7 @@ import {
   CheckCircleIcon,
   ExclamationTriangleIcon
 } from '@heroicons/react/24/outline'
+import { Link } from 'react-router-dom'
 import toast from 'react-hot-toast'
 
 function DashboardPage() {
@@ -18,6 +19,7 @@ function DashboardPage() {
     totalRevenue: 0,
     averageOrderValue: 0
   })
+  const [lowStockAlerts, setLowStockAlerts] = useState([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -40,6 +42,9 @@ function DashboardPage() {
         date: today,
         branchId: 1 
       })
+
+      // Load low stock alerts
+      const alertsResponse = await inventoryAPI.getAlerts()
       
       const ordersData = ordersResponse.data.orders
       const salesData = salesResponse.data.summary
@@ -50,6 +55,10 @@ function DashboardPage() {
         totalRevenue: parseFloat(salesData.total_revenue || 0),
         averageOrderValue: parseFloat(salesData.average_order_value || 0)
       })
+
+      if (alertsResponse.data.success) {
+        setLowStockAlerts(alertsResponse.data.alerts || [])
+      }
       
     } catch (error) {
       toast.error('Failed to load dashboard data')
@@ -179,6 +188,49 @@ function DashboardPage() {
           </div>
         </div>
       </div>
+
+      {/* Low Stock Alerts */}
+      {lowStockAlerts.length > 0 && (
+        <div className="card border-l-4 border-l-red-500 bg-red-50">
+          <div className="card-body">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center">
+                <ExclamationTriangleIcon className="h-6 w-6 text-red-600 mr-3" />
+                <div>
+                  <h3 className="text-lg font-semibold text-red-800">Low Stock Alert</h3>
+                  <p className="text-red-700">
+                    {lowStockAlerts.length} item(s) are running low on stock
+                  </p>
+                </div>
+              </div>
+              <Link to="/admin/inventory" className="btn-secondary text-sm">
+                View Inventory
+              </Link>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {lowStockAlerts.slice(0, 6).map((alert) => (
+                <div key={alert.id} className="bg-white rounded-lg p-3 border border-red-200">
+                  <div className="flex justify-between items-start">
+                    <div className="flex-1">
+                      <span className="text-sm font-medium text-gray-900">
+                        {alert.stock_item_name}
+                      </span>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-xs text-red-600 font-semibold">
+                          {alert.current_stock} {alert.unit}
+                        </span>
+                        <span className="text-xs text-gray-500">
+                          / Min: {alert.min_threshold} {alert.unit}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Recent Orders */}
       <div className="card">

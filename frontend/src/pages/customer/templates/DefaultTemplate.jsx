@@ -56,7 +56,7 @@ export default function DefaultTemplate({ menu, table, addItem, onSelectItem }) 
                           e.stopPropagation();
                           addItem(item);
                         }}
-                        className="btn-primary w-full group-hover:animate-bounce"
+                        className="btn-primary w-full group-hover:animate-bounce transition-transform duration-200 rounded-md h-10 flex items-center justify-center"
                       >
                         Add to Cart
                       </button>

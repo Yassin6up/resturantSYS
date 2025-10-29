@@ -1,15 +1,18 @@
 import { useState, useEffect } from 'react'
 import { useSocket } from '../../contexts/SocketContext'
-import { ordersAPI } from '../../services/api'
+import { ordersAPI, appSettingsAPI , settingsAPI } from '../../services/api'
 import { 
   MagnifyingGlassIcon, 
   QrCodeIcon,
   CheckCircleIcon,
   XCircleIcon,
   EyeIcon,
-  PrinterIcon
+  PrinterIcon,
+  KeyIcon
 } from '@heroicons/react/24/outline'
 import toast from 'react-hot-toast'
+import { useSearchParams } from 'react-router-dom'
+import InvoiceRenderer from '../../components/InvoiceRender'
 
 function OrdersPage() {
   const { socket, updateOrderStatus: socketUpdateOrderStatus } = useSocket()
@@ -24,9 +27,23 @@ function OrdersPage() {
   const [searchInput, setSearchInput] = useState('')
   const [showOrderModal, setShowOrderModal] = useState(false)
   const [selectedOrder, setSelectedOrder] = useState(null)
+  const [searchParams, setSearchParams] = useSearchParams()
+  const [showInvoiceModal, setShowInvoiceModal] = useState(false)
+  const [selectedTemplate, setSelectedTemplate] = useState('default')
+  const [businessInfo, setBusinessInfo] = useState(null)
+  const [loadingBusinessInfo, setLoadingBusinessInfo] = useState(true)
+
+  console.log('OrdersPage render with orders:', selectedOrder)
 
   useEffect(() => {
     loadOrders()
+    loadBusinessInfo()
+    
+    // Check for URL parameters to show modal directly
+    const orderSearchQuery = searchParams.get('orderSearchQuery')
+    if (orderSearchQuery) {
+      handleSearchByCodeOrPin(orderSearchQuery)
+    }
   }, [])
 
   useEffect(() => {
@@ -54,6 +71,101 @@ function OrdersPage() {
     }
   }
 
+const loadBusinessInfo = async () => {
+  try {
+    setLoadingBusinessInfo(true)
+    
+    // Fetch from both APIs
+    const [appSettingsResponse, settingsResponse] = await Promise.all([
+      appSettingsAPI.getSettings(),
+      settingsAPI.getSettings()
+    ]);
+
+    let businessData = {
+      name: 'Restaurant',
+      description: 'Modern Restaurant Management System',
+      currency: 'MAD',
+      taxRate: 0,
+      serviceCharge: 0,
+      welcomeMessage: 'Thank you for your business!',
+      address: '',
+      phone: '',
+      email: '',
+      logoUrl: '',
+      primaryColor: '#3B82F6',
+      secondaryColor: '#1E40AF'
+    };
+
+    // Process app settings API response
+    if (appSettingsResponse.data && appSettingsResponse.data.settings) {
+      const appSettings = appSettingsResponse.data.settings;
+      
+console.log('🟠 App settings fetched:', appSettings);
+      // Helper function to safely extract value
+      const getValue = (setting) => {
+        if (!setting) return '';
+        return typeof setting === 'object' && setting !== null && 'value' in setting 
+          ? setting.value 
+          : setting;
+      };
+
+      businessData = {
+        ...businessData,
+        name: getValue(appSettings.app_name) || getValue(appSettings.name) || businessData.name,
+        description: getValue(appSettings.app_description) || getValue(appSettings.description) || businessData.description,
+        currency: getValue(appSettings.currency) || businessData.currency,
+        taxRate: parseFloat(getValue(appSettings.tax_rate)) || businessData.taxRate,
+        serviceCharge: parseFloat(getValue(appSettings.service_charge)) || businessData.serviceCharge,
+        welcomeMessage: getValue(appSettings.welcome_message) || businessData.welcomeMessage,
+        address: getValue(appSettings.restaurant_address) || businessData.address,
+        phone: getValue(appSettings.restaurant_phone) || businessData.phone,
+        email: getValue(appSettings.restaurant_email) || businessData.email,
+        logoUrl: appSettings.logo_url.value || businessData.logoUrl,
+        primaryColor: getValue(appSettings.primary_color) || businessData.primaryColor,
+        secondaryColor: getValue(appSettings.secondary_color) || businessData.secondaryColor
+      };
+    }
+
+    // Process settings API response (overrides app settings with more specific values)
+    if (settingsResponse.data && settingsResponse.data.settings) {
+      const settings = settingsResponse.data.settings;
+      
+      // Find specific settings by key
+  
+      console.log('🟠 Settings fetched:', settings);
+      businessData = {
+        ...businessData,
+        name: settings.restaurant_name || businessData.name,
+        currency: settings.currency || businessData.currency,
+        taxRate: parseFloat(settings.tax_rate) || businessData.taxRate,
+        serviceCharge: parseFloat(settings.service_charge_rate) || businessData.serviceCharge,
+      };
+    }
+
+    setBusinessInfo(businessData);
+    console.log('Business info loaded:', businessData);
+    
+  } catch (error) {
+    console.error('Failed to load business info:', error);
+    // Set default business info if API fails
+    setBusinessInfo({
+      name: 'Restaurant',
+      description: 'Modern Restaurant Management System',
+      currency: 'MAD',
+      taxRate: 0,
+      serviceCharge: 0,
+      welcomeMessage: 'Thank you for your business!',
+      address: '',
+      phone: '',
+      email: '',
+      logoUrl: '',
+      primaryColor: '#3B82F6',
+      secondaryColor: '#1E40AF'
+    });
+  } finally {
+    setLoadingBusinessInfo(false);
+  }
+};
   const applyFilters = () => {
     let filtered = [...orders]
 
@@ -63,34 +175,54 @@ function OrdersPage() {
 
     if (filters.table) {
       filtered = filtered.filter(order => 
-        order.table_number.toLowerCase().includes(filters.table.toLowerCase())
+        order.table_number && order.table_number.toLowerCase().includes(filters.table.toLowerCase())
       )
     }
 
     if (filters.search) {
       filtered = filtered.filter(order => 
         order.order_code.toLowerCase().includes(filters.search.toLowerCase()) ||
-        (order.customer_name && order.customer_name.toLowerCase().includes(filters.search.toLowerCase()))
+        (order.customer_name && order.customer_name.toLowerCase().includes(filters.search.toLowerCase())) ||
+        (order.pin && order.pin.includes(filters.search))
       )
     }
 
     setFilteredOrders(filtered)
   }
 
-  const handleSearchByCode = async () => {
-    if (!searchInput.trim()) {
-      toast.error('Please enter an order code')
+  const handleSearchByCodeOrPin = async (searchValue) => {
+    if (!searchValue.trim()) {
+      toast.error('Please enter an order code or PIN')
       return
     }
 
     try {
-      const response = await ordersAPI.getOrderByCode(searchInput.trim())
-      if (response.data && response.data.order) {
-        setSelectedOrder(response.data.order)
-        setShowOrderModal(true)
+      // Check if it's a PIN (8 digits) or order code
+      const isPin = /^\d{8}$/.test(searchValue.trim());
+      
+      if (isPin) {
+        // Search by PIN using the internal search endpoint (requires auth)
+        const pinResponse = await ordersAPI.searchOrderByPin(searchValue.trim())
+        if (pinResponse.data && pinResponse.data.order) {
+          setSelectedOrder(pinResponse.data.order)
+          setShowOrderModal(true)
+          setSearchParams({ orderSearchQuery: searchValue.trim() })
+          return
+        }
+      } else {
+        // Search by order code
+        const response = await ordersAPI.getOrderByCode(searchValue.trim())
+        if (response.data && response.data.order) {
+          setSelectedOrder(response.data.order)
+          setShowOrderModal(true)
+          setSearchParams({ orderSearchQuery: searchValue.trim() })
+          return
+        }
       }
+      
+      toast.error('Order not found with the provided code or PIN')
     } catch (error) {
-      toast.error('Order not found')
+      toast.error('Order not found with the provided code or PIN')
       console.error('Order search error:', error)
     }
   }
@@ -150,6 +282,14 @@ function OrdersPage() {
         o.id === orderId ? { ...o, status: newStatus } : o
       ))
       
+      // Update selected order in modal
+      if (selectedOrder && selectedOrder.id === orderId) {
+        setSelectedOrder(prev => ({
+          ...prev,
+          status: newStatus
+        }))
+      }
+      
       // Send status update via Socket.IO for real-time updates
       if (socketUpdateOrderStatus) {
         socketUpdateOrderStatus(orderId, newStatus)
@@ -163,6 +303,23 @@ function OrdersPage() {
       toast.error('Failed to update order status')
       console.error('Status update error:', error)
     }
+  }
+
+  const handlePrintInvoice = (order) => {
+    setSelectedOrder(order)
+    setShowInvoiceModal(true)
+  }
+
+  const closeModal = () => {
+    setShowOrderModal(false)
+    setSelectedOrder(null)
+    // Remove search query from URL when closing modal
+    setSearchParams({})
+  }
+
+  const closeInvoiceModal = () => {
+    setShowInvoiceModal(false)
+    setSelectedOrder(null)
   }
 
   const getStatusColor = (status) => {
@@ -187,6 +344,16 @@ function OrdersPage() {
     }
   }
 
+  const formatDate = (dateString) => {
+    return new Date(dateString).toLocaleString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    })
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -208,13 +375,13 @@ function OrdersPage() {
         </div>
         <button
           onClick={loadOrders}
-          className="btn-outline"
+          className="btn-outline rounded-lg px-4 py-2 flex items-center gap-2"
         >
           Refresh
         </button>
       </div>
 
-      {/* Quick Search by Order Code */}
+      {/* Quick Search by Order Code or PIN */}
       <div className="card bg-gradient-to-r from-blue-50 to-purple-50">
         <div className="card-body">
           <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
@@ -222,7 +389,7 @@ function OrdersPage() {
             Quick Order Search
           </h3>
           <p className="text-sm text-gray-600 mb-4">
-            Enter order code manually or use a QR scanner device/app to scan the payment QR code
+            Enter order code or PIN manually, or use a QR scanner device/app to scan the payment QR code
           </p>
           <div className="flex gap-3">
             <div className="relative flex-1">
@@ -231,18 +398,22 @@ function OrdersPage() {
                 type="text"
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && handleSearchByCode()}
-                placeholder="Enter order code (e.g., R0120241024001)"
+                onKeyPress={(e) => e.key === 'Enter' && handleSearchByCodeOrPin(searchInput)}
+                placeholder="Enter order code or PIN (e.g., CAS-20251028-0002 or 69709299)"
                 className="form-input pl-10"
               />
             </div>
             <button
-              onClick={handleSearchByCode}
-              className="btn-primary px-8 whitespace-nowrap"
+              onClick={() => handleSearchByCodeOrPin(searchInput)}
+              className="btn-primary px-8 whitespace-nowrap rounded-lg flex items-center justify-center "
             >
               <MagnifyingGlassIcon className="h-5 w-5 mr-2" />
               Search Order
             </button>
+          </div>
+          <div className="mt-3 flex items-center gap-2 text-sm text-gray-500">
+            <KeyIcon className="h-4 w-4" />
+            <span>You can search by order code (CAS-20251028-0002) or PIN (69709299)</span>
           </div>
         </div>
       </div>
@@ -252,14 +423,14 @@ function OrdersPage() {
         <div className="card-body">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
-              <label className="form-label">Filter by Code/Customer</label>
+              <label className="form-label">Filter by Code/Customer/PIN</label>
               <div className="relative">
                 <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <input
                   type="text"
                   value={filters.search}
                   onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
-                  placeholder="Order code or customer name"
+                  placeholder="Order code, customer name, or PIN"
                   className="form-input pl-10"
                 />
               </div>
@@ -297,7 +468,7 @@ function OrdersPage() {
             <div className="flex items-end">
               <button
                 onClick={() => setFilters({ status: '', table: '', search: '' })}
-                className="btn-outline w-full"
+                className="btn-outline w-full rounded-lg h-10"
               >
                 Clear Filters
               </button>
@@ -349,7 +520,7 @@ function OrdersPage() {
                     <tr key={order.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm font-medium text-gray-900">{order.order_code}</div>
-                        <div className="text-sm text-gray-500">#{order.id}</div>
+                        <div className="text-sm text-gray-500">PIN: {order.pin}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {order.table_number || '-'}
@@ -358,7 +529,7 @@ function OrdersPage() {
                         {order.customer_name || '-'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">
-                        {order.total.toFixed(2)} MAD
+                        {order.total?.toFixed(2)} MAD
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <button
@@ -408,7 +579,7 @@ function OrdersPage() {
                             setShowOrderModal(true)
                           }}
                           className="text-blue-600 hover:text-blue-900"
-                          title="View Order Details & QR"
+                          title="View Order Details"
                         >
                           <EyeIcon className="h-5 w-5" />
                         </button>
@@ -425,7 +596,7 @@ function OrdersPage() {
       {/* Order Details Modal */}
       {showOrderModal && selectedOrder && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+          <div className="bg-white rounded-3xl max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
             <div className="p-8">
               {/* Header */}
               <div className="flex justify-between items-start mb-6">
@@ -434,89 +605,145 @@ function OrdersPage() {
                   <p className="text-gray-600">Order #{selectedOrder.order_code}</p>
                 </div>
                 <button
-                  onClick={() => setShowOrderModal(false)}
-                  className="text-gray-400 hover:text-gray-600"
+                  onClick={closeModal}
+                  className="text-gray-400 hover:text-gray-600 text-2xl"
                 >
                   ✕
                 </button>
               </div>
 
-              {/* Order Info */}
-              <div className="grid grid-cols-2 gap-4 mb-6">
+              {/* Order Information Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
                 <div className="bg-gray-50 rounded-xl p-4">
-                  <p className="text-sm text-gray-600">Customer</p>
-                  <p className="font-semibold">{selectedOrder.customer_name || '-'}</p>
+                  <p className="text-sm text-gray-600">Customer Name</p>
+                  <p className="font-semibold text-lg">{selectedOrder.customer_name || 'No Name'}</p>
                 </div>
+                
                 <div className="bg-gray-50 rounded-xl p-4">
-                  <p className="text-sm text-gray-600">Table</p>
-                  <p className="font-semibold">{selectedOrder.table_number || '-'}</p>
+                  <p className="text-sm text-gray-600">Table Number</p>
+                  <p className="font-semibold text-lg">{selectedOrder.table_number || 'No Table'}</p>
                 </div>
+                
+                <div className="bg-gray-50 rounded-xl p-4">
+                  <p className="text-sm text-gray-600">Order PIN</p>
+                  <p className="font-semibold text-lg font-mono">{selectedOrder.pin || 'No PIN'}</p>
+                </div>
+                
+                <div className="bg-gray-50 rounded-xl p-4">
+                  <p className="text-sm text-gray-600">Branch</p>
+                  <p className="font-semibold">{selectedOrder.branch_name || 'Unknown Branch'}</p>
+                </div>
+              </div>
+
+              {/* Status and Payment Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                 <div className="bg-gray-50 rounded-xl p-4">
                   <p className="text-sm text-gray-600">Payment Status</p>
-                  <span className={`badge ${getPaymentStatusColor(selectedOrder.payment_status)}`}>
-                    {selectedOrder.payment_status}
-                  </span>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className={`badge ${getPaymentStatusColor(selectedOrder.payment_status)} text-lg`}>
+                      {selectedOrder.payment_status}
+                    </span>
+                    <span className="text-sm text-gray-600 capitalize">
+                      ({selectedOrder.payment_method || 'cash'})
+                    </span>
+                  </div>
                 </div>
+                
                 <div className="bg-gray-50 rounded-xl p-4">
                   <p className="text-sm text-gray-600">Order Status</p>
-                  <span className={`badge ${getStatusColor(selectedOrder.status)}`}>
-                    {selectedOrder.status}
-                  </span>
+                  <div className="mt-1">
+                    <select
+                      value={selectedOrder.status}
+                      onChange={(e) => handleStatusUpdate(selectedOrder.id, e.target.value)}
+                      className={`text-sm font-medium rounded-full px-4 py-2 border-0 w-full ${getStatusColor(selectedOrder.status)}`}
+                    >
+                      <option value="PENDING">PENDING</option>
+                      <option value="CONFIRMED">CONFIRMED</option>
+                      <option value="PREPARING">PREPARING</option>
+                      <option value="READY">READY</option>
+                      <option value="SERVED">SERVED</option>
+                      <option value="COMPLETED">COMPLETED</option>
+                      <option value="CANCELLED">CANCELLED</option>
+                    </select>
+                  </div>
                 </div>
               </div>
 
-              {/* Total */}
+              {/* Timestamps */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                <div className="bg-gray-50 rounded-xl p-4">
+                  <p className="text-sm text-gray-600">Order Created</p>
+                  <p className="font-semibold">{formatDate(selectedOrder.created_at)}</p>
+                </div>
+                
+                <div className="bg-gray-50 rounded-xl p-4">
+                  <p className="text-sm text-gray-600">Last Updated</p>
+                  <p className="font-semibold">{formatDate(selectedOrder.updated_at)}</p>
+                </div>
+              </div>
+
+              {/* Financial Breakdown */}
               <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl p-6 mb-6">
-                <div className="flex justify-between items-center">
-                  <span className="text-lg font-semibold">Total Amount:</span>
-                  <span className="text-3xl font-bold text-blue-600">
-                    {selectedOrder.total.toFixed(2)} MAD
-                  </span>
+                <h3 className="font-bold text-gray-900 mb-4 text-lg">Financial Breakdown</h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="text-center">
+                    <p className="text-sm text-gray-600">Subtotal</p>
+                    <p className="text-lg font-semibold">{selectedOrder.total - selectedOrder.tax - selectedOrder.service_charge || 0} MAD</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-sm text-gray-600">Tax</p>
+                    <p className="text-lg font-semibold">{selectedOrder.tax?.toFixed(2) || '0.00'} MAD</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-sm text-gray-600">Service Charge</p>
+                    <p className="text-lg font-semibold">{selectedOrder.service_charge?.toFixed(2) || '0.00'} MAD</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-sm text-gray-600">Total Amount</p>
+                    <p className="text-2xl font-bold text-blue-600">{selectedOrder.total?.toFixed(2) || '0.00'} MAD</p>
+                  </div>
                 </div>
-              </div>
-
-              {/* Order QR Codes */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
-                {selectedOrder.payment_qr_code && (
-                  <div className="bg-white border-2 border-blue-100 rounded-2xl p-6 text-center">
-                    <h3 className="font-bold text-gray-900 mb-4">Payment QR Code</h3>
-                    <img 
-                      src={selectedOrder.payment_qr_code} 
-                      alt="Payment QR Code"
-                      className="w-48 h-48 mx-auto"
-                    />
-                    <p className="text-sm text-gray-600 mt-4">
-                      For cashier payment confirmation
-                    </p>
-                  </div>
-                )}
-                {selectedOrder.tracking_qr_code && (
-                  <div className="bg-white border-2 border-purple-100 rounded-2xl p-6 text-center">
-                    <h3 className="font-bold text-gray-900 mb-4">Tracking QR Code</h3>
-                    <img 
-                      src={selectedOrder.tracking_qr_code} 
-                      alt="Tracking QR Code"
-                      className="w-48 h-48 mx-auto"
-                    />
-                    <p className="text-sm text-gray-600 mt-4">
-                      For customer order tracking
-                    </p>
-                  </div>
-                )}
               </div>
 
               {/* Order Items */}
               {selectedOrder.items && selectedOrder.items.length > 0 && (
-                <div className="mt-6">
-                  <h3 className="font-bold text-gray-900 mb-3">Order Items</h3>
-                  <div className="space-y-2">
+                <div className="mb-6">
+                  <h3 className="font-bold text-gray-900 mb-4 text-lg">Order Items</h3>
+                  <div className="space-y-3">
                     {selectedOrder.items.map((item, index) => (
-                      <div key={index} className="flex justify-between items-center bg-gray-50 rounded-lg p-3">
-                        <div>
-                          <p className="font-medium">{item.item_name}</p>
-                          <p className="text-sm text-gray-600">Qty: {item.quantity}</p>
+                      <div key={index} className="bg-white border border-gray-200 rounded-xl p-4">
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1">
+                            <p className="font-semibold text-gray-900">
+                              {item.menu_item_name || item.item_name || `Item ${index + 1}`}
+                            </p>
+                            <p className="text-sm text-gray-600 mt-1">
+                              Quantity: {item.quantity} × {item.unit_price?.toFixed(2)} MAD
+                            </p>
+                            {item.note && (
+                              <p className="text-sm text-gray-500 mt-1">
+                                Note: {item.note}
+                              </p>
+                            )}
+                            {item.modifiers && item.modifiers.length > 0 && (
+                              <div className="mt-2">
+                                <p className="text-sm text-gray-600 font-medium">Modifiers:</p>
+                                <div className="flex flex-wrap gap-1 mt-1">
+                                  {item.modifiers.map((modifier, modIndex) => (
+                                    <span key={modIndex} className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">
+                                      {modifier.name} (+{modifier.extra_price} MAD)
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                          <div className="text-right">
+                            <p className="text-lg font-bold text-gray-900">
+                              {((item.unit_price * item.quantity) + (item.modifiers?.reduce((sum, mod) => sum + mod.extra_price, 0) * item.quantity || 0)).toFixed(2)} MAD
+                            </p>
+                          </div>
                         </div>
-                        <p className="font-semibold">{item.total.toFixed(2)} MAD</p>
                       </div>
                     ))}
                   </div>
@@ -524,7 +751,7 @@ function OrdersPage() {
               )}
 
               {/* Actions */}
-              <div className="mt-6 flex gap-3">
+              <div className="flex gap-3 pt-6 border-t border-gray-200">
                 <button
                   onClick={() => handlePaymentConfirmation(selectedOrder)}
                   className={`flex-1 py-3 px-6 rounded-xl font-semibold transition-colors ${
@@ -535,8 +762,17 @@ function OrdersPage() {
                 >
                   {selectedOrder.payment_status === 'PAID' ? 'Mark as Unpaid' : 'Confirm Payment'}
                 </button>
+                
                 <button
-                  onClick={() => setShowOrderModal(false)}
+                  onClick={() => handlePrintInvoice(selectedOrder)}
+                  className="flex items-center justify-center gap-2 py-3 px-6 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl transition-colors"
+                >
+                  <PrinterIcon className="h-5 w-5" />
+                  Print Invoice
+                </button>
+                
+                <button
+                  onClick={closeModal}
                   className="flex-1 py-3 px-6 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold rounded-xl transition-colors"
                 >
                   Close
@@ -545,6 +781,16 @@ function OrdersPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Invoice Modal */}
+      {showInvoiceModal && selectedOrder && businessInfo && (
+        <InvoiceRenderer
+          order={selectedOrder}
+          template={selectedTemplate}
+          businessInfo={businessInfo}
+          onClose={closeInvoiceModal}
+        />
       )}
     </div>
   )

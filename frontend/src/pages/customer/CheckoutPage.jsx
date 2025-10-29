@@ -8,6 +8,7 @@ import {
   XMarkIcon
 } from '@heroicons/react/24/outline'
 import toast from 'react-hot-toast'
+import { useSearchParams } from 'react-router-dom'
 
 function CheckoutPage() {
   const { items: cartItems, total, clearCart, branchId, tableNumber } = useCart()
@@ -18,10 +19,13 @@ function CheckoutPage() {
   const [orderDetails, setOrderDetails] = useState(null)
   const [paymentMethod, setPaymentMethod] = useState('cash')
   const [customerName, setCustomerName] = useState('')
+  const [searchParams] = useSearchParams()
+  const table = searchParams.get("table")
+  const branch = searchParams.get("branch") || "1"
 
   useEffect(() => {
     if (cartItems.length === 0) {
-      navigate('/menu')
+      navigate(`/menu?table=${table}&branch=${branch}`)
     }
   }, [cartItems, navigate])
 
@@ -48,8 +52,8 @@ function CheckoutPage() {
       return
     }
 
-    if (!tableNumber) {
-      toast.error('Table number not found. Please scan the QR code at your table.')
+    if (!table) {
+      toast.error('Table not found. Please scan the QR code at your table.')
       return
     }
 
@@ -57,8 +61,8 @@ function CheckoutPage() {
       setLoading(true)
       
       const orderData = {
-        branchId: branchId || 1,
-        tableId: parseInt(tableNumber),
+        branchId: parseInt(branch) || 1,
+        tableNumber: table, // Send table number instead of table ID
         customerName: customerName.trim(),
         items: cartItems.map(item => ({
           menuItemId: item.menuItemId,
@@ -68,6 +72,13 @@ function CheckoutPage() {
         })),
         paymentMethod: paymentMethod
       }
+
+
+
+      console.log('🟡 FRONTEND - Before API call:');
+      console.log('Full orderData:', JSON.stringify(orderData, null, 2));
+      console.log('tableNumber value:', orderData.tableNumber, 'type:', typeof orderData.tableNumber);
+      console.log('table value from URL:', table, 'type:', typeof table);
 
       const response = await ordersAPI.createOrder(orderData)
       
@@ -83,12 +94,16 @@ function CheckoutPage() {
           }, 1500)
         }
         
-        clearCart()
+        // clearCart()
         toast.success('Order placed successfully!')
       }
     } catch (error) {
       console.error('Order creation error:', error)
-      toast.error(error.response?.data?.error || 'Failed to place order')
+      if (error.response?.data?.error) {
+        toast.error(error.response.data.error)
+      } else {
+        toast.error('Failed to place order. Please try again.')
+      }
     } finally {
       setLoading(false)
     }
@@ -126,6 +141,7 @@ function CheckoutPage() {
                 <div className="mt-4 text-center">
                   <p className="text-sm text-gray-600 mb-1">Order Code:</p>
                   <p className="text-2xl font-bold text-gray-900">{orderDetails.orderCode}</p>
+                  <p className="text-sm text-gray-600 mt-2">PIN: {orderDetails.pin}</p>
                 </div>
               </div>
 
@@ -138,15 +154,19 @@ function CheckoutPage() {
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">Table:</span>
-                    <span className="font-medium">#{tableNumber}</span>
+                    <span className="font-medium">#{table}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">Items:</span>
                     <span className="font-medium">{cartItems.reduce((sum, item) => sum + item.quantity, 0)}</span>
                   </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Payment Method:</span>
+                    <span className="font-medium capitalize">{orderDetails.paymentMethod}</span>
+                  </div>
                   <div className="flex justify-between pt-2 border-t border-gray-200">
                     <span className="text-gray-900 font-semibold">Total:</span>
-                    <span className="font-bold text-blue-600">{totals.grandTotal.toFixed(2)} MAD</span>
+                    <span className="font-bold text-blue-600">{orderDetails.total.toFixed(2)} MAD</span>
                   </div>
                 </div>
               </div>
@@ -160,7 +180,7 @@ function CheckoutPage() {
                 </button>
                 
                 <button
-                  onClick={() => navigate('/menu')}
+                  onClick={() => navigate(`/menu?table=${table}&branch=${branch}`)}
                   className="w-full py-4 px-6 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold rounded-xl transition-all active:scale-95 flex items-center justify-center gap-2"
                 >
                   <ArrowLeftIcon className="h-5 w-5" />
@@ -196,7 +216,9 @@ function CheckoutPage() {
             </div>
             <div className="p-6 space-y-4">
               <div>
-                <label className="block font-semibold text-gray-900 mb-2">Your Name</label>
+                <label className="block font-semibold text-gray-900 mb-2">
+                  Your Name <span className="text-red-500">*</span>
+                </label>
                 <input
                   type="text"
                   value={customerName}
@@ -211,17 +233,17 @@ function CheckoutPage() {
                 <div className="relative">
                   <input
                     type="text"
-                    value={tableNumber || 'Not set'}
+                    value={table || 'Not set'}
                     readOnly
                     className="w-full px-4 py-3 bg-gray-50 border-2 border-gray-200 rounded-xl text-gray-700 cursor-not-allowed"
                   />
-                  {tableNumber && (
+                  {table && (
                     <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
                       <CheckCircleIcon className="h-6 w-6 text-green-500" />
                     </div>
                   )}
                 </div>
-                {tableNumber && (
+                {table && (
                   <p className="text-sm text-green-600 mt-2 flex items-center gap-1">
                     <CheckCircleIcon className="h-4 w-4" />
                     Table detected from QR code
@@ -250,6 +272,14 @@ function CheckoutPage() {
                     <div className="flex-1">
                       <h3 className="font-bold text-gray-900">{item.name}</h3>
                       <p className="text-sm text-gray-600">Quantity: {item.quantity}</p>
+                      {item.modifiers && item.modifiers.length > 0 && (
+                        <p className="text-xs text-gray-500">
+                          Modifiers: {item.modifiers.map(m => m.name).join(', ')}
+                        </p>
+                      )}
+                      {item.note && (
+                        <p className="text-xs text-gray-500">Note: {item.note}</p>
+                      )}
                     </div>
                     <span className="font-bold text-gray-900">
                       {item.total.toFixed(2)} MAD
@@ -321,7 +351,7 @@ function CheckoutPage() {
 
           <button
             onClick={handlePlaceOrder}
-            disabled={loading || !customerName.trim() || !tableNumber}
+            disabled={loading || !customerName.trim() || !table}
             className="w-full py-5 px-6 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold text-lg rounded-xl shadow-xl hover:shadow-2xl transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center justify-center gap-2"
           >
             {loading ? (

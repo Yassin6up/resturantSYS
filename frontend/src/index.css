@@ -55,6 +55,48 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Print Styles */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  
+  .invoice-default,
+  .invoice-minimal,
+  .invoice-modern,
+  .invoice-default *,
+  .invoice-minimal *,
+  .invoice-modern * {
+    visibility: visible;
+  }
+  
+  .invoice-default,
+  .invoice-minimal,
+  .invoice-modern {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    box-shadow: none;
+    margin: 0;
+    padding: 0;
+  }
+  
+  /* Remove backgrounds for better printing */
+  .invoice-modern {
+    background: white !important;
+  }
+  
+  .bg-gradient-to-br {
+    background: white !important;
+  }
+  
+  /* Hide non-essential elements */
+  .no-print {
+    display: none !important;
+  }
+}
+
 /* Custom Components */
 @layer components {
   /* Airbnb-style Buttons */

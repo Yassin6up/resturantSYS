@@ -2,10 +2,14 @@ import { useCart } from '../../contexts/CartContext'
 import { useNavigate } from 'react-router-dom'
 import { PlusIcon, MinusIcon, TrashIcon, ShoppingBagIcon, ArrowRightIcon } from '@heroicons/react/24/outline'
 import toast from 'react-hot-toast'
-
+import { useSearchParams } from 'react-router-dom'
 function CartPage() {
   const navigate = useNavigate()
   const { items, total, updateQuantity, removeItem, clearCart } = useCart()
+
+  const [searchParams] = useSearchParams();
+   const table = searchParams.get("table");
+   const branch = searchParams.get("branch") || "1";
 
   const handleQuantityChange = (itemId, newQuantity) => {
     if (newQuantity <= 0) {
@@ -21,7 +25,7 @@ function CartPage() {
       toast.error('Your cart is empty')
       return
     }
-    navigate('/checkout')
+    navigate(`/checkout?table=${table}&branch=${branch}`)
   }
 
   const handleClearCart = () => {
@@ -45,7 +49,7 @@ function CartPage() {
             Discover our delicious menu and add your favorite items!
           </p>
           <button
-            onClick={() => navigate('/menu')}
+            onClick={() => navigate(`/menu?table=${table}&branch=${branch}`)}
             className="px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold rounded-xl shadow-lg hover:shadow-xl transition-all active:scale-95 flex items-center justify-center gap-2 mx-auto"
           >
             <span>Browse Menu</span>
@@ -216,7 +220,7 @@ function CartPage() {
                   </button>
                   
                   <button
-                    onClick={() => navigate('/menu')}
+                    onClick={() => navigate(`/menu?table=${table}&branch=${branch}`)}
                     className="w-full py-4 px-6 bg-white hover:bg-gray-50 text-gray-700 font-semibold rounded-xl border-2 border-gray-200 transition-all active:scale-95"
                   >
                     Continue Shopping
