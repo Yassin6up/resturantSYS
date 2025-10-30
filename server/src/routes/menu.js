@@ -271,13 +271,19 @@ router.get('/items', authenticateToken, authorize('admin', 'manager'), async (re
 
     const items = await query.orderBy('menu_items.name');
 
-    // Get modifiers for each item
+    // Get modifiers and variants for each item
     for (const item of items) {
       const modifiers = await db('modifiers')
         .select('modifiers.*')
         .where({ 'modifiers.menu_item_id': item.id });
 
+      const variants = await db('product_variants')
+        .select('*')
+        .where({ 'menu_item_id': item.id, 'is_active': true })
+        .orderBy('sort_order', 'asc');
+
       item.modifiers = modifiers;
+      item.variants = variants;
     }
 
     res.json({ items });
@@ -290,7 +296,7 @@ router.get('/items', authenticateToken, authorize('admin', 'manager'), async (re
 // Create menu item (admin)
 router.post('/items', authenticateToken, authorize('admin', 'manager'), upload.single('image'), async (req, res) => {
   try {
-    const { name, description, price, categoryId, sku, modifiers, image } = req.body;
+    const { name, description, price, categoryId, sku, modifiers, variants, image } = req.body;
     
     // Use authenticated user's branch_id for security
     const branchId = req.user.branch_id;
@@ -328,18 +334,37 @@ router.post('/items', authenticateToken, authorize('admin', 'manager'), upload.s
       await db('modifiers').insert(modifierData);
     }
 
+    // Add variants if provided
+    if (variants && variants.length > 0) {
+      const variantData = variants.map((variant, index) => ({
+        menu_item_id: itemId,
+        name: variant.name,
+        price_adjustment: variant.price_adjustment || variant.priceAdjustment || 0,
+        sort_order: variant.sort_order || variant.sortOrder || index,
+        is_active: true
+      }));
+
+      await db('product_variants').insert(variantData);
+    }
+
     const item = await db('menu_items')
       .select('menu_items.*', 'categories.name as category_name')
       .leftJoin('categories', 'menu_items.category_id', 'categories.id')
       .where({ 'menu_items.id': itemId })
       .first();
 
-    // Get modifiers
+    // Get modifiers and variants
     const itemModifiers = await db('modifiers')
       .select('modifiers.*')
       .where({ 'modifiers.menu_item_id': itemId });
 
+    const itemVariants = await db('product_variants')
+      .select('*')
+      .where({ 'menu_item_id': itemId })
+      .orderBy('sort_order', 'asc');
+
     item.modifiers = itemModifiers;
+    item.variants = itemVariants;
 
     // Log menu item creation
     await db('audit_logs').insert({
@@ -359,7 +384,7 @@ router.post('/items', authenticateToken, authorize('admin', 'manager'), upload.s
 router.put('/items/:id', authenticateToken, authorize('admin', 'manager'), upload.single('image'), async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, description, price, categoryId, sku, isAvailable, modifiers, image } = req.body;
+    const { name, description, price, categoryId, sku, isAvailable, modifiers, variants, image } = req.body;
     
     // Use authenticated user's branch_id for security
     const branchId = req.user.branch_id;
@@ -433,18 +458,43 @@ router.put('/items/:id', authenticateToken, authorize('admin', 'manager'), uploa
       }
     }
 
+    // Update variants if provided
+    if (variants) {
+      // Delete existing variants
+      await db('product_variants').where({ menu_item_id: id }).del();
+
+      // Insert new variants
+      if (variants.length > 0) {
+        const variantData = variants.map((variant, index) => ({
+          menu_item_id: id,
+          name: variant.name,
+          price_adjustment: variant.price_adjustment || variant.priceAdjustment || 0,
+          sort_order: variant.sort_order || variant.sortOrder || index,
+          is_active: true
+        }));
+
+        await db('product_variants').insert(variantData);
+      }
+    }
+
     const item = await db('menu_items')
       .select('menu_items.*', 'categories.name as category_name')
       .leftJoin('categories', 'menu_items.category_id', 'categories.id')
       .where({ 'menu_items.id': id })
       .first();
 
-    // Get modifiers
+    // Get modifiers and variants
     const itemModifiers = await db('modifiers')
       .select('modifiers.*')
       .where({ 'modifiers.menu_item_id': id });
 
+    const itemVariants = await db('product_variants')
+      .select('*')
+      .where({ 'menu_item_id': id })
+      .orderBy('sort_order', 'asc');
+
     item.modifiers = itemModifiers;
+    item.variants = itemVariants;
 
     // Log menu item update
     await db('audit_logs').insert({

@@ -20,6 +20,8 @@ const appSettingsRoutes = require('./src/routes/app-settings');
 const backupRoutes = require('./src/routes/backup');
 const employeesRoutes = require('./src/routes/employees');
 const restaurantsRoutes = require('./src/routes/restaurants');
+const googleImagesRoutes = require('./src/routes/google-images');
+const variantsRoutes = require('./src/routes/variants');
 
 const { initializeDatabase } = require('./src/database/init');
 const { ensureVariantsTable } = require('./src/utils/ensure-variants-table');
@@ -85,6 +87,8 @@ app.use('/api/app-settings', appSettingsRoutes);
 app.use('/api/backup', backupRoutes);
 app.use('/api/employees', employeesRoutes);
 app.use('/api/restaurants', restaurantsRoutes);
+app.use('/api/google-images', googleImagesRoutes);
+app.use('/api/variants', variantsRoutes);
 
 // Health check
 app.get('/health', (req, res) => {
