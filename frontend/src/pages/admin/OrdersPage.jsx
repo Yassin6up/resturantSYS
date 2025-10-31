@@ -46,6 +46,45 @@ function OrdersPage() {
     }
   }, [])
 
+  // Socket.io real-time updates
+  useEffect(() => {
+    if (socket) {
+      // Listen for new orders
+      socket.on('order.created', (newOrder) => {
+        console.log('📝 New order created:', newOrder)
+        setOrders(prev => [newOrder, ...prev])
+        toast.success(`New order ${newOrder.order_code} received!`)
+      })
+
+      // Listen for order updates
+      socket.on('order.updated', (updatedOrder) => {
+        console.log('🔄 Order updated:', updatedOrder)
+        setOrders(prev => prev.map(order => 
+          order.id === updatedOrder.id ? updatedOrder : order
+        ))
+        if (selectedOrder && selectedOrder.id === updatedOrder.id) {
+          setSelectedOrder(updatedOrder)
+        }
+      })
+
+      // Listen for payment updates
+      socket.on('payment.recorded', (paymentData) => {
+        console.log('💰 Payment recorded:', paymentData)
+        setOrders(prev => prev.map(order => 
+          order.id === paymentData.orderId 
+            ? { ...order, payment_status: paymentData.paymentStatus }
+            : order
+        ))
+      })
+
+      return () => {
+        socket.off('order.created')
+        socket.off('order.updated')
+        socket.off('payment.recorded')
+      }
+    }
+  }, [socket, selectedOrder])
+
   useEffect(() => {
     applyFilters()
   }, [orders, filters])

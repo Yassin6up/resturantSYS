@@ -8,58 +8,48 @@ const { logger } = require('../middleware/errorHandler');
 
 const router = express.Router();
 
+// Updated order creation API - using existing variant fields in order_items
 router.post('/', orderRateLimiter, validateOrder, async (req, res) => {
   const trx = await db.transaction();
   
   try {
-    const { branchId, tableId, tableNumber, customerName, items, paymentMethod, clientMeta } = req.body;
+    const { 
+      branchId, 
+      tableNumber, 
+      customerName, 
+      items, 
+      paymentMethod, 
+      amountPaid,
+      changeAmount,
+      deliveryAddress,
+      customerPhone
+    } = req.body;
 
-    console.log('🔵 BACKEND - Received order data:', { branchId, tableId, tableNumber, customerName });
+    console.log('🔵 BACKEND - Received order data:', { 
+      branchId, 
+      tableNumber, 
+      customerName,
+      items: items.map(item => ({
+        menuItemId: item.menuItemId,
+        variantId: item.variantId,
+        quantity: item.quantity
+      }))
+    });
 
-    // USE WHICHEVER FIELD HAS THE TABLE DATA (tableId OR tableNumber)
-    let tableIdentifier;
-    
-    if (tableNumber) {
-      tableIdentifier = tableNumber;
-      console.log('🔍 Using tableNumber as identifier:', tableIdentifier);
-    } else if (tableId) {
-      tableIdentifier = tableId;
-      console.log('🔍 Using tableId as identifier:', tableIdentifier);
-    } else {
-      await trx.rollback();
-      return res.status(400).json({ error: 'Table information is required. Please provide tableNumber or tableId.' });
-    }
-
-    // RESOLVE TABLE ID FROM TABLE IDENTIFIER
-    let actualTableId;
-    let actualTableNumber;
-
-    console.log('🔍 Looking up table by identifier:', { tableIdentifier, branchId });
-    
+    // Validate table
     const table = await trx('tables')
       .where({ 
-        table_number: tableIdentifier.toString(),
+        table_number: tableNumber.toString(),
         branch_id: branchId 
       })
       .first();
     
     if (!table) {
       await trx.rollback();
-      
-      // Get available tables for better error message
-      const availableTables = await trx('tables')
-        .where({ branch_id: branchId })
-        .select('table_number');
-      const tableList = availableTables.map(t => t.table_number).join(', ');
-      
       return res.status(400).json({ 
-        error: `Table "${tableIdentifier}" not found in branch ${branchId}. Available tables: ${tableList || 'None'}`
+        error: `Table "${tableNumber}" not found in branch ${branchId}.`
       });
     }
-    
-    actualTableId = table.id;
-    actualTableNumber = table.table_number;
-    console.log('✅ Resolved table:', { actualTableId, actualTableNumber });
 
     // Generate order code
     const branch = await trx('branches').where({ id: branchId }).first();
@@ -77,7 +67,7 @@ router.post('/', orderRateLimiter, validateOrder, async (req, res) => {
     
     const orderCode = `${branch.code}-${timestamp}-${String(parseInt(orderCount.count) + 1).padStart(4, '0')}`;
 
-    // Generate unique 8-digit PIN
+    // Generate unique PIN
     let pin;
     let isUnique = false;
     let attempts = 0;
@@ -97,7 +87,7 @@ router.post('/', orderRateLimiter, validateOrder, async (req, res) => {
       return res.status(500).json({ error: 'Failed to generate unique PIN' });
     }
 
-    // Calculate totals
+    // Calculate totals with variants
     let subtotal = 0;
     const orderItems = [];
 
@@ -113,7 +103,27 @@ router.post('/', orderRateLimiter, validateOrder, async (req, res) => {
         return res.status(400).json({ error: `Menu item "${menuItem.name}" is not available` });
       }
 
-      let itemTotal = menuItem.price * item.quantity;
+      // Handle variant price adjustment
+      let basePrice = parseFloat(menuItem.price);
+      let variantData = null;
+
+      if (item.variantId) {
+        const variant = await trx('product_variants')
+          .where({ 
+            id: item.variantId,
+            menu_item_id: item.menuItemId,
+            is_active: true 
+          })
+          .first();
+        
+        if (variant) {
+          variantData = variant;
+          basePrice += parseFloat(variant.price_adjustment || 0);
+          console.log(`✅ Variant applied: ${variant.name}, Price adjustment: ${variant.price_adjustment}`);
+        }
+      }
+
+      let itemTotal = basePrice * item.quantity;
       const modifiers = [];
 
       // Add modifier costs
@@ -121,24 +131,26 @@ router.post('/', orderRateLimiter, validateOrder, async (req, res) => {
         for (const modifierId of item.modifiers) {
           const modifier = await trx('modifiers').where({ id: modifierId }).first();
           if (modifier) {
-            itemTotal += modifier.extra_price * item.quantity;
+            itemTotal += parseFloat(modifier.extra_price || 0) * item.quantity;
             modifiers.push(modifier);
           }
         }
       }
 
       subtotal += itemTotal;
+      
       orderItems.push({
         menuItemId: item.menuItemId,
         quantity: item.quantity,
-        unitPrice: menuItem.price,
-        note: item.note,
+        unitPrice: basePrice,
+        note: item.note || '',
         modifiers,
-        itemTotal // This is just for calculation, not for database storage
+        variant: variantData,
+        itemTotal
       });
     }
 
-    // Get tax and service charge rates
+    // Calculate tax and totals
     const taxRate = await trx('settings').where({ key: 'tax_rate' }).first();
     const serviceChargeRate = await trx('settings').where({ key: 'service_charge_rate' }).first();
     
@@ -149,30 +161,45 @@ router.post('/', orderRateLimiter, validateOrder, async (req, res) => {
     const serviceCharge = subtotal * (serviceChargeRateValue / 100);
     const total = subtotal + tax + serviceCharge;
 
+    // Determine payment status
+    let paymentStatus = 'UNPAID';
+    if (amountPaid && parseFloat(amountPaid) >= total) {
+      paymentStatus = 'PAID';
+    } else if (amountPaid && parseFloat(amountPaid) > 0) {
+      paymentStatus = 'PARTIALLY_PAID';
+    }
+
     // Create order
     const [orderId] = await trx('orders').insert({
       branch_id: branchId,
       order_code: orderCode,
       pin: pin,
-      table_id: actualTableId,
+      table_id: table.id,
       customer_name: customerName,
+      customer_phone: customerPhone,
       total: parseFloat(total.toFixed(2)),
       tax: parseFloat(tax.toFixed(2)),
       service_charge: parseFloat(serviceCharge.toFixed(2)),
-      status: paymentMethod === 'CARD' ? 'AWAITING_PAYMENT' : 'PENDING',
-      payment_status: 'UNPAID',
-      payment_method: paymentMethod || 'cash'
+      status: 'PENDING',
+      payment_status: paymentStatus,
+      payment_method: paymentMethod || 'cash',
+      amount_paid: amountPaid ? parseFloat(amountPaid) : 0,
+      change_amount: changeAmount ? parseFloat(changeAmount) : 0,
+      delivery_address: deliveryAddress,
+      order_type: deliveryAddress ? 'DELIVERY' : 'DINE_IN'
     });
 
-    // Create order items - FIXED: removed total_price column
+    // Create order items using existing variant fields
     for (const orderItem of orderItems) {
       const [orderItemId] = await trx('order_items').insert({
         order_id: orderId,
         menu_item_id: orderItem.menuItemId,
         quantity: orderItem.quantity,
         unit_price: orderItem.unitPrice,
-        note: orderItem.note
-        // Removed total_price since it doesn't exist in your table
+        note: orderItem.note,
+        variant_id: orderItem.variant?.id || null,
+        variant_name: orderItem.variant?.name || null,
+        variant_price: orderItem.variant?.price_adjustment || null
       });
 
       // Create order item modifiers
@@ -187,69 +214,50 @@ router.post('/', orderRateLimiter, validateOrder, async (req, res) => {
 
     await trx.commit();
 
-    // Generate order tracking QR code for customer
+    // Generate QR codes
     const orderTrackingUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/order-status/${orderId}?pin=${pin}`;
     const trackingQrCode = await QRCode.toDataURL(orderTrackingUrl);
 
-    // Generate payment QR code for cashier (cash payments only)
     let paymentQrCode = null;
-    if (paymentMethod === 'cash' || !paymentMethod) {
+    if (paymentMethod === 'cash') {
       const paymentData = JSON.stringify({
         orderCode,
         orderId,
         total: total.toFixed(2),
-        tableNumber: actualTableNumber
+        tableNumber: table.table_number
       });
-      paymentQrCode = await QRCode.toDataURL(paymentData, {
-        width: 300,
-        margin: 2
-      });
+      paymentQrCode = await QRCode.toDataURL(paymentData);
     }
 
     // Emit real-time event
     const io = req.app.get('io');
-    const order = await db('orders')
-      .select('orders.*', 'tables.table_number', 'branches.name as branch_name')
-      .leftJoin('tables', 'orders.table_id', 'tables.id')
-      .leftJoin('branches', 'orders.branch_id', 'branches.id')
-      .where({ 'orders.id': orderId })
-      .first();
-
     if (io) {
+      const order = await db('orders')
+        .select('orders.*', 'tables.table_number', 'branches.name as branch_name')
+        .leftJoin('tables', 'orders.table_id', 'tables.id')
+        .leftJoin('branches', 'orders.branch_id', 'branches.id')
+        .where({ 'orders.id': orderId })
+        .first();
+
       io.to(`branch:${branchId}:kitchen`).emit('order.created', order);
       io.to(`branch:${branchId}:cashier`).emit('order.created', order);
     }
 
-    // Log order creation
-    await db('audit_logs').insert({
-      user_id: null,
-      action: 'ORDER_CREATE',
-      meta: JSON.stringify({ 
-        orderId, 
-        orderCode, 
-        tableId: actualTableId, 
-        tableNumber: actualTableNumber,
-        customerName, 
-        total,
-        paymentMethod,
-        ip: req.ip,
-        userAgent: req.get('User-Agent')
-      })
-    });
-
-    logger.info(`Order created: ${orderCode} for table ${actualTableNumber} - Payment: ${paymentMethod || 'cash'}`);
+    logger.info(`Order created: ${orderCode} for table ${table.table_number}`);
 
     res.status(201).json({
       orderId,
       orderCode,
       pin: pin,
-      tableNumber: actualTableNumber,
+      tableNumber: table.table_number,
       trackingUrl: orderTrackingUrl,
       trackingQrCode: trackingQrCode,
       paymentQrCode: paymentQrCode,
       status: 'PENDING',
       total: parseFloat(total.toFixed(2)),
       paymentMethod: paymentMethod || 'cash',
+      amountPaid: amountPaid || 0,
+      changeAmount: changeAmount || 0,
       message: 'Order created successfully'
     });
 

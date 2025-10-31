@@ -169,6 +169,7 @@ function KitchenDisplayPage() {
   const { socket } = useSocket()
   const [printOrder, setPrintOrder] = useState(null)
   const printRef = useRef()
+  const audioRef = useRef(null)
 
   // Update current time every second
   useEffect(() => {
@@ -207,10 +208,11 @@ function KitchenDisplayPage() {
   useEffect(() => {
     if (socket) {
       // Join kitchen room for real-time updates
-      socket.emit('join-kitchen')
+      socket.emit('join-kitchen', 1) // branchId = 1
 
       // Listen for order updates
       socket.on('order.created', handleOrderCreated)
+      socket.on('order.paid', handleOrderCreated) // When order is paid, treat it as new order
       socket.on('order.updated', handleOrderUpdated)
       socket.on('order.confirmed', handleOrderConfirmed)
       socket.on('order.status.updated', handleOrderStatusUpdated)
@@ -218,12 +220,75 @@ function KitchenDisplayPage() {
       return () => {
         socket.emit('leave-kitchen')
         socket.off('order.created')
+        socket.off('order.paid')
         socket.off('order.updated')
         socket.off('order.confirmed')
         socket.off('order.status.updated')
       }
     }
   }, [socket])
+
+  // Play notification sound
+  const playNotificationSound = () => {
+    try {
+      // Create audio context and play a beep sound
+      if (!audioRef.current) {
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)()
+        const oscillator = audioContext.createOscillator()
+        const gainNode = audioContext.createGain()
+        
+        oscillator.connect(gainNode)
+        gainNode.connect(audioContext.destination)
+        
+        oscillator.frequency.value = 800
+        oscillator.type = 'sine'
+        
+        gainNode.gain.setValueAtTime(0.3, audioContext.currentTime)
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5)
+        
+        oscillator.start(audioContext.currentTime)
+        oscillator.stop(audioContext.currentTime + 0.5)
+        
+        // Play three beeps
+        setTimeout(() => {
+          const osc2 = audioContext.createOscillator()
+          const gain2 = audioContext.createGain()
+          osc2.connect(gain2)
+          gain2.connect(audioContext.destination)
+          osc2.frequency.value = 800
+          osc2.type = 'sine'
+          gain2.gain.setValueAtTime(0.3, audioContext.currentTime)
+          gain2.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5)
+          osc2.start(audioContext.currentTime)
+          osc2.stop(audioContext.currentTime + 0.5)
+        }, 200)
+        
+        setTimeout(() => {
+          const osc3 = audioContext.createOscillator()
+          const gain3 = audioContext.createGain()
+          osc3.connect(gain3)
+          gain3.connect(audioContext.destination)
+          osc3.frequency.value = 1000
+          osc3.type = 'sine'
+          gain3.gain.setValueAtTime(0.3, audioContext.currentTime)
+          gain3.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.7)
+          osc3.start(audioContext.currentTime)
+          osc3.stop(audioContext.currentTime + 0.7)
+        }, 400)
+      }
+      toast.success('🔔 New Order Received!', {
+        duration: 3000,
+        style: {
+          background: '#10B981',
+          color: '#fff',
+          fontSize: '16px',
+          fontWeight: 'bold'
+        }
+      })
+    } catch (error) {
+      console.error('Error playing sound:', error)
+    }
+  }
 
   const loadOrders = async () => {
     try {
@@ -244,7 +309,9 @@ function KitchenDisplayPage() {
   }
 
   const handleOrderCreated = (order) => {
+    console.log('🔔 New order received in kitchen:', order)
     setOrders(prev => [order, ...prev])
+    playNotificationSound()
   }
 
   const handleOrderUpdated = (updatedOrder) => {

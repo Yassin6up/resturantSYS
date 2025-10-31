@@ -14,5 +14,6 @@ router.use('/tables', tablesRouter);
 router.use('/orders', ordersRouter);
 router.use('/payments', paymentsRouter);
 router.use('/settings', settingsRouter);
+// router.use('/settings', settingsRouter);
 
 export default router;

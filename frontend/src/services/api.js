@@ -122,10 +122,51 @@ export const menuAPI = {
   updateCategory: (id, data) => api.put(`/api/menu/categories/${id}`, data),
   deleteCategory: (id) => api.delete(`/api/menu/categories/${id}`),
   getMenuItems: (params) => api.get('/api/menu/items', { params }),
-  createMenuItem: (data) => api.post('/api/menu/items', data),
-  updateMenuItem: (id, data) => api.put(`/api/menu/items/${id}`, data),
+ // Correct API functions
+  createMenuItem: (data) => api.post('/api/menu/items', data, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  }),
+  updateMenuItem: (id, data) => api.put(`/api/menu/items/${id}`, data, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  }),
   deleteMenuItem: (id) => api.delete(`/api/menu/items/${id}`),
   toggleAvailability: (id, isAvailable) => api.patch(`/api/menu/items/${id}/availability`, { isAvailable }),
+ 
+getMenuItemVariants: (menuItemId) => {
+    return api.get(`/api/variants/menu-item/${menuItemId}`);
+  },
+  
+  getVariant: (variantId) => {
+    return api.get(`/api/variants/${variantId}`);
+  },
+  
+  createMenuItemVariant: (menuItemId, variantData) => {
+    return api.post(`/api/variants/menu-item/${menuItemId}`, variantData);
+  },
+  
+  createMenuItemVariantsBulk: (menuItemId, variants) => {
+    return api.post(`/api/variants/menu-item/${menuItemId}/bulk`, { variants });
+  },
+  
+  updateMenuItemVariant: (variantId, variantData) => {
+    return api.put(`/api/variants/${variantId}`, variantData);
+  },
+  
+  updateMenuItemVariantsBulk: (menuItemId, variants) => {
+    return api.put(`/api/variants/menu-item/${menuItemId}/bulk`, { variants });
+  },
+  
+  deleteMenuItemVariant: (variantId) => {
+    return api.delete(`/api/variants/${variantId}`);
+  },
+  
+  deleteMenuItemVariants: (menuItemId) => {
+    return api.delete(`/api/variants/menu-item/${menuItemId}`);
+  }
 }
 
 // Orders API

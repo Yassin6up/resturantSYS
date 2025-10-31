@@ -11,6 +11,7 @@ const router = express.Router();
 router.get('/image/:filename', async (req, res) => {
   try {
     const filename = req.params.filename;
+    console.log('Requested filename:', filename);
     const uploadsDir = path.join(__dirname, '../../uploads');
     const filePath = path.join(uploadsDir, filename);
 
@@ -39,17 +40,27 @@ router.get('/image/:filename', async (req, res) => {
 
     const contentType = contentTypes[ext] || 'application/octet-stream';
     
-    // Set headers
+    // Set headers - FIXED: removed duplicate Content-Type
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
     res.setHeader('Content-Type', contentType);
-    res.setHeader('Cache-Control', 'public, max-age=31536000'); // Cache for 1 year
     
     // Send file
     res.sendFile(filePath);
   } catch (error) {
-    logger.error('Image serving error:', error);
+    console.error('Image serving error:', error);
     res.status(500).json({ error: 'Failed to serve image' });
   }
 });
+
+// Add OPTIONS handler for CORS preflight
+router.options('/image/:filename', (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.status(200).end();
+});
+
 
 // Ensure uploads directory exists
 const uploadsDir = path.join(__dirname, '../../uploads');

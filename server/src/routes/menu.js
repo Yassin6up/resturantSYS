@@ -66,13 +66,25 @@ router.get('/', async (req, res) => {
         })
         .orderBy('menu_items.name');
 
-      // Get modifiers for each item
+      // Get modifiers and variants for each item
       for (const item of items) {
+        // Get modifiers for the item
         const modifiers = await db('modifiers')
           .select('modifiers.*')
           .where({ 'modifiers.menu_item_id': item.id });
 
         item.modifiers = modifiers;
+
+        // Get variants for the item
+        const variants = await db('product_variants')
+          .select('*')
+          .where({ 
+            'product_variants.menu_item_id': item.id,
+            'product_variants.is_active': true
+          })
+          .orderBy('product_variants.sort_order', 'asc');
+
+        item.variants = variants;
       }
 
       category.items = items;
@@ -298,6 +310,31 @@ router.post('/items', authenticateToken, authorize('admin', 'manager'), upload.s
   try {
     const { name, description, price, categoryId, sku, modifiers, variants, image } = req.body;
     
+    console.log('data received:', req.body);
+    
+    // Parse variants if it's a string
+    let parsedVariants = [];
+    if (variants) {
+      try {
+        parsedVariants = typeof variants === 'string' ? JSON.parse(variants) : variants;
+        console.log('parsed variants:', parsedVariants);
+      } catch (parseError) {
+        console.error('Failed to parse variants:', parseError);
+        return res.status(400).json({ error: 'Invalid variants format' });
+      }
+    }
+
+    // Parse modifiers if provided
+    let parsedModifiers = [];
+    if (modifiers) {
+      try {
+        parsedModifiers = typeof modifiers === 'string' ? JSON.parse(modifiers) : modifiers;
+      } catch (parseError) {
+        console.error('Failed to parse modifiers:', parseError);
+        return res.status(400).json({ error: 'Invalid modifiers format' });
+      }
+    }
+    
     // Use authenticated user's branch_id for security
     const branchId = req.user.branch_id;
     
@@ -310,8 +347,16 @@ router.post('/items', authenticateToken, authorize('admin', 'manager'), upload.s
       return res.status(400).json({ error: 'Name, price, and category are required' });
     }
 
-    // Get image path - either from file upload or from body (pre-uploaded via /api/upload/image)
-    const imagePath = req.file ? `/uploads/${req.file.filename}` : (image || null);
+    // Get image URL - either from file upload or from body (pre-uploaded via /api/upload/image)
+    let imageUrl = image || null;
+    
+    if (req.file) {
+      // Construct full URL for uploaded file
+      const protocol = req.protocol;
+      const host = req.get('host');
+      imageUrl = `${protocol}://${host}/api/upload/image/${req.file.filename}`;
+      console.log('Generated image URL:', imageUrl);
+    }
 
     const [itemId] = await db('menu_items').insert({
       name,
@@ -320,12 +365,12 @@ router.post('/items', authenticateToken, authorize('admin', 'manager'), upload.s
       category_id: categoryId,
       branch_id: branchId,
       sku,
-      image: imagePath
+      image: imageUrl  // Store full URL instead of just path
     });
 
     // Add modifiers if provided
-    if (modifiers && modifiers.length > 0) {
-      const modifierData = modifiers.map(modifier => ({
+    if (parsedModifiers && parsedModifiers.length > 0) {
+      const modifierData = parsedModifiers.map(modifier => ({
         menu_item_id: itemId,
         name: modifier.name,
         extra_price: modifier.extra_price || 0
@@ -335,13 +380,13 @@ router.post('/items', authenticateToken, authorize('admin', 'manager'), upload.s
     }
 
     // Add variants if provided
-    if (variants && variants.length > 0) {
-      const variantData = variants.map((variant, index) => ({
+    if (parsedVariants && parsedVariants.length > 0) {
+      const variantData = parsedVariants.map((variant, index) => ({
         menu_item_id: itemId,
         name: variant.name,
         price_adjustment: variant.price_adjustment || variant.priceAdjustment || 0,
         sort_order: variant.sort_order || variant.sortOrder || index,
-        is_active: true
+        is_active: variant.is_active !== false
       }));
 
       await db('product_variants').insert(variantData);
@@ -375,10 +420,11 @@ router.post('/items', authenticateToken, authorize('admin', 'manager'), upload.s
 
     res.status(201).json({ item });
   } catch (error) {
-    logger.error('Menu item creation error:', error);
+    console.error('Menu item creation error:', error);
     res.status(500).json({ error: 'Failed to create menu item' });
   }
 });
+
 
 // Update menu item (admin)
 router.put('/items/:id', authenticateToken, authorize('admin', 'manager'), upload.single('image'), async (req, res) => {
@@ -515,6 +561,12 @@ router.delete('/items/:id', authenticateToken, authorize('admin', 'manager'), as
   try {
     const { id } = req.params;
 
+    // Check if item exists
+    const menuItem = await db('menu_items').where({ id }).first();
+    if (!menuItem) {
+      return res.status(404).json({ error: 'Menu item not found' });
+    }
+
     // Check if item has orders
     const orderCount = await db('order_items').where({ menu_item_id: id }).count('id as count').first();
     
@@ -522,11 +574,20 @@ router.delete('/items/:id', authenticateToken, authorize('admin', 'manager'), as
       return res.status(400).json({ error: 'Cannot delete menu item with existing orders' });
     }
 
-    // Delete modifiers first
-    await db('modifiers').where({ menu_item_id: id }).del();
-
-    // Delete menu item
-    await db('menu_items').where({ id }).del();
+    // Delete related records in the correct order to respect foreign key constraints
+    await db.transaction(async (trx) => {
+      // 1. Delete variants first (if they exist)
+      await trx('product_variants').where({ menu_item_id: id }).del();
+      
+      // 2. Delete modifiers
+      await trx('modifiers').where({ menu_item_id: id }).del();
+      
+      // 3. Delete recipes (this is the missing constraint from your error)
+      await trx('recipes').where({ menu_item_id: id }).del();
+      
+      // 4. Finally delete the menu item
+      await trx('menu_items').where({ id }).del();
+    });
 
     // Log menu item deletion
     await db('audit_logs').insert({
@@ -538,6 +599,14 @@ router.delete('/items/:id', authenticateToken, authorize('admin', 'manager'), as
     res.json({ message: 'Menu item deleted successfully' });
   } catch (error) {
     logger.error('Menu item deletion error:', error);
+    
+    // Provide more specific error messages
+    if (error.code === 'ER_ROW_IS_REFERENCED_2') {
+      return res.status(400).json({ 
+        error: 'Cannot delete menu item. It is referenced in other records. Please remove all associations first.' 
+      });
+    }
+    
     res.status(500).json({ error: 'Failed to delete menu item' });
   }
 });

@@ -15,24 +15,36 @@ function cartReducer(state, action) {
     case 'ADD_ITEM':
       const existingItem = state.items.find(
         item => item.menuItemId === action.payload.menuItemId && 
-        JSON.stringify(item.modifiers) === JSON.stringify(action.payload.modifiers)
+        JSON.stringify(item.modifiers) === JSON.stringify(action.payload.modifiers) &&
+        item.variantId === action.payload.variantId
       )
 
       if (existingItem) {
+        const newQuantity = existingItem.quantity + action.payload.quantity;
+        const newTotal = existingItem.unitPrice * newQuantity;
+        const quantityDiff = action.payload.quantity;
+
         return {
           ...state,
           items: state.items.map(item =>
             item.id === existingItem.id
-              ? { ...item, quantity: item.quantity + action.payload.quantity }
+              ? { 
+                  ...item, 
+                  quantity: newQuantity,
+                  total: newTotal
+                }
               : item
           ),
-          total: state.total + action.payload.total,
-          itemCount: state.itemCount + action.payload.quantity
+          total: state.total + (action.payload.unitPrice * quantityDiff),
+          itemCount: state.itemCount + quantityDiff
         }
       } else {
         return {
           ...state,
-          items: [...state.items, { ...action.payload, id: Date.now() }],
+          items: [...state.items, { 
+            ...action.payload, 
+            id: Date.now().toString() + Math.random().toString(36).substr(2, 9) 
+          }],
           total: state.total + action.payload.total,
           itemCount: state.itemCount + action.payload.quantity
         }
@@ -54,16 +66,21 @@ function cartReducer(state, action) {
       if (!itemToUpdate) return state
 
       const quantityDiff = action.payload.quantity - itemToUpdate.quantity
-      const newTotal = state.total + (quantityDiff * itemToUpdate.unitPrice)
+      const priceDiff = quantityDiff * itemToUpdate.unitPrice
+      const newTotal = itemToUpdate.unitPrice * action.payload.quantity
 
       return {
         ...state,
         items: state.items.map(item =>
           item.id === action.payload.id
-            ? { ...item, quantity: action.payload.quantity }
+            ? { 
+                ...item, 
+                quantity: action.payload.quantity, 
+                total: newTotal 
+              }
             : item
         ),
-        total: newTotal,
+        total: state.total + priceDiff,
         itemCount: state.itemCount + quantityDiff
       }
 
@@ -74,7 +91,6 @@ function cartReducer(state, action) {
       return action.payload
     
     case 'SET_BRANCH_INFO':
-      console.log('CartContext: SET_BRANCH_INFO', action.payload);
       return {
         ...state,
         branchId: action.payload.branchId,
@@ -89,7 +105,7 @@ function cartReducer(state, action) {
 export function CartProvider({ children }) {
   const [state, dispatch] = useReducer(cartReducer, initialState)
 
-  // Load cart from localStorage on mount
+  // Load cart from localStorage
   useEffect(() => {
     const savedCart = localStorage.getItem('posq_cart')
     if (savedCart) {
@@ -103,33 +119,41 @@ export function CartProvider({ children }) {
     }
   }, [])
 
-  // Save cart to localStorage whenever it changes
+  // Save cart to localStorage
   useEffect(() => {
-    console.log('CartContext: Saving to localStorage', state);
     localStorage.setItem('posq_cart', JSON.stringify(state))
   }, [state])
 
-  const addItem = (menuItem, quantity = 1, modifiers = [], note = '', branchId = null, tableNumber = null) => {
-    const modifierTotal = modifiers.reduce((sum, modifier) => sum + modifier.extra_price, 0)
-    const unitPrice = menuItem.price + modifierTotal
-    const total = unitPrice * quantity
+  const addItem = (menuItem, quantity = 1, modifiers = [], note = '', branchId = null, tableNumber = null, variant = null) => {
+    const basePrice = parseFloat(menuItem.price || 0);
+    const variantPrice = variant ? parseFloat(variant.price_adjustment || 0) : 0;
+    const modifierTotal = modifiers.reduce((sum, modifier) => sum + parseFloat(modifier.extra_price || 0), 0);
+    
+    const unitPrice = basePrice + variantPrice + modifierTotal;
+    const total = unitPrice * quantity;
+
+    const cartItem = {
+      menuItemId: menuItem.id,
+      name: menuItem.name,
+      image: menuItem.image,
+      price: menuItem.price,
+      quantity,
+      unitPrice,
+      total,
+      modifiers,
+      note,
+      branchId: branchId || state.branchId,
+      tableNumber: tableNumber || state.tableNumber,
+      variantId: variant?.id || null,
+      variantName: variant?.name || null,
+      variantPriceAdjustment: variant?.price_adjustment || 0
+    };
+
     dispatch({
       type: 'ADD_ITEM',
-      payload: {
-        menuItemId: menuItem.id,
-        name: menuItem.name,
-        image: menuItem.image,
-        price: menuItem.price,
-        quantity,
-        unitPrice,
-        total,
-        modifiers,
-        note,
-        branchId,
-        tableNumber
-      }
-    })
-  }
+      payload: cartItem
+    });
+  };
   
   const setBranchInfo = (branchId, tableNumber) => {
     dispatch({ 
@@ -154,28 +178,13 @@ export function CartProvider({ children }) {
     dispatch({ type: 'CLEAR_CART' })
   }
 
-  const setCart = (cartData) => {
-    dispatch({ type: 'SET_CART', payload: cartData })
-  }
-
-  const getCartTotal = () => {
-    return state.items.reduce((total, item) => total + item.total, 0)
-  }
-
-  const getItemCount = () => {
-    return state.items.reduce((count, item) => count + item.quantity, 0)
-  }
-
   const value = {
     ...state,
     addItem,
     removeItem,
     updateQuantity,
     clearCart,
-    setCart,
-    setBranchInfo,
-    getCartTotal,
-    getItemCount
+    setBranchInfo
   }
 
   return (

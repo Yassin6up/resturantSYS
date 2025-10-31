@@ -3,6 +3,7 @@ import { menuAPI } from '../../services/api'
 import { PlusIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/outline'
 import MenuItemForm from '../../components/MenuItemForm'
 import CategoryForm from '../../components/CategoryForm'
+import GoogleImageSearchModal from '../../components/GoogleImageSearchModal'
 import toast from 'react-hot-toast'
 
 function MenuManagementPage() {
@@ -12,6 +13,7 @@ function MenuManagementPage() {
   const [activeTab, setActiveTab] = useState('categories')
   const [showItemForm, setShowItemForm] = useState(false)
   const [showCategoryForm, setShowCategoryForm] = useState(false)
+  const [showImageSearch, setShowImageSearch] = useState(false)
   const [editingItem, setEditingItem] = useState(null)
   const [editingCategory, setEditingCategory] = useState(null)
 
@@ -110,6 +112,21 @@ function MenuManagementPage() {
     }
   }
 
+  const handleDeleteItem = async (itemId) => {
+    if (!window.confirm('Are you sure you want to delete this menu item? This action cannot be undone.')) {
+      return
+    }
+
+    try {
+      await menuAPI.deleteMenuItem(itemId)
+      setMenuItems(prev => prev.filter(item => item.id !== itemId))
+      toast.success('Menu item deleted successfully')
+    } catch (error) {
+      console.error('Menu item deletion error:', error)
+      toast.error(error.response?.data?.error || 'Failed to delete menu item')
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -127,7 +144,7 @@ function MenuManagementPage() {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Menu Management</h1>
-          <p className="text-gray-600">Manage categories, items, and modifiers</p>
+          <p className="text-gray-600">Manage categories, items, variants, and modifiers</p>
         </div>
         <button 
           onClick={handleAddItem}
@@ -261,6 +278,9 @@ function MenuManagementPage() {
                         Price
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Variants
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Status
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -269,16 +289,22 @@ function MenuManagementPage() {
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {menuItems.map((item) => (
-                      <tr key={item.id}>
+                    {menuItems.map((item) => {
+console.log('Rendering item:', item);
+                      return <tr key={item.id}>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <img 
-                            src={item.image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=100&h=100&fit=crop'} 
+                            src={ item.image}
                             alt={item.name}
                             className="h-12 w-12 rounded-lg object-cover"
                             onError={(e) => {
-                              e.target.src = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=100&h=100&fit=crop';
-                            }}
+                                console.error('Image failed to load:', {
+                                  url: item.image,
+                                  error: e
+                                });
+                                // Add a fallback image
+                                e.target.src = 'https://via.placeholder.com/100?text=No+Image';
+                              }}
                           />
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
@@ -293,6 +319,15 @@ function MenuManagementPage() {
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                           {item.price.toFixed(2)} MAD
                         </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {item.variants_count > 0 ? (
+                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                              {item.variants_count} variants
+                            </span>
+                          ) : (
+                            <span className="text-gray-400">No variants</span>
+                          )}
+                        </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span className={`badge ${item.is_available ? 'badge-success' : 'badge-danger'}`}>
                             {item.is_available ? 'Available' : 'Unavailable'}
@@ -305,12 +340,15 @@ function MenuManagementPage() {
                           >
                             <PencilIcon className="h-4 w-4" />
                           </button>
-                          <button className="text-red-600 hover:text-red-900">
+                          <button 
+                            onClick={() => handleDeleteItem(item.id)}
+                            className="text-red-600 hover:text-red-900"
+                          >
                             <TrashIcon className="h-4 w-4" />
                           </button>
                         </td>
                       </tr>
-                    ))}
+})}
                   </tbody>
                 </table>
               </div>
@@ -322,7 +360,7 @@ function MenuManagementPage() {
       {/* Menu Item Form Modal */}
       {showItemForm && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6">
               <div className="flex justify-between items-center mb-6">
                 <h2 className="text-xl font-semibold text-gray-900">
@@ -344,6 +382,7 @@ function MenuManagementPage() {
                 categories={categories}
                 onSave={handleSaveItem}
                 onCancel={handleCancelForm}
+                onImageSearch={() => setShowImageSearch(true)}
                 branchId={1}
               />
             </div>
@@ -380,6 +419,21 @@ function MenuManagementPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Google Image Search Modal */}
+      {showImageSearch && (
+        <GoogleImageSearchModal
+          isOpen={showImageSearch}
+          onClose={() => setShowImageSearch(false)}
+          onSelectImage={(imageUrl) => {
+            // This will be handled in the MenuItemForm component
+            const event = new CustomEvent('imageSelected', { detail: imageUrl });
+            window.dispatchEvent(event);
+            setShowImageSearch(false);
+          }}
+          searchQuery={editingItem?.name || ''}
+        />
       )}
     </div>
   )
