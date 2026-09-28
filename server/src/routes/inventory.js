@@ -2,6 +2,7 @@ const express = require('express');
 const { db } = require('../database/init');
 const { authenticateToken, authorize } = require('../middleware/auth');
 const { logger } = require('../middleware/errorHandler');
+const { syncMenuItemAvailability } = require('../utils/menuAvailability');
 
 const router = express.Router();
 
@@ -35,9 +36,12 @@ router.get('/stock', authenticateToken, authorize('admin', 'manager'), async (re
 });
 
 // Create stock item (admin/manager)
+// Create stock item (admin/manager)
+// Create stock item (admin/manager)
+// Create stock item (admin/manager)
 router.post('/stock', authenticateToken, authorize('admin', 'manager'), async (req, res) => {
   try {
-    const { name, sku, unit, minStock, maxStock, currentStock, costPrice, supplier, description, isActive } = req.body;
+    const { name, sku, unit, min_threshold, quantity } = req.body;
     
     // Use authenticated user's branch_id for security
     const branchId = req.user.branch_id;
@@ -50,18 +54,15 @@ router.post('/stock', authenticateToken, authorize('admin', 'manager'), async (r
       return res.status(400).json({ error: 'Name is required' });
     }
 
+    const initialQuantity = Number(quantity) || 0;
+
     const [stockItemId] = await db('stock_items').insert({
       name,
-      sku,
+      sku: sku || '',
       branch_id: branchId,
       unit: unit || 'piece',
-      min_stock: minStock || 0,
-      max_stock: maxStock || 100,
-      current_stock: currentStock || 0,
-      cost_price: costPrice || 0,
-      supplier: supplier || '',
-      description: description || '',
-      is_active: isActive !== false
+      quantity: initialQuantity,
+      min_threshold: Number(min_threshold) || 0
     });
 
     const stockItem = await db('stock_items')
@@ -70,12 +71,25 @@ router.post('/stock', authenticateToken, authorize('admin', 'manager'), async (r
       .where({ 'stock_items.id': stockItemId })
       .first();
 
+    // Log stock movement for initial quantity
+    if (initialQuantity > 0) {
+      await db('stock_movements').insert({
+        stock_item_id: stockItemId,
+        change: initialQuantity,
+        reason: 'Initial stock creation',
+        type: 'in',
+        user_id: req.user.id
+      });
+    }
+
     // Log stock item creation
     await db('audit_logs').insert({
       user_id: req.user.id,
       action: 'STOCK_ITEM_CREATE',
-      meta: JSON.stringify({ stockItemId, name, sku, branchId })
+      meta: JSON.stringify({ stockItemId, name, sku, branchId, initialQuantity })
     });
+
+    logger.info(`Stock item created: ${name} with initial quantity ${initialQuantity}`);
 
     res.status(201).json({ success: true, item: stockItem });
   } catch (error) {
@@ -88,7 +102,7 @@ router.post('/stock', authenticateToken, authorize('admin', 'manager'), async (r
 router.put('/stock/:id', authenticateToken, authorize('admin', 'manager'), async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, sku, unit, minThreshold } = req.body;
+    const { name, sku, unit, min_threshold, quantity } = req.body;
     
     // Use authenticated user's branch_id for security
     const branchId = req.user.branch_id;
@@ -106,15 +120,23 @@ router.put('/stock/:id', authenticateToken, authorize('admin', 'manager'), async
       return res.status(403).json({ error: 'Access denied: Stock item belongs to different branch' });
     }
 
+    const newQuantity = Number(quantity) || 0;
+    const quantityChange = newQuantity - existingItem.quantity;
+
     await db('stock_items')
       .where({ id })
       .update({
         name,
-        sku,
-        unit,
-        min_threshold: minThreshold,
+        sku: sku || '',
+        unit: unit || 'piece',
+        quantity: newQuantity,
+        min_threshold: Number(min_threshold) || 0,
         updated_at: db.raw('CURRENT_TIMESTAMP')
       });
+
+    if (quantityChange !== 0) {
+      await syncMenuItemAvailability(id);
+    }
 
     const stockItem = await db('stock_items')
       .select('stock_items.*', 'branches.name as branch_name')
@@ -122,14 +144,37 @@ router.put('/stock/:id', authenticateToken, authorize('admin', 'manager'), async
       .where({ 'stock_items.id': id })
       .first();
 
+    // Log stock movement if quantity changed
+    if (quantityChange !== 0) {
+      const movementType = quantityChange > 0 ? 'in' : 'out';
+      const movementReason = quantityChange > 0 ? 'Manual stock adjustment (increase)' : 'Manual stock adjustment (decrease)';
+      
+      await db('stock_movements').insert({
+        stock_item_id: id,
+        change: Math.abs(quantityChange),
+        reason: movementReason,
+        type: movementType,
+        user_id: req.user.id
+      });
+
+      logger.info(`Stock movement during update: ${existingItem.name} ${quantityChange > 0 ? '+' : ''}${quantityChange} (${movementReason})`);
+    }
+
     // Log stock item update
     await db('audit_logs').insert({
       user_id: req.user.id,
       action: 'STOCK_ITEM_UPDATE',
-      meta: JSON.stringify({ stockItemId: id, name, sku })
+      meta: JSON.stringify({ 
+        stockItemId: id, 
+        name, 
+        sku,
+        oldQuantity: existingItem.quantity,
+        newQuantity: newQuantity,
+        quantityChange: quantityChange
+      })
     });
 
-    res.json({ stockItem });
+    res.json({ success: true, item: stockItem });
   } catch (error) {
     logger.error('Stock item update error:', error);
     res.status(500).json({ error: 'Failed to update stock item' });
@@ -164,16 +209,33 @@ router.delete('/stock/:id', authenticateToken, authorize('admin', 'manager'), as
       return res.status(400).json({ error: 'Cannot delete stock item used in recipes' });
     }
 
+    // Log stock movement for deletion (if there was remaining stock)
+    if (existingItem.quantity > 0) {
+      await db('stock_movements').insert({
+        stock_item_id: id,
+        change: existingItem.quantity,
+        reason: 'Stock item deletion - remaining stock removed',
+        type: 'out',
+        user_id: req.user.id
+      });
+    }
+
     await db('stock_items').where({ id }).del();
 
     // Log stock item deletion
     await db('audit_logs').insert({
       user_id: req.user.id,
       action: 'STOCK_ITEM_DELETE',
-      meta: JSON.stringify({ stockItemId: id })
+      meta: JSON.stringify({ 
+        stockItemId: id,
+        name: existingItem.name,
+        finalQuantity: existingItem.quantity
+      })
     });
 
-    res.json({ message: 'Stock item deleted successfully' });
+    logger.info(`Stock item deleted: ${existingItem.name} with final quantity ${existingItem.quantity}`);
+
+    res.json({ success: true, message: 'Stock item deleted successfully' });
   } catch (error) {
     logger.error('Stock item deletion error:', error);
     res.status(500).json({ error: 'Failed to delete stock item' });
@@ -184,7 +246,7 @@ router.delete('/stock/:id', authenticateToken, authorize('admin', 'manager'), as
 router.post('/stock/:id/move', authenticateToken, authorize('admin', 'manager'), async (req, res) => {
   try {
     const { id } = req.params;
-    const { change, reason } = req.body;
+    const { change, reason, type } = req.body;
     
     // Use authenticated user's branch_id for security
     const branchId = req.user.branch_id;
@@ -194,7 +256,7 @@ router.post('/stock/:id/move', authenticateToken, authorize('admin', 'manager'),
     }
 
     if (!change || !reason) {
-      return res.status(400).json({ error: 'Change amount and reason are required' });
+      return res.status(400).json({ error: 'Change and reason are required' });
     }
 
     const stockItem = await db('stock_items').where({ id }).first();
@@ -216,11 +278,13 @@ router.post('/stock/:id/move', authenticateToken, authorize('admin', 'manager'),
     // Log stock movement
     await db('stock_movements').insert({
       stock_item_id: id,
-      change,
+      change: Math.abs(change),
       reason,
-      user_id: req.user.id,
-      type: 'manual'
+      type: type || (change > 0 ? 'in' : 'out'),
+      user_id: req.user.id
     });
+
+    await syncMenuItemAvailability(id);
 
     const updatedStockItem = await db('stock_items')
       .select('stock_items.*', 'branches.name as branch_name')
@@ -228,7 +292,7 @@ router.post('/stock/:id/move', authenticateToken, authorize('admin', 'manager'),
       .where({ 'stock_items.id': id })
       .first();
 
-    // Log stock movement
+    // Log stock movement in audit logs
     await db('audit_logs').insert({
       user_id: req.user.id,
       action: 'STOCK_MOVEMENT',
@@ -236,6 +300,7 @@ router.post('/stock/:id/move', authenticateToken, authorize('admin', 'manager'),
         stockItemId: id, 
         change, 
         reason,
+        type: type || (change > 0 ? 'in' : 'out'),
         newQuantity: updatedStockItem.quantity
       })
     });
@@ -243,6 +308,7 @@ router.post('/stock/:id/move', authenticateToken, authorize('admin', 'manager'),
     logger.info(`Stock movement: ${stockItem.name} ${change > 0 ? '+' : ''}${change} (${reason})`);
 
     res.json({ 
+      success: true,
       stockItem: updatedStockItem,
       message: 'Stock movement recorded successfully' 
     });
@@ -305,7 +371,7 @@ router.get('/history', authenticateToken, authorize('admin', 'manager'), async (
       return res.status(400).json({ error: 'User is not assigned to a branch' });
     }
 
-    const { limit = 100, offset = 0, stockItemId, type } = req.query;
+    const { limit = 100, offset = 0, stockItemId, changeType } = req.query;
 
     let query = db('stock_movements')
       .select(
@@ -313,21 +379,21 @@ router.get('/history', authenticateToken, authorize('admin', 'manager'), async (
         'stock_items.name as stock_item_name',
         'stock_items.unit',
         'stock_items.sku',
-        'users.username as user_name',
-        'users.full_name',
-        'orders.order_code'
+        // Infer type based on change value
+        db.raw('CASE WHEN stock_movements.change > 0 THEN "in" ELSE "out" END as movement_type')
       )
       .leftJoin('stock_items', 'stock_movements.stock_item_id', 'stock_items.id')
-      .leftJoin('users', 'stock_movements.user_id', 'users.id')
-      .leftJoin('orders', 'stock_movements.order_id', 'orders.id')
       .where({ 'stock_items.branch_id': branchId });
 
     if (stockItemId) {
       query = query.where({ 'stock_movements.stock_item_id': stockItemId });
     }
 
-    if (type) {
-      query = query.where({ 'stock_movements.type': type });
+    // Filter by inferred movement type
+    if (changeType === 'in') {
+      query = query.where('stock_movements.change', '>', 0);
+    } else if (changeType === 'out') {
+      query = query.where('stock_movements.change', '<', 0);
     }
 
     const history = await query
@@ -362,7 +428,7 @@ router.get('/alerts', authenticateToken, authorize('admin', 'manager'), async (r
       .leftJoin('stock_items', 'low_stock_alerts.stock_item_id', 'stock_items.id')
       .where({ 
         'low_stock_alerts.branch_id': branchId,
-        'low_stock_alerts.is_resolved': false 
+        'low_stock_alerts.is_resolved': 0  // Using 0 instead of false for integer field
       })
       .orderBy('low_stock_alerts.created_at', 'desc');
 
@@ -449,15 +515,15 @@ router.get('/recipes', authenticateToken, authorize('admin', 'manager'), async (
 // Create recipe (admin/manager)
 router.post('/recipes', authenticateToken, authorize('admin', 'manager'), async (req, res) => {
   try {
-    const { menuItemId, stockItemId, qtyPerServing } = req.body;
+    const { menu_item_id, stock_item_id, qty_per_serving } = req.body;
 
-    if (!menuItemId || !stockItemId || !qtyPerServing) {
+    if (!menu_item_id || !stock_item_id || !qty_per_serving) {
       return res.status(400).json({ error: 'Menu item ID, stock item ID, and quantity per serving are required' });
     }
 
     // Check if recipe already exists
     const existingRecipe = await db('recipes')
-      .where({ menu_item_id: menuItemId, stock_item_id: stockItemId })
+      .where({ menu_item_id: menu_item_id, stock_item_id: stock_item_id })
       .first();
 
     if (existingRecipe) {
@@ -465,9 +531,9 @@ router.post('/recipes', authenticateToken, authorize('admin', 'manager'), async 
     }
 
     const [recipeId] = await db('recipes').insert({
-      menu_item_id: menuItemId,
-      stock_item_id: stockItemId,
-      qty_per_serving: qtyPerServing
+      menu_item_id: menu_item_id,
+      stock_item_id: stock_item_id,
+      qty_per_serving: qty_per_serving
     });
 
     const recipe = await db('recipes')
@@ -487,10 +553,10 @@ router.post('/recipes', authenticateToken, authorize('admin', 'manager'), async 
     await db('audit_logs').insert({
       user_id: req.user.id,
       action: 'RECIPE_CREATE',
-      meta: JSON.stringify({ recipeId, menuItemId, stockItemId, qtyPerServing })
+      meta: JSON.stringify({ recipeId, menu_item_id, stock_item_id, qty_per_serving })
     });
 
-    res.status(201).json({ recipe });
+    res.status(201).json({ success: true, recipe });
   } catch (error) {
     logger.error('Recipe creation error:', error);
     res.status(500).json({ error: 'Failed to create recipe' });

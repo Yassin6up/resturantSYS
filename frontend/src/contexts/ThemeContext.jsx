@@ -15,6 +15,7 @@ export function ThemeProvider({ children }) {
     try {
       const response = await appSettingsAPI.getSettings()
       if (response.data.success) {
+        console.log('Loaded settings:', response.data.settings)
         setSettings(response.data.settings)
         applyTheme(response.data.settings)
       }
@@ -136,6 +137,7 @@ export function ThemeProvider({ children }) {
     getAppName,
     getWelcomeMessage,
     getCurrency,
+    
     applyTheme
   }
 

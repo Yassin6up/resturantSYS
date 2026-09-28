@@ -1,12 +1,17 @@
 import { useState, useEffect } from 'react'
-import { menuAPI } from '../../services/api'
+import { useLocation } from 'react-router-dom'
+import { menuAPI, authAPI } from '../../services/api'
 import { PlusIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/outline'
 import MenuItemForm from '../../components/MenuItemForm'
 import CategoryForm from '../../components/CategoryForm'
 import GoogleImageSearchModal from '../../components/GoogleImageSearchModal'
 import toast from 'react-hot-toast'
+import { useAdminBusiness } from '../../contexts/AdminBusinessContext'
+import CatalogImport from '../../components/CatalogImport'
 
 function MenuManagementPage() {
+  const [showImport, setShowImport] = useState(false)
+  const location = useLocation()
   const [categories, setCategories] = useState([])
   const [menuItems, setMenuItems] = useState([])
   const [loading, setLoading] = useState(true)
@@ -16,6 +21,12 @@ function MenuManagementPage() {
   const [showImageSearch, setShowImageSearch] = useState(false)
   const [editingItem, setEditingItem] = useState(null)
   const [editingCategory, setEditingCategory] = useState(null)
+  const { businessType, branch } = useAdminBusiness()
+  const isEcommerce = businessType === 'ecommerce'
+  const itemLabel = isEcommerce ? 'Product' : 'Menu Item'
+  const itemsLabel = isEcommerce ? 'Products' : 'Menu Items'
+  useEffect(() => { setActiveTab(location.pathname === '/admin/products' ? 'items' : 'categories') }, [location.pathname])
+
 
   useEffect(() => {
     loadData()
@@ -25,8 +36,8 @@ function MenuManagementPage() {
     try {
       setLoading(true)
       const [categoriesRes, itemsRes] = await Promise.all([
-        menuAPI.getCategories({ branchId: 1 }),
-        menuAPI.getMenuItems({ branchId: 1 })
+        menuAPI.getCategories({ branchId: branch.id }),
+        menuAPI.getMenuItems({ branchId: branch.id })
       ])
       
       setCategories(categoriesRes.data.categories)
@@ -140,19 +151,20 @@ function MenuManagementPage() {
 
   return (
     <div className="space-y-6">
+      {showImport && <CatalogImport isEcommerce={isEcommerce} onClose={() => setShowImport(false)} onImported={() => { setShowImport(false); loadData() }} />}
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Menu Management</h1>
+          <h1 className="text-2xl font-bold text-gray-900">{isEcommerce ? 'Product Management' : 'Menu Management'}</h1>
           <p className="text-gray-600">Manage categories, items, variants, and modifiers</p>
         </div>
-        <button 
+        <div className="flex flex-wrap gap-2"><button className="btn-secondary" onClick={() => setShowImport(true)}>Import Excel / Google Sheet</button><button 
           onClick={handleAddItem}
           className="btn-primary"
         >
           <PlusIcon className="h-5 w-5 mr-2" />
           Add Item
-        </button>
+        </button></div>
       </div>
 
       {/* Tabs */}
@@ -176,7 +188,7 @@ function MenuManagementPage() {
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
             }`}
           >
-            Menu Items ({menuItems.length})
+            {itemsLabel} ({menuItems.length})
           </button>
         </nav>
       </div>
@@ -244,7 +256,7 @@ function MenuManagementPage() {
         <div className="card">
           <div className="card-header">
             <div className="flex justify-between items-center">
-              <h2 className="text-lg font-semibold text-gray-900">Menu Items</h2>
+              <h2 className="text-lg font-semibold text-gray-900">{itemsLabel}</h2>
               <button 
                 onClick={handleAddItem}
                 className="btn-primary btn-sm"
@@ -364,7 +376,7 @@ console.log('Rendering item:', item);
             <div className="p-6">
               <div className="flex justify-between items-center mb-6">
                 <h2 className="text-xl font-semibold text-gray-900">
-                  {editingItem ? 'Edit Menu Item' : 'Add New Menu Item'}
+                  {editingItem ? `Edit ${itemLabel}` : `Add New ${itemLabel}`}
                 </h2>
                 <button
                   onClick={handleCancelForm}

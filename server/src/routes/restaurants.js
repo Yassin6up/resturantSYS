@@ -3,7 +3,34 @@ const router = express.Router();
 const bcrypt = require('bcrypt');
 const { db } = require('../database/init');
 const { authenticateToken, authorize } = require('../middleware/auth');
+const { resolveTenant } = require('../middleware/tenant');
 const { logger } = require('../middleware/errorHandler');
+const { generateUniqueSlug } = require('../utils/slugify');
+const { seedDefaultHours } = require('./availability');
+const BOOKING_TYPES = ['appointments', 'hotel', 'office'];
+
+// Public: info about the tenant resolved from the request's Host header (or
+// X-Branch-Slug). The frontend uses this to decide whether it's on the
+// marketing apex domain (no tenant -> landing page) or a store's own
+// subdomain (tenant found -> pick the right storefront by business_type).
+router.get('/public/current', resolveTenant, async (req, res) => {
+  if (!req.branch) {
+    return res.json({ found: false });
+  }
+  const settings = req.branch.settings ? JSON.parse(req.branch.settings) : {};
+  delete settings.theme_draft;
+  res.json({
+    found: true,
+    id: req.branch.id,
+    name: req.branch.name,
+    slug: req.branch.slug,
+    business_type: req.branch.business_type || 'restaurant',
+    description: req.branch.description,
+    logo_url: req.branch.logo_url,
+    is_active: req.branch.is_active,
+    settings
+  });
+});
 
 // Get all restaurants for an owner
 router.get('/', authenticateToken, authorize('owner'), async (req, res) => {
@@ -13,7 +40,10 @@ router.get('/', authenticateToken, authorize('owner'), async (req, res) => {
         'branches.*',
         db.raw('COUNT(DISTINCT users.id) as employee_count'),
         db.raw('COUNT(DISTINCT tables.id) as table_count'),
-        db.raw('COUNT(DISTINCT menu_items.id) as menu_item_count')
+        db.raw('COUNT(DISTINCT menu_items.id) as menu_item_count'),
+        // Correlated subqueries, not joins - avoids fan-out with the joins above.
+        db.raw(`(SELECT COUNT(*) FROM customers WHERE customers.branch_id = branches.id) as member_count`),
+        db.raw(`(SELECT COALESCE(SUM(total), 0) FROM orders WHERE orders.branch_id = branches.id AND orders.status IN ('CONFIRMED','PREPARING','READY','SERVED','COMPLETED')) as total_revenue`)
       )
       .leftJoin('users', 'branches.id', 'users.branch_id')
       .leftJoin('tables', 'branches.id', 'tables.branch_id')
@@ -125,7 +155,9 @@ router.get('/:id', authenticateToken, authorize('owner', 'admin', 'manager'), as
 // Create new restaurant (owner only)
 router.post('/', authenticateToken, authorize('owner'), async (req, res) => {
   try {
-    const { name, code, address, phone, email, website, description, logo_url, settings, isActive, is_active, createAdmin, adminEmployee } = req.body;
+    const { name, code, slug: requestedSlug, address, phone, email, website, description, logo_url, settings, isActive, is_active, createAdmin, adminEmployee, business_type } = req.body;
+    const validBusinessTypes = ['restaurant', 'ecommerce', 'appointments', 'hotel', 'office'];
+    const businessType = validBusinessTypes.includes(business_type) ? business_type : 'restaurant';
 
     // Validate required fields
     if (!name || !code) {
@@ -137,6 +169,8 @@ router.post('/', authenticateToken, authorize('owner'), async (req, res) => {
     if (existing) {
       return res.status(400).json({ error: 'Restaurant code already exists' });
     }
+
+    const slug = await generateUniqueSlug(db, requestedSlug || name);
 
     // If creating admin, validate admin data
     if (createAdmin && adminEmployee) {
@@ -155,6 +189,7 @@ router.post('/', authenticateToken, authorize('owner'), async (req, res) => {
     const [id] = await db('branches').insert({
       name,
       code: code.toUpperCase(),
+      slug,
       address,
       phone,
       email,
@@ -162,6 +197,7 @@ router.post('/', authenticateToken, authorize('owner'), async (req, res) => {
       description,
       logo_url,
       owner_id: req.user.id,
+      business_type: businessType,
       settings: settings ? JSON.stringify(settings) : JSON.stringify({
         currency: 'MAD',
         tax_rate: 10,
@@ -172,20 +208,31 @@ router.post('/', authenticateToken, authorize('owner'), async (req, res) => {
       is_active: isActive !== undefined ? isActive : (is_active !== undefined ? is_active : true)
     });
 
-    // Create default categories for new restaurant
-    await db('categories').insert([
-      { branch_id: id, name: 'Appetizers', position: 1 },
-      { branch_id: id, name: 'Main Courses', position: 2 },
-      { branch_id: id, name: 'Desserts', position: 3 },
-      { branch_id: id, name: 'Beverages', position: 4 }
-    ]);
+    // Seed sensible defaults per vertical. Appointments/hotel/office stores
+    // manage bookable services instead of a menu, so they get no categories.
+    if (businessType === 'restaurant') {
+      await db('categories').insert([
+        { branch_id: id, name: 'Appetizers', position: 1 },
+        { branch_id: id, name: 'Main Courses', position: 2 },
+        { branch_id: id, name: 'Desserts', position: 3 },
+        { branch_id: id, name: 'Beverages', position: 4 }
+      ]);
+    } else if (businessType === 'ecommerce') {
+      await db('categories').insert([
+        { branch_id: id, name: 'Featured', position: 1 },
+        { branch_id: id, name: 'New Arrivals', position: 2 },
+        { branch_id: id, name: 'Best Sellers', position: 3 }
+      ]);
+    } else if (BOOKING_TYPES.includes(businessType)) {
+      await seedDefaultHours(db, id);
+    }
 
     // Create admin employee if requested
     if (createAdmin && adminEmployee) {
       const hashedPassword = await bcrypt.hash(adminEmployee.password, 10);
       const [userId] = await db('users').insert({
         username: adminEmployee.username,
-        password: hashedPassword,
+        password_hash: hashedPassword,
         full_name: adminEmployee.full_name,
         email: adminEmployee.email || null,
         phone: adminEmployee.phone || null,
@@ -228,7 +275,7 @@ router.post('/', authenticateToken, authorize('owner'), async (req, res) => {
 router.put('/:id', authenticateToken, authorize('owner', 'admin'), async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, code, address, phone, email, website, description, logo_url, settings, is_active, isActive } = req.body;
+    const { name, code, address, phone, email, website, description, logo_url, settings, is_active, isActive, business_type } = req.body;
 
     const restaurant = await db('branches').where({ id }).first();
     if (!restaurant) {
@@ -246,6 +293,12 @@ router.put('/:id', authenticateToken, authorize('owner', 'admin'), async (req, r
     }
 
     const updates = {};
+    if (business_type !== undefined) {
+      if (!['restaurant', 'ecommerce', 'appointments', 'hotel', 'office'].includes(business_type)) {
+        return res.status(400).json({ error: 'Invalid business type' });
+      }
+      updates.business_type = business_type;
+    }
     if (name) updates.name = name;
     if (address !== undefined) updates.address = address;
     if (phone !== undefined) updates.phone = phone;
@@ -263,7 +316,7 @@ router.put('/:id', authenticateToken, authorize('owner', 'admin'), async (req, r
     }
     
     if (settings) {
-      updates.settings = JSON.stringify(settings);
+      updates.settings = JSON.stringify({ ...JSON.parse(restaurant.settings || '{}'), ...settings });
     }
 
     await db('branches').where({ id }).update(updates);
@@ -531,6 +584,33 @@ router.get('/:id/analytics', authenticateToken, authorize('owner', 'admin', 'man
         .where('branch_id', id)
         .orderBy('name')
         .limit(20)
+    };
+
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+    const [
+      totalMembers, newMembers, pointsIssued, pointsRedeemed,
+      outstandingLiability, memberRevenue
+    ] = await Promise.all([
+      db('customers').where({ branch_id: id }).count('id as c').first().then(r => Number(r.c) || 0),
+      db('customers').where({ branch_id: id }).andWhere('created_at', '>=', thirtyDaysAgo).count('id as c').first().then(r => Number(r.c) || 0),
+      db('loyalty_ledger').where({ branch_id: id, type: 'earn' }).sum('points as p').first().then(r => Number(r.p) || 0),
+      db('loyalty_ledger').where({ branch_id: id, type: 'redeem' }).sum('points as p').first().then(r => Math.abs(Number(r.p) || 0)),
+      db('customers').where({ branch_id: id }).sum('points_balance as p').first().then(r => Number(r.p) || 0),
+      db('orders').where({ branch_id: id }).whereNotNull('customer_id')
+        .whereIn('status', ['CONFIRMED', 'PREPARING', 'READY', 'SERVED', 'COMPLETED'])
+        .sum('total as t').first().then(r => Number(r.t) || 0)
+    ]);
+
+    analytics.loyalty = {
+      totalMembers,
+      newMembersLast30Days: newMembers,
+      pointsIssued,
+      pointsRedeemed,
+      outstandingPointsLiability: outstandingLiability,
+      revenueFromMembers: memberRevenue,
+      revenueFromMembersPct: analytics.totalRevenue > 0
+        ? Math.round((memberRevenue / analytics.totalRevenue) * 100)
+        : 0
     };
 
     res.json(analytics);

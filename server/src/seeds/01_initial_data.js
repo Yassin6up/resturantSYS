@@ -59,6 +59,7 @@ exports.seed = async function(knex) {
       id: 1,
       name: 'Casablanca Main',
       code: 'CAS',
+      slug: 'casablanca-main',
       address: '123 Avenue Mohammed V, Casablanca, Morocco'
     }
   ]);

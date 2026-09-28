@@ -1,14 +1,16 @@
 exports.up = async function(knex) {
-  await knex.schema.createTable('product_variants', table => {
-    table.increments('id').primary();
-    table.integer('menu_item_id').unsigned().notNullable();
-    table.string('name').notNullable();
-    table.decimal('price_adjustment', 10, 2).defaultTo(0);
-    table.integer('sort_order').defaultTo(0);
-    table.boolean('is_active').defaultTo(true);
-    table.timestamps(true, true);
-    table.foreign('menu_item_id').references('id').inTable('menu_items').onDelete('CASCADE');
-  });
+  if (!(await knex.schema.hasTable('product_variants'))) {
+    await knex.schema.createTable('product_variants', table => {
+      table.increments('id').primary();
+      table.integer('menu_item_id').unsigned().notNullable();
+      table.string('name').notNullable();
+      table.decimal('price_adjustment', 10, 2).defaultTo(0);
+      table.integer('sort_order').defaultTo(0);
+      table.boolean('is_active').defaultTo(true);
+      table.timestamps(true, true);
+      table.foreign('menu_item_id').references('id').inTable('menu_items').onDelete('CASCADE');
+    });
+  }
 
   const hasOrderType = await knex.schema.hasColumn('orders', 'order_type');
   if (!hasOrderType) {

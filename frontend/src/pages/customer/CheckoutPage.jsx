@@ -1,385 +1,80 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
+import { CheckCircle, ArrowLeft, ShoppingBag, MapPin, CreditCard } from 'lucide-react'
 import { useCart } from '../../contexts/CartContext'
-import { useNavigate } from 'react-router-dom'
+import { useTenant } from '../../contexts/TenantContext'
+import { useTheme } from '../../contexts/ThemeContext'
 import { ordersAPI } from '../../services/api'
-import { 
-  CheckCircleIcon,
-  ArrowLeftIcon,
-  XMarkIcon
-} from '@heroicons/react/24/outline'
-import toast from 'react-hot-toast'
-import { useSearchParams } from 'react-router-dom'
 
-function CheckoutPage() {
-  const { items: cartItems, total, clearCart, branchId, tableNumber } = useCart()
-  const navigate = useNavigate()
-  const [loading, setLoading] = useState(false)
-  const [showPaymentModal, setShowPaymentModal] = useState(false)
-  const [paymentQRCode, setPaymentQRCode] = useState(null)
-  const [orderDetails, setOrderDetails] = useState(null)
-  const [paymentMethod, setPaymentMethod] = useState('cash')
-  const [customerName, setCustomerName] = useState('')
-  const [searchParams] = useSearchParams()
-  const table = searchParams.get("table")
-  const branch = searchParams.get("branch") || "1"
-
-  useEffect(() => {
-    if (cartItems.length === 0) {
-      navigate(`/menu?table=${table}&branch=${branch}`)
-    }
-  }, [cartItems, navigate])
-
-  const calculateTotals = () => {
-    const subtotal = total
-    const taxRate = 10
-    const serviceChargeRate = 5
-    
-    const tax = (subtotal * taxRate) / 100
-    const serviceCharge = (subtotal * serviceChargeRate) / 100
-    const grandTotal = subtotal + tax + serviceCharge
-
-    return {
-      subtotal,
-      tax,
-      serviceCharge,
-      grandTotal
-    }
-  }
-
-  const handlePlaceOrder = async () => {
-    if (!customerName.trim()) {
-      toast.error('Please enter your name')
-      return
-    }
-
-    if (!table) {
-      toast.error('Table not found. Please scan the QR code at your table.')
-      return
-    }
-
+export default function CheckoutPage() {
+  const { items, total, branchId, tableNumber, clearCart } = useCart()
+  const tenant = useTenant()
+  const { getCurrency } = useTheme()
+  const [params] = useSearchParams()
+  const table = params.get('table') && params.get('table') !== 'null' ? params.get('table') : tableNumber
+  const [fulfillment, setFulfillment] = useState(table && tenant.businessType !== 'ecommerce' ? 'DINE_IN' : 'TAKEAWAY')
+  const [form, setForm] = useState({ name: '', phone: '', address: '' })
+  const [order, setOrder] = useState(null)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const query = params.toString() ? `?${params}` : ''
+  const currency = getCurrency()
+  const money = n => `${Number(n).toFixed(2)} ${currency}`
+  const submit = async e => {
+    e.preventDefault()
+    if (busy || order) return
+    setError(''); setBusy(true)
     try {
-      setLoading(true)
-      
-      const orderData = {
-        branchId: parseInt(branch) || 1,
-        tableNumber: table, // Send table number instead of table ID
-        customerName: customerName.trim(),
-        items: cartItems.map(item => ({
-          menuItemId: item.menuItemId,
-          quantity: item.quantity,
-          modifiers: item.modifiers?.map(m => m.id) || [],
-          note: item.note || ''
-        })),
-        paymentMethod: paymentMethod
-      }
-
-
-
-      console.log('🟡 FRONTEND - Before API call:');
-      console.log('Full orderData:', JSON.stringify(orderData, null, 2));
-      console.log('tableNumber value:', orderData.tableNumber, 'type:', typeof orderData.tableNumber);
-      console.log('table value from URL:', table, 'type:', typeof table);
-
-      const response = await ordersAPI.createOrder(orderData)
-      
-      if (response.data.orderId) {
-        setOrderDetails(response.data)
-        
-        if (paymentMethod === 'cash' && response.data.paymentQrCode) {
-          setPaymentQRCode(response.data.paymentQrCode)
-          setShowPaymentModal(true)
-        } else {
-          setTimeout(() => {
-            navigate(`/order-status/${response.data.orderId}?pin=${response.data.pin}`)
-          }, 1500)
-        }
-        
-        // clearCart()
-        toast.success('Order placed successfully!')
-      }
-    } catch (error) {
-      console.error('Order creation error:', error)
-      if (error.response?.data?.error) {
-        toast.error(error.response.data.error)
-      } else {
-        toast.error('Failed to place order. Please try again.')
-      }
-    } finally {
-      setLoading(false)
-    }
+      const { data } = await ordersAPI.createOrder({
+        branchId: tenant.id || branchId || Number(params.get('branch')),
+        tableNumber: fulfillment === 'DINE_IN' ? table : null,
+        orderType: fulfillment, customerName: form.name.trim(), customerPhone: form.phone.trim(),
+        deliveryAddress: fulfillment === 'DELIVERY' ? form.address.trim() : null,
+        paymentMethod: 'cash',
+        items: items.map(item => ({ menuItemId: item.menuItemId, quantity: item.quantity,
+          variantId: item.variantId, modifiers: item.modifiers?.map(m => m.id) || [], note: item.note || '' }))
+      })
+      setOrder(data)
+      clearCart()
+    } catch (err) {
+      setError(err.response?.data?.error || 'We could not place your order. Please try again.')
+    } finally { setBusy(false) }
   }
-
-  const totals = calculateTotals()
-
-  if (showPaymentModal && orderDetails) {
-    return (
-      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-3xl max-w-lg w-full max-h-[90vh] overflow-y-auto shadow-2xl">
-          <div className="p-8">
-            <div className="text-center mb-8">
-              <div className="w-20 h-20 bg-gradient-to-br from-green-500 to-emerald-500 rounded-full flex items-center justify-center mx-auto mb-4 shadow-xl">
-                <CheckCircleIcon className="h-12 w-12 text-white" />
-              </div>
-              <h2 className="text-3xl font-bold text-gray-900 mb-2">Order Placed!</h2>
-              <p className="text-gray-600">Order #{orderDetails.orderCode}</p>
-            </div>
-
-            <div className="space-y-6">
-              <div className="bg-gradient-to-br from-blue-50 to-purple-50 rounded-2xl p-6 border-2 border-blue-100">
-                <h3 className="font-bold text-gray-900 mb-4 text-center text-lg">
-                  Show this QR code to the cashier
-                </h3>
-                {paymentQRCode && (
-                  <div className="flex justify-center p-4 bg-white rounded-xl">
-                    <img 
-                      src={paymentQRCode} 
-                      alt="Payment QR Code"
-                      className="w-64 h-64"
-                    />
-                  </div>
-                )}
-                <div className="mt-4 text-center">
-                  <p className="text-sm text-gray-600 mb-1">Order Code:</p>
-                  <p className="text-2xl font-bold text-gray-900">{orderDetails.orderCode}</p>
-                  <p className="text-sm text-gray-600 mt-2">PIN: {orderDetails.pin}</p>
-                </div>
-              </div>
-
-              <div className="bg-gray-50 rounded-2xl p-5">
-                <h4 className="font-semibold text-gray-900 mb-3">Order Summary</h4>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Customer:</span>
-                    <span className="font-medium">{customerName}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Table:</span>
-                    <span className="font-medium">#{table}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Items:</span>
-                    <span className="font-medium">{cartItems.reduce((sum, item) => sum + item.quantity, 0)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Payment Method:</span>
-                    <span className="font-medium capitalize">{orderDetails.paymentMethod}</span>
-                  </div>
-                  <div className="flex justify-between pt-2 border-t border-gray-200">
-                    <span className="text-gray-900 font-semibold">Total:</span>
-                    <span className="font-bold text-blue-600">{orderDetails.total.toFixed(2)} MAD</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                <button
-                  onClick={() => navigate(`/order-status/${orderDetails.orderId}?pin=${orderDetails.pin}`)}
-                  className="w-full py-4 px-6 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold rounded-xl shadow-lg hover:shadow-xl transition-all active:scale-95"
-                >
-                  Track Order Status
-                </button>
-                
-                <button
-                  onClick={() =>{
-                   navigate(`/menu?table=${table}&branch=${branch}`)
-                   clearCart()}}
-                  className="w-full py-4 px-6 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold rounded-xl transition-all active:scale-95 flex items-center justify-center gap-2"
-                >
-                  <ArrowLeftIcon className="h-5 w-5" />
-                  <span>Back to Menu</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50 py-8">
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-        
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-blue-600 via-purple-600 to-pink-600 rounded-3xl mb-4 shadow-xl">
-            <span className="text-4xl">🛒</span>
-          </div>
-          <h1 className="text-4xl font-black mb-2 bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
-            Checkout
-          </h1>
-          <p className="text-gray-600 font-medium">Complete your order</p>
-        </div>
-
-        <div className="space-y-6">
-          
-          <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
-            <div className="bg-gradient-to-r from-blue-600 to-purple-600 px-6 py-4">
-              <h2 className="text-xl font-bold text-white">Customer Information</h2>
-            </div>
-            <div className="p-6 space-y-4">
-              <div>
-                <label className="block font-semibold text-gray-900 mb-2">
-                  Your Name <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={customerName}
-                  onChange={(e) => setCustomerName(e.target.value)}
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
-                  placeholder="Enter your name"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block font-semibold text-gray-900 mb-2">Table Number</label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    value={table || 'Not set'}
-                    readOnly
-                    className="w-full px-4 py-3 bg-gray-50 border-2 border-gray-200 rounded-xl text-gray-700 cursor-not-allowed"
-                  />
-                  {table && (
-                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                      <CheckCircleIcon className="h-6 w-6 text-green-500" />
-                    </div>
-                  )}
-                </div>
-                {table && (
-                  <p className="text-sm text-green-600 mt-2 flex items-center gap-1">
-                    <CheckCircleIcon className="h-4 w-4" />
-                    Table detected from QR code
-                  </p>
-                )}
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
-            <div className="bg-gradient-to-r from-blue-600 to-purple-600 px-6 py-4">
-              <h2 className="text-xl font-bold text-white">Order Summary</h2>
-            </div>
-            <div className="p-6">
-              <div className="space-y-4 max-h-64 overflow-y-auto">
-                {cartItems.map((item, index) => (
-                  <div key={index} className="flex items-center gap-4 p-3 bg-gray-50 rounded-xl">
-                    <img
-                      src={item.image}
-                      alt={item.name}
-                      className="w-16 h-16 rounded-lg object-cover"
-                      onError={(e) => {
-                        e.target.src = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=100&h=100&fit=crop';
-                      }}
-                    />
-                    <div className="flex-1">
-                      <h3 className="font-bold text-gray-900">{item.name}</h3>
-                      <p className="text-sm text-gray-600">Quantity: {item.quantity}</p>
-                      {item.modifiers && item.modifiers.length > 0 && (
-                        <p className="text-xs text-gray-500">
-                          Modifiers: {item.modifiers.map(m => m.name).join(', ')}
-                        </p>
-                      )}
-                      {item.note && (
-                        <p className="text-xs text-gray-500">Note: {item.note}</p>
-                      )}
-                    </div>
-                    <span className="font-bold text-gray-900">
-                      {item.total.toFixed(2)} MAD
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
-            <div className="bg-gradient-to-r from-blue-600 to-purple-600 px-6 py-4">
-              <h2 className="text-xl font-bold text-white">Payment Method</h2>
-            </div>
-            <div className="p-6">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <button
-                  onClick={() => setPaymentMethod('cash')}
-                  className={`p-6 rounded-xl border-3 transition-all ${
-                    paymentMethod === 'cash'
-                      ? 'border-blue-500 bg-blue-50 shadow-lg scale-105'
-                      : 'border-gray-200 hover:border-gray-300'
-                  }`}
-                >
-                  <div className="text-4xl mb-2">💵</div>
-                  <h3 className="font-bold text-lg text-gray-900">Cash</h3>
-                  <p className="text-sm text-gray-600">Pay at cashier</p>
-                </button>
-                
-                <button
-                  onClick={() => setPaymentMethod('card')}
-                  className={`p-6 rounded-xl border-3 transition-all ${
-                    paymentMethod === 'card'
-                      ? 'border-blue-500 bg-blue-50 shadow-lg scale-105'
-                      : 'border-gray-200 hover:border-gray-300'
-                  }`}
-                >
-                  <div className="text-4xl mb-2">💳</div>
-                  <h3 className="font-bold text-lg text-gray-900">Card</h3>
-                  <p className="text-sm text-gray-600">Online payment</p>
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-gradient-to-br from-blue-50 to-purple-50 rounded-2xl shadow-lg border-2 border-blue-100 p-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-4">Total Breakdown</h2>
-            <div className="space-y-3">
-              <div className="flex justify-between text-gray-700">
-                <span>Subtotal:</span>
-                <span className="font-semibold">{totals.subtotal.toFixed(2)} MAD</span>
-              </div>
-              <div className="flex justify-between text-gray-700">
-                <span>Tax (10%):</span>
-                <span className="font-semibold">{totals.tax.toFixed(2)} MAD</span>
-              </div>
-              <div className="flex justify-between text-gray-700">
-                <span>Service Charge (5%):</span>
-                <span className="font-semibold">{totals.serviceCharge.toFixed(2)} MAD</span>
-              </div>
-              <div className="flex justify-between text-2xl font-bold border-t-2 border-blue-200 pt-3">
-                <span className="text-gray-900">Grand Total:</span>
-                <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                  {totals.grandTotal.toFixed(2)} MAD
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <button
-            onClick={handlePlaceOrder}
-            disabled={loading || !customerName.trim() || !table}
-            className="w-full py-5 px-6 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold text-lg rounded-xl shadow-xl hover:shadow-2xl transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center justify-center gap-2"
-          >
-            {loading ? (
-              <>
-                <div className="inline-block h-5 w-5 animate-spin rounded-full border-2 border-solid border-white border-r-transparent"></div>
-                <span>Placing Order...</span>
-              </>
-            ) : (
-              <>
-                <CheckCircleIcon className="h-6 w-6" />
-                <span>Place Order</span>
-              </>
-            )}
-          </button>
-
-          <button
-            onClick={() => navigate('/cart')}
-            className="w-full py-4 px-6 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold rounded-xl transition-all active:scale-95 flex items-center justify-center gap-2"
-          >
-            <ArrowLeftIcon className="h-5 w-5" />
-            <span>Back to Cart</span>
-          </button>
-        </div>
-      </div>
+  if (order) return <section className="flow-panel mx-auto max-w-xl text-center" aria-live="polite">
+    <CheckCircle className="mx-auto mb-5 h-14 w-14 text-emerald-700" />
+    <p className="eyebrow">ORDER RECEIVED</p><h1 className="flow-title">Thank you, {form.name}.</h1>
+    <p className="mt-4 text-slate-600">Your order is awaiting confirmation. Payment is due {fulfillment === 'DELIVERY' ? 'on delivery' : 'at collection or the counter'}.</p>
+    <div className="my-6 rounded-2xl bg-stone-50 p-5 text-left space-y-3">
+      <p>Order <strong className="float-right">{order.orderCode}</strong></p>
+      <p>Total <strong className="float-right">{money(order.total)}</strong></p>
+      <p>Tracking PIN <strong className="float-right">{order.pin}</strong></p>
     </div>
-  )
+    <Link className="flow-primary w-full" to={`/order-status?pin=${order.pin}${tenant.id ? `&branch=${tenant.id}` : ''}`}>Track your order</Link>
+    <Link className="mt-4 block text-sm underline" to={`/${query}`}>Continue browsing</Link>
+  </section>
+  if (!items.length) return <section className="flow-panel text-center max-w-xl mx-auto"><ShoppingBag className="mx-auto h-12 w-12 mb-4" /><h1 className="flow-title">Your basket is empty</h1><Link className="flow-primary mt-6" to={`/${query}`}>Explore the collection</Link></section>
+  return <div className="commerce-flow">
+    <Link className="inline-flex items-center gap-2 text-sm text-slate-600 mb-8" to={`/cart${query}`}><ArrowLeft size={16} /> Back to basket</Link>
+    <p className="eyebrow">THE LAST LITTLE STEP</p><h1 className="flow-title mb-8">Make it yours.</h1>
+    <form onSubmit={submit} className="grid lg:grid-cols-[1.3fr_1fr] gap-8 items-start">
+      <div className="space-y-6">
+        <section className="flow-panel"><h2 className="text-xl font-semibold mb-5">01 / Your details</h2>
+          <label className="flow-label" htmlFor="checkout-name">Full name</label><input id="checkout-name" className="flow-input" autoComplete="name" required maxLength={100} value={form.name} onChange={e => setForm({...form, name:e.target.value})} />
+          <label className="flow-label mt-4" htmlFor="checkout-phone">Phone number</label><input id="checkout-phone" className="flow-input" type="tel" autoComplete="tel" required maxLength={30} value={form.phone} onChange={e => setForm({...form, phone:e.target.value})} />
+        </section>
+        <section className="flow-panel"><h2 className="text-xl font-semibold mb-5">02 / How would you like it?</h2>
+          <div className="flex flex-wrap gap-3">{[['TAKEAWAY','Collect in person'],['DELIVERY','Delivery'],...(table && tenant.businessType !== 'ecommerce' ? [['DINE_IN',`Table ${table}`]] : [])].map(([value,label]) => <button type="button" key={value} aria-pressed={fulfillment === value} onClick={() => setFulfillment(value)} className={`flow-choice ${fulfillment === value ? 'is-selected' : ''}`}>{label}</button>)}</div>
+          {fulfillment === 'DELIVERY' && <div className="mt-5"><label className="flow-label" htmlFor="checkout-address"><MapPin size={16} className="inline mr-1" /> Full delivery address</label><textarea id="checkout-address" className="flow-input" autoComplete="street-address" required rows={3} maxLength={1000} value={form.address} onChange={e => setForm({...form,address:e.target.value})} /><p className="text-sm text-slate-500 mt-2">The store will confirm delivery availability and timing with you.</p></div>}
+        </section>
+        <section className="flow-panel"><h2 className="text-xl font-semibold mb-4">03 / Payment</h2><p className="flex gap-3 items-center"><CreditCard size={20} /> Pay {fulfillment === 'DELIVERY' ? 'on delivery' : 'in person'}</p><p className="text-sm text-slate-500 mt-2">No online charge is made when you place this order.</p></section>
+      </div>
+      <aside className="flow-panel lg:sticky lg:top-28"><h2 className="text-xl font-semibold mb-6">Your order</h2>
+        <ul className="divide-y divide-stone-100">{items.map(item => <li key={item.id} className="py-4 flex justify-between gap-4"><div><p className="font-medium">{item.quantity} × {item.name}</p>{item.variantName && <p className="text-sm text-slate-500">{item.variantName}</p>}{item.note && <p className="text-sm text-slate-500">{item.note}</p>}</div><span className="whitespace-nowrap">{money(item.total)}</span></li>)}</ul>
+        <div className="border-t pt-5 mt-4 flex justify-between font-semibold text-lg"><span>Items subtotal</span><span>{money(total)}</span></div>
+        <p className="text-sm text-slate-500 mt-3">Applicable tax{fulfillment === 'DINE_IN' ? ' and table service' : ''} is calculated by the store. The final total appears in your confirmation.</p>
+        {error && <p role="alert" className="mt-4 rounded-xl bg-red-50 p-3 text-red-700">{error}</p>}
+        <button className="flow-primary w-full mt-6" disabled={busy}>{busy ? 'Placing your order…' : 'Place order'}</button>
+      </aside>
+    </form>
+  </div>
 }
-
-export default CheckoutPage

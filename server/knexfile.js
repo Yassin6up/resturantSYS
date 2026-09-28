@@ -1,62 +1,41 @@
 require('dotenv').config();
-const config = {
-  development: {
-    client: process.env.DB_TYPE || 'sqlite3',
-    connection: process.env.DB_TYPE === 'sqlite3' 
-      ? { filename: process.env.DB_PATH || './data/posq.db' }
-      : {
-          host: process.env.DB_HOST || 'localhost',
-          port: process.env.DB_PORT || 3306,
-          user: process.env.DB_USER || 'posq',
-          password: process.env.DB_PASSWORD || '',
-          database: process.env.DB_NAME || 'posq'
-        },
-    migrations: {
-      directory: './src/migrations'
-    },
-    seeds: {
-      directory: './src/seeds'
-    },
-    useNullAsDefault: true
-  },
 
-  production: {
-    client: process.env.DB_TYPE || 'sqlite3',
-    connection: process.env.DB_TYPE === 'sqlite3' 
-      ? { filename: process.env.DB_PATH || './data/posq.db' }
-      : {
-          host: process.env.DB_HOST,
-          port: process.env.DB_PORT,
-          user: process.env.DB_USER,
-          password: process.env.DB_PASSWORD,
-          database: process.env.DB_NAME
-        },
-    migrations: {
-      directory: './src/migrations'
-    },
-    seeds: {
-      directory: './src/seeds'
-    },
-    useNullAsDefault: true,
-    pool: {
-      min: 2,
-      max: 10
-    }
-  },
+const isSqlite = (process.env.DB_TYPE || 'sqlite3') === 'sqlite3';
+const client = isSqlite ? 'sqlite3' : 'mysql2';
 
-  test: {
-    client: 'sqlite3',
-    connection: {
-      filename: ':memory:'
-    },
-    migrations: {
-      directory: './src/migrations'
-    },
-    seeds: {
-      directory: './src/seeds'
-    },
-    useNullAsDefault: true
+const connection = isSqlite
+  ? { filename: process.env.DB_PATH || './data/posq.db' }
+  : {
+      host: process.env.DB_HOST || 'localhost',
+      port: process.env.DB_PORT || 3306,
+      user: process.env.DB_USER || 'posq',
+      password: process.env.DB_PASSWORD || '',
+      database: process.env.DB_NAME || 'posq'
+    };
+
+const shared = {
+  client,
+  connection,
+  useNullAsDefault: true,
+  migrations: {
+    directory: './src/migrations'
+  },
+  seeds: {
+    directory: './src/seeds'
   }
 };
 
-module.exports = config;
+module.exports = {
+  development: shared,
+  production: {
+    ...shared,
+    pool: { min: 2, max: 10 }
+  },
+  test: {
+    client: 'sqlite3',
+    connection: { filename: ':memory:' },
+    useNullAsDefault: true,
+    migrations: { directory: './src/migrations' },
+    seeds: { directory: './src/seeds' }
+  }
+};

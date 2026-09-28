@@ -3,7 +3,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const { db } = require('../database/init');
-const { authenticateToken, authorize } = require('../middleware/auth');
+const { authenticateToken, authorize, requireActiveBranch } = require('../middleware/auth');
 const { validateMenuItem } = require('../middleware/validation');
 const { logger } = require('../middleware/errorHandler');
 
@@ -43,10 +43,16 @@ const upload = multer({
 // Get menu for a specific branch (public endpoint)
 router.get('/', async (req, res) => {
   try {
-    const { branchId, table } = req.query;
+    const { table } = req.query;
+    const branchId = req.branchId || req.query.branchId;
 
     if (!branchId) {
       return res.status(400).json({ error: 'Branch ID is required' });
+    }
+
+    const branch = req.branch || await db('branches').where({ id: branchId }).first();
+    if (!branch || branch.is_active === false || branch.is_active === 0) {
+      return res.status(404).json({ error: 'This restaurant is temporarily unavailable' });
     }
 
     // Get categories with menu items
@@ -129,9 +135,9 @@ router.get('/categories', authenticateToken, authorize('admin', 'manager'), asyn
 });
 
 // Create category (admin)
-router.post('/categories', authenticateToken, authorize('admin', 'manager'), async (req, res) => {
+router.post('/categories', authenticateToken, requireActiveBranch, authorize('admin', 'manager'), async (req, res) => {
   try {
-    const { name, position, description, isActive } = req.body;
+    const { name, position } = req.body;
     
     // Use authenticated user's branch_id for security
     const branchId = req.user.branch_id;
@@ -147,9 +153,7 @@ router.post('/categories', authenticateToken, authorize('admin', 'manager'), asy
     const [categoryId] = await db('categories').insert({
       name,
       branch_id: branchId,
-      position: position || 0,
-      description: description || '',
-      is_active: isActive !== false
+      position: position || 0
     });
 
     const category = await db('categories').where({ id: categoryId }).first();
@@ -172,7 +176,7 @@ router.post('/categories', authenticateToken, authorize('admin', 'manager'), asy
 router.put('/categories/:id', authenticateToken, authorize('admin', 'manager'), async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, position, description, isActive } = req.body;
+    const { name, position } = req.body; // Remove description and isActive
     
     // Use authenticated user's branch_id for security
     const branchId = req.user.branch_id;
@@ -190,14 +194,13 @@ router.put('/categories/:id', authenticateToken, authorize('admin', 'manager'), 
       return res.status(403).json({ error: 'Access denied: Category belongs to different branch' });
     }
 
+    // Update only the fields that exist in your schema
     await db('categories')
       .where({ id })
       .update({
         name,
-        position,
-        description: description || '',
-        is_active: isActive !== false,
-        updated_at: db.raw('CURRENT_TIMESTAMP')
+        position: position || 0
+        // Remove description, is_active, and updated_at since they don't exist
       });
 
     const category = await db('categories').where({ id }).first();
@@ -306,7 +309,7 @@ router.get('/items', authenticateToken, authorize('admin', 'manager'), async (re
 });
 
 // Create menu item (admin)
-router.post('/items', authenticateToken, authorize('admin', 'manager'), upload.single('image'), async (req, res) => {
+router.post('/items', authenticateToken, requireActiveBranch, authorize('admin', 'manager'), upload.single('image'), async (req, res) => {
   try {
     const { name, description, price, categoryId, sku, modifiers, variants, image } = req.body;
     

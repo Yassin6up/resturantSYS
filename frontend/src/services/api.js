@@ -15,6 +15,8 @@ const api = axios.create({
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token')
+    const branch = new URLSearchParams(window.location.search).get('branch')
+    if (branch && /^\d+$/.test(branch)) config.headers['X-Branch-Id'] = branch
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
     }
@@ -46,7 +48,7 @@ api.interceptors.response.use(
     const originalRequest = error.config
 
     // If error is 401 or 403 and we haven't retried yet
-    if ((error.response?.status === 401 || error.response?.status === 403) && !originalRequest._retry) {
+    if (error.response?.status === 401 && localStorage.getItem('token') && !originalRequest._retry) {
       if (isRefreshing) {
         // If already refreshing, queue this request
         return new Promise((resolve, reject) => {
@@ -107,6 +109,7 @@ api.interceptors.response.use(
 // Auth API
 export const authAPI = {
   login: (credentials) => api.post('/api/auth/login', credentials),
+  register: (data) => api.post('/api/auth/register', data),
   pinLogin: (credentials) => api.post('/api/auth/pin-login', credentials),
   logout: () => api.post('/api/auth/logout'),
   refreshToken: (refreshToken) => api.post('/api/auth/refresh', { refreshToken }),
@@ -116,6 +119,8 @@ export const authAPI = {
 
 // Menu API
 export const menuAPI = {
+  importItems: rows => api.post('/api/catalog-import', { rows }, { timeout: 60000 }),
+  readGoogleSheet: url => api.post('/api/catalog-import/google-sheet', { url }, { timeout: 25000 }),
   getMenu: (params) => api.get('/api/menu', { params }),
   getCategories: (params) => api.get('/api/menu/categories', { params }),
   createCategory: (data) => api.post('/api/menu/categories', data),
@@ -183,6 +188,78 @@ export const ordersAPI = {
   updatePayment: (id, data) => api.patch(`/api/orders/${id}/payment`, data),
   confirmOrder: (id) => api.post(`/api/orders/${id}/confirm`),
   cancelOrder: (id, reason) => api.post(`/api/orders/${id}/cancel`, { reason }),
+}
+
+// Loyalty API (staff-side, POS pay modal + admin customers page)
+export const loyaltyAPI = {
+  lookup: (phone) => api.post('/api/loyalty/pos/lookup', { phone }),
+  createCustomer: (data) => api.post('/api/loyalty/pos/create', data),
+  getSettings: () => api.get('/api/loyalty/settings'),
+  updateSettings: (data) => api.put('/api/loyalty/settings', data),
+  getRewards: () => api.get('/api/loyalty/rewards'),
+  createReward: (data) => api.post('/api/loyalty/rewards', data),
+  updateReward: (id, data) => api.put(`/api/loyalty/rewards/${id}`, data),
+  deleteReward: (id) => api.delete(`/api/loyalty/rewards/${id}`),
+  getCustomers: (params) => api.get('/api/loyalty/customers', { params }),
+  getCustomer: (id) => api.get(`/api/loyalty/customers/${id}`),
+  adjustPoints: (id, data) => api.post(`/api/loyalty/customers/${id}/adjust`, data),
+}
+
+// Platform billing API (Stripe subscriptions - restaurants paying the platform)
+export const billingAPI = {
+  getPlans: () => api.get('/api/billing/plans'),
+  createPlan: (data) => api.post('/api/billing/plans', data),
+  updatePlan: (id, data) => api.put(`/api/billing/plans/${id}`, data),
+  getRestaurantBilling: (id) => api.get(`/api/billing/restaurants/${id}`),
+  assignPlan: (id, planId) => api.post(`/api/billing/restaurants/${id}/plan`, { planId }),
+  setPrice: (id, amountCents, applyImmediately) => api.post(`/api/billing/restaurants/${id}/price`, { amountCents, applyImmediately }),
+  getCheckoutLink: (id, opts) => api.post(`/api/billing/restaurants/${id}/checkout-link`, opts || {}),
+  cancelSubscription: (id, atPeriodEnd) => api.post(`/api/billing/restaurants/${id}/cancel`, { atPeriodEnd }),
+  getMyStatus: () => api.get('/api/billing/my/status'),
+  getMyPortal: () => api.get('/api/billing/my/portal'),
+}
+
+// WhatsApp marketing API
+export const whatsappAPI = {
+  getStatus: () => api.get('/api/whatsapp/status'),
+  connect: () => api.post('/api/whatsapp/connect'),
+  disconnect: () => api.post('/api/whatsapp/disconnect'),
+  createCampaign: (data) => api.post('/api/whatsapp/campaigns', data),
+  getCampaigns: () => api.get('/api/whatsapp/campaigns'),
+  getCampaign: (id) => api.get(`/api/whatsapp/campaigns/${id}`),
+  cancelCampaign: (id) => api.post(`/api/whatsapp/campaigns/${id}/cancel`),
+}
+
+// Public tenant info - lets the frontend tell apart the marketing apex
+// domain (no tenant) from a store's own subdomain, and which business_type
+// storefront to render.
+export const tenantAPI = {
+  getCurrent: () => api.get('/api/restaurants/public/current'),
+}
+
+// Bookable services (appointments/hotel/office verticals)
+export const servicesAPI = {
+  getPublic: () => api.get('/api/services/public'),
+  getAll: () => api.get('/api/services'),
+  create: (data) => api.post('/api/services', data),
+  update: (id, data) => api.put(`/api/services/${id}`, data),
+  delete: (id) => api.delete(`/api/services/${id}`),
+}
+
+// Weekly availability schedule + blocked dates (appointments/hotel/office)
+export const availabilityAPI = {
+  get: () => api.get('/api/availability'),
+  updateHours: (hours) => api.put('/api/availability/hours', { hours }),
+  addException: (data) => api.post('/api/availability/exceptions', data),
+  removeException: (id) => api.delete(`/api/availability/exceptions/${id}`),
+}
+
+// Bookings (appointments/hotel/office verticals)
+export const bookingsAPI = {
+  getAvailability: (serviceId, date) => api.get('/api/bookings/availability', { params: { serviceId, date } }),
+  create: (data) => api.post('/api/bookings', data),
+  getAll: () => api.get('/api/bookings'),
+  updateStatus: (id, status) => api.patch(`/api/bookings/${id}/status`, { status }),
 }
 
 // Tables API
@@ -332,3 +409,17 @@ export const restaurantsAPI = {
 }
 
 export default api
+
+export const reservationsAPI = {
+  availability: (date, partySize) => api.get('/api/reservations/availability', { params: { date, partySize } }),
+  create: data => api.post('/api/reservations', data),
+  list: () => api.get('/api/reservations'),
+  update: (id, status) => api.patch(`/api/reservations/${id}/status`, { status })
+}
+
+export const themesAPI = {
+  current: () => api.get('/api/themes/current'),
+  upload: formData => api.post('/api/themes/upload', formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
+  activate: active => api.post('/api/themes/activate', { active }),
+  remove: () => api.delete('/api/themes/current')
+}

@@ -289,12 +289,15 @@ router.post('/refund', authenticateToken, authorize('admin', 'manager'), async (
 });
 
 // Stripe webhook handler
-router.post('/webhook/stripe', express.raw({ type: 'application/json' }), async (req, res) => {
+// NOTE: express.raw() here would receive an empty, already-drained stream
+// because the global express.json() upstream in index.js parses the body
+// first - it stashes the exact raw bytes as req.rawBody for this reason.
+router.post('/webhook/stripe', async (req, res) => {
   const sig = req.headers['stripe-signature'];
   let event;
 
   try {
-    event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
+    event = stripe.webhooks.constructEvent(req.rawBody, sig, process.env.STRIPE_WEBHOOK_SECRET);
   } catch (err) {
     logger.error('Stripe webhook signature verification failed:', err);
     return res.status(400).send(`Webhook Error: ${err.message}`);

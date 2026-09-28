@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
-  ArrowLeft, Edit, TrendingUp, ShoppingCart, Users, Package, 
+  ArrowLeft, Edit, TrendingUp, ShoppingCart, Users, Package,
   DollarSign, Activity, Calendar, MapPin, Phone, Mail, Globe,
-  CheckCircle, XCircle, BarChart3
+  CheckCircle, XCircle, BarChart3, Gift, CreditCard
 } from 'lucide-react';
 import api from '../../services/api';
+import BillingTab from './BillingTab';
 
 export default function RestaurantDetails() {
   const { id } = useParams();
@@ -35,6 +36,22 @@ export default function RestaurantDetails() {
       alert('Failed to load restaurant details');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const toggleActive = async () => {
+    const action = restaurant.is_active ? 'suspend' : 'reactivate';
+    if (!window.confirm(`Are you sure you want to ${action} "${restaurant.name}"?`)) return;
+    try {
+      if (restaurant.is_active) {
+        await api.put(`/api/restaurants/${id}`, { is_active: false });
+      } else {
+        await api.post(`/api/restaurants/${id}/activate`);
+      }
+      loadRestaurantDetails();
+    } catch (error) {
+      console.error(`Error trying to ${action} restaurant:`, error);
+      alert(`Failed to ${action} restaurant`);
     }
   };
 
@@ -107,13 +124,26 @@ export default function RestaurantDetails() {
               </div>
             </div>
             
-            <button
-              onClick={() => navigate(`/owner/restaurants/${id}/edit`)}
-              className="px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 font-medium transition-all flex items-center gap-2 shadow-lg shadow-blue-500/30"
-            >
-              <Edit className="w-5 h-5" />
-              Edit Restaurant
-            </button>
+            <div className="flex gap-3">
+              <button
+                onClick={toggleActive}
+                className={`px-6 py-3 rounded-xl font-medium transition-all flex items-center gap-2 shadow-lg ${
+                  restaurant.is_active
+                    ? 'bg-red-50 text-red-600 hover:bg-red-100 shadow-red-500/10'
+                    : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100 shadow-emerald-500/10'
+                }`}
+              >
+                {restaurant.is_active ? <XCircle className="w-5 h-5" /> : <CheckCircle className="w-5 h-5" />}
+                {restaurant.is_active ? 'Suspend' : 'Reactivate'}
+              </button>
+              <button
+                onClick={() => navigate(`/owner/restaurants/${id}/edit`)}
+                className="px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 font-medium transition-all flex items-center gap-2 shadow-lg shadow-blue-500/30"
+              >
+                <Edit className="w-5 h-5" />
+                Edit Restaurant
+              </button>
+            </div>
           </div>
         </div>
 
@@ -178,7 +208,9 @@ export default function RestaurantDetails() {
             <div className="flex gap-1 p-2 overflow-x-auto">
               {[
                 { id: 'overview', label: 'Overview', icon: Activity },
+                { id: 'billing', label: 'Billing', icon: CreditCard },
                 { id: 'products', label: 'Top Products', icon: Package },
+                { id: 'loyalty', label: 'Loyalty', icon: Gift },
                 { id: 'employees', label: 'Employees', icon: Users },
                 { id: 'inventory', label: 'Inventory', icon: Package }
               ].map((tab) => {
@@ -319,6 +351,44 @@ export default function RestaurantDetails() {
                     <p className="text-slate-500 text-center py-8">No employees found</p>
                   )}
                 </div>
+              </div>
+            )}
+
+            {activeTab === 'billing' && <BillingTab restaurantId={id} />}
+
+            {activeTab === 'loyalty' && (
+              <div>
+                <h3 className="text-xl font-bold text-slate-900 mb-4">Loyalty Program</h3>
+                {analytics?.loyalty ? (
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                    <div className="p-4 bg-slate-50 rounded-xl">
+                      <p className="text-2xl font-bold text-slate-900">{analytics.loyalty.totalMembers}</p>
+                      <p className="text-sm text-slate-500">Total members</p>
+                    </div>
+                    <div className="p-4 bg-slate-50 rounded-xl">
+                      <p className="text-2xl font-bold text-slate-900">{analytics.loyalty.newMembersLast30Days}</p>
+                      <p className="text-sm text-slate-500">New (30 days)</p>
+                    </div>
+                    <div className="p-4 bg-slate-50 rounded-xl">
+                      <p className="text-2xl font-bold text-slate-900">{analytics.loyalty.revenueFromMembersPct}%</p>
+                      <p className="text-sm text-slate-500">Revenue from members</p>
+                    </div>
+                    <div className="p-4 bg-slate-50 rounded-xl">
+                      <p className="text-2xl font-bold text-emerald-600">{analytics.loyalty.pointsIssued.toLocaleString()}</p>
+                      <p className="text-sm text-slate-500">Points issued</p>
+                    </div>
+                    <div className="p-4 bg-slate-50 rounded-xl">
+                      <p className="text-2xl font-bold text-orange-600">{analytics.loyalty.pointsRedeemed.toLocaleString()}</p>
+                      <p className="text-sm text-slate-500">Points redeemed</p>
+                    </div>
+                    <div className="p-4 bg-slate-50 rounded-xl">
+                      <p className="text-2xl font-bold text-slate-900">{analytics.loyalty.outstandingPointsLiability.toLocaleString()}</p>
+                      <p className="text-sm text-slate-500">Outstanding balance (all members)</p>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-slate-500 text-center py-8">No loyalty data yet</p>
+                )}
               </div>
             )}
 

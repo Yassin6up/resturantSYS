@@ -7,7 +7,9 @@ import {
   TrashIcon,
   CheckCircleIcon,
   XCircleIcon,
-  MagnifyingGlassIcon
+  MagnifyingGlassIcon,
+  EyeIcon,
+  EyeSlashIcon
 } from '@heroicons/react/24/outline'
 import toast from 'react-hot-toast'
 
@@ -18,6 +20,7 @@ function EmployeesPage() {
   const [editingEmployee, setEditingEmployee] = useState(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [filterRole, setFilterRole] = useState('all')
+  const [filterStatus, setFilterStatus] = useState('all')
   const [formData, setFormData] = useState({
     username: '',
     password: '',
@@ -27,7 +30,8 @@ function EmployeesPage() {
     salary: '',
     phone: '',
     email: '',
-    hire_date: new Date().toISOString().split('T')[0]
+    hire_date: new Date().toISOString().split('T')[0],
+    is_active: true
   })
 
   useEffect(() => {
@@ -61,7 +65,8 @@ function EmployeesPage() {
         salary: employee.salary || '',
         phone: employee.phone || '',
         email: employee.email || '',
-        hire_date: employee.hire_date || new Date().toISOString().split('T')[0]
+        hire_date: employee.hire_date || new Date().toISOString().split('T')[0],
+        is_active: employee.is_active
       })
     } else {
       setEditingEmployee(null)
@@ -74,7 +79,8 @@ function EmployeesPage() {
         salary: '',
         phone: '',
         email: '',
-        hire_date: new Date().toISOString().split('T')[0]
+        hire_date: new Date().toISOString().split('T')[0],
+        is_active: true
       })
     }
     setShowModal(true)
@@ -92,7 +98,8 @@ function EmployeesPage() {
       salary: '',
       phone: '',
       email: '',
-      hire_date: new Date().toISOString().split('T')[0]
+      hire_date: new Date().toISOString().split('T')[0],
+      is_active: true
     })
   }
 
@@ -135,33 +142,44 @@ function EmployeesPage() {
     }
   }
 
+  const handleToggleStatus = async (employee) => {
+    const newStatus = !employee.is_active
+    const action = newStatus ? 'activate' : 'deactivate'
+    
+    if (!window.confirm(`Are you sure you want to ${action} ${employee.full_name}?`)) {
+      return
+    }
+
+    try {
+      setLoading(true)
+      const updateData = {
+        ...employee,
+        is_active: newStatus
+      }
+      await employeesAPI.updateEmployee(employee.id, updateData)
+      toast.success(`Employee ${action}d successfully`)
+      await loadEmployees()
+    } catch (error) {
+      toast.error(error.response?.data?.error || `Failed to ${action} employee`)
+      console.error('Toggle status error:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const handleDelete = async (employee) => {
-    if (!window.confirm(`Are you sure you want to deactivate ${employee.full_name}?`)) {
+    if (!window.confirm(`Are you sure you want to permanently delete ${employee.full_name}? This action cannot be undone.`)) {
       return
     }
 
     try {
       setLoading(true)
       await employeesAPI.deleteEmployee(employee.id)
-      toast.success('Employee deactivated successfully')
+      toast.success('Employee deleted successfully')
       await loadEmployees()
     } catch (error) {
-      toast.error(error.response?.data?.error || 'Failed to deactivate employee')
+      toast.error(error.response?.data?.error || 'Failed to delete employee')
       console.error('Delete employee error:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleActivate = async (employee) => {
-    try {
-      setLoading(true)
-      await employeesAPI.activateEmployee(employee.id)
-      toast.success('Employee activated successfully')
-      await loadEmployees()
-    } catch (error) {
-      toast.error('Failed to activate employee')
-      console.error('Activate employee error:', error)
     } finally {
       setLoading(false)
     }
@@ -172,7 +190,10 @@ function EmployeesPage() {
                          emp.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          emp.role.toLowerCase().includes(searchTerm.toLowerCase())
     const matchesRole = filterRole === 'all' || emp.role === filterRole
-    return matchesSearch && matchesRole
+    const matchesStatus = filterStatus === 'all' || 
+                         (filterStatus === 'active' && emp.is_active) ||
+                         (filterStatus === 'inactive' && !emp.is_active)
+    return matchesSearch && matchesRole && matchesStatus
   })
 
   const getRoleBadgeColor = (role) => {
@@ -274,6 +295,19 @@ function EmployeesPage() {
                 <option value="waiter">Waiter</option>
               </select>
             </div>
+
+            {/* Status Filter */}
+            <div>
+              <select
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+                className="form-input"
+              >
+                <option value="all">All Status</option>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+              </select>
+            </div>
           </div>
         </div>
       </div>
@@ -322,11 +356,14 @@ function EmployeesPage() {
                   </tr>
                 ) : (
                   filteredEmployees.map((employee) => (
-                    <tr key={employee.id} className="hover:bg-gray-50">
+                    <tr key={employee.id} className={`hover:bg-gray-50 ${!employee.is_active ? 'bg-gray-50 opacity-75' : ''}`}>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div>
                           <div className="text-sm font-medium text-gray-900">
                             {employee.full_name}
+                            {!employee.is_active && (
+                              <span className="ml-2 text-xs text-gray-500">(Inactive)</span>
+                            )}
                           </div>
                           <div className="text-sm text-gray-500">@{employee.username}</div>
                           {employee.pin && (
@@ -363,28 +400,31 @@ function EmployeesPage() {
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
                         <button
                           onClick={() => handleOpenModal(employee)}
-                          className="text-blue-600 hover:text-blue-900"
+                          className="text-blue-600 hover:text-blue-900 disabled:text-gray-400 disabled:cursor-not-allowed"
                           title="Edit"
+                          disabled={loading}
                         >
                           <PencilIcon className="h-5 w-5" />
                         </button>
-                        {employee.is_active ? (
-                          <button
-                            onClick={() => handleDelete(employee)}
-                            className="text-red-600 hover:text-red-900"
-                            title="Deactivate"
-                          >
-                            <TrashIcon className="h-5 w-5" />
-                          </button>
-                        ) : (
-                          <button
-                            onClick={() => handleActivate(employee)}
-                            className="text-green-600 hover:text-green-900"
-                            title="Activate"
-                          >
-                            <CheckCircleIcon className="h-5 w-5" />
-                          </button>
-                        )}
+                        <button
+                          onClick={() => handleToggleStatus(employee)}
+                          className={employee.is_active ? 
+                            "text-orange-600 hover:text-orange-900 disabled:text-gray-400 disabled:cursor-not-allowed" : 
+                            "text-green-600 hover:text-green-900 disabled:text-gray-400 disabled:cursor-not-allowed"
+                          }
+                          title={employee.is_active ? "Deactivate" : "Activate"}
+                          disabled={loading}
+                        >
+                          {employee.is_active ? <EyeSlashIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
+                        </button>
+                        <button
+                          onClick={() => handleDelete(employee)}
+                          className="text-red-600 hover:text-red-900 disabled:text-gray-400 disabled:cursor-not-allowed"
+                          title="Delete Permanently"
+                          disabled={loading}
+                        >
+                          <TrashIcon className="h-5 w-5" />
+                        </button>
                       </td>
                     </tr>
                   ))
@@ -525,6 +565,40 @@ function EmployeesPage() {
                   </div>
                 </div>
               </div>
+
+              {/* Status */}
+              {editingEmployee && (
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Account Status</h3>
+                  <div className="flex items-center space-x-4">
+                    <label className="flex items-center cursor-pointer">
+                      <div className="relative">
+                        <input
+                          type="checkbox"
+                          checked={formData.is_active}
+                          onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
+                          className="sr-only"
+                        />
+                        <div className={`w-10 h-6 rounded-full transition-colors ${
+                          formData.is_active ? 'bg-green-500' : 'bg-gray-300'
+                        }`}></div>
+                        <div className={`absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform ${
+                          formData.is_active ? 'transform translate-x-4' : ''
+                        }`}></div>
+                      </div>
+                      <span className="ml-3 text-sm font-medium text-gray-900">
+                        {formData.is_active ? 'Active' : 'Inactive'}
+                      </span>
+                    </label>
+                    <span className="text-sm text-gray-500">
+                      {formData.is_active ? 
+                        'Employee can access the system' : 
+                        'Employee cannot access the system'
+                      }
+                    </span>
+                  </div>
+                </div>
+              )}
 
               {/* Actions */}
               <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">

@@ -4,18 +4,26 @@ import { useCart } from "../../contexts/CartContext";
 import { useTheme } from "../../contexts/ThemeContext";
 import { menuAPI } from "../../services/api";
 import { PlusIcon, MinusIcon } from "@heroicons/react/24/outline";
-import CartBottomBar from "../../components/CartBottomBar";
+import { useTenant } from "../../contexts/TenantContext";
 import toast from "react-hot-toast";
 
 import DefaultTemplate from "./templates/DefaultTemplate";
 import ModernTemplate from "./templates/ModernTemplate";
 import ElegantTemplate from "./templates/ElegantTemplate";
 import MinimalTemplate from "./templates/MinimalTemplate";
+import LuxuryTemplate from "./templates/LuxuryTemplate";
+import HealthyTemplate from "./templates/HealthyTemplate";
+import CasualTemplate from "./templates/CasualTemplate";
+import CafeTemplate from "./templates/CafeTemplate";
+import SteakhouseTemplate from "./templates/SteakhouseTemplate";
+import SushiTemplate from "./templates/SushiTemplate";
+import BarTemplate from "./templates/BarTemplate";
 
 function MenuPage() {
   const [searchParams] = useSearchParams();
   const table = searchParams.get("table");
-  const branch = searchParams.get("branch") || "1";
+  const tenant = useTenant();
+  const branch = tenant.id || searchParams.get("branch") || "1";
 
   const [menu, setMenu] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -31,7 +39,7 @@ function MenuPage() {
   const { addItem, setBranchInfo } = useCart();
   const { getSetting } = useTheme();
 
-  const menuTemplate = getSetting('menu_template') || 'default';
+  const menuTemplate = (tenant.settings?.custom_theme?.active ? tenant.settings.custom_theme.template : null) || tenant.settings?.menu_template || getSetting('menu_template') || 'default';
 
   useEffect(() => {
     console.log('MenuPage: Setting branch info', { branch: parseInt(branch), table });
@@ -47,8 +55,7 @@ function MenuPage() {
       setLoading(true);
       const response = await menuAPI.getMenu({ branchId: parseInt(branch) });
       setMenu(response.data.categories);
-      
-      await preloadVariantsInfo(response.data.categories);
+
     } catch (error) {
       toast.error("Failed to load menu");
       console.error("Menu load error:", error);
@@ -110,7 +117,7 @@ function MenuPage() {
   };
 
   const handleAddToCart = () => {
-    if (!selectedItem) return;
+    if (!selectedItem || loadingVariants) return;
 
     addItem(
       selectedItem,
@@ -132,27 +139,10 @@ function MenuPage() {
     setNote("");
   };
 
-  const handleBuyClick = async (item) => {
-    if (itemsWithVariants.has(item.id)) {
-      setSelectedItem(item);
-      setQuantity(1);
-      setSelectedModifiers([]);
-      setSelectedVariant(null);
-      setNote("");
-    } else {
-      addItem(item, 1, [], "", parseInt(branch), table, null);
-      toast.success(`${item.name} added to cart`);
-    }
+  const handleBuyClick = (item) => {
+    setQuantity(1); setSelectedModifiers([]); setNote(''); setSelectedVariant(null); setSelectedItem(item);
   };
-
-  const quickAddItem = (item) => {
-    if (!itemsWithVariants.has(item.id)) {
-      addItem(item, 1, [], "", parseInt(branch), table, null);
-      toast.success(`${item.name} added to cart`);
-    } else {
-      handleBuyClick(item);
-    }
-  };
+  const quickAddItem = handleBuyClick;
 
   const toggleModifier = (modifier) => {
     setSelectedModifiers((prev) => {
@@ -200,7 +190,14 @@ function MenuPage() {
     default: DefaultTemplate,
     modern: ModernTemplate,
     elegant: ElegantTemplate,
-    minimal: MinimalTemplate
+    minimal: MinimalTemplate,
+    luxury: LuxuryTemplate,
+    healthy: HealthyTemplate,
+    casual: CasualTemplate,
+    cafe: CafeTemplate,
+    steakhouse: SteakhouseTemplate,
+    sushi: SushiTemplate,
+    bar: BarTemplate
   };
 
   const SelectedTemplate = templates[menuTemplate] || DefaultTemplate;
@@ -211,12 +208,12 @@ function MenuPage() {
         menu={menu}
         table={table}
         addItem={handleBuyClick}
-        onSelectItem={setSelectedItem}
+        onSelectItem={item => { setQuantity(1); setSelectedModifiers([]); setNote(""); setSelectedVariant(null); setSelectedItem(item); }}
         itemsWithVariants={itemsWithVariants}
       />
 
       {selectedItem && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+        <div role="dialog" aria-modal="true" aria-label="Product details" className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-lg max-w-md w-full max-h-[90vh] overflow-y-auto">
             <div className="relative overflow-hidden">
               <img
@@ -393,7 +390,6 @@ function MenuPage() {
         </div>
       )}
 
-      <CartBottomBar />
     </>
   );
 }

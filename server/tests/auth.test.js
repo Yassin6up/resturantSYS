@@ -5,8 +5,7 @@ const { db } = require('../src/database/init');
 describe('Authentication API', () => {
   beforeAll(async () => {
     // Setup test database
-    await db.migrate.latest();
-    await db.seed.run();
+    await require('./fixture')();
   });
 
   afterAll(async () => {

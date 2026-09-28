@@ -37,10 +37,28 @@ export default function OwnerDashboard() {
       totalTables: acc.totalTables + parseInt(r.table_count || 0),
       totalMenuItems: acc.totalMenuItems + parseInt(r.menu_item_count || 0),
       activeRestaurants: acc.activeRestaurants + (r.is_active ? 1 : 0),
-    }), { totalEmployees: 0, totalTables: 0, totalMenuItems: 0, activeRestaurants: 0 });
+      totalRevenue: acc.totalRevenue + parseFloat(r.total_revenue || 0),
+      totalMembers: acc.totalMembers + parseInt(r.member_count || 0),
+    }), { totalEmployees: 0, totalTables: 0, totalMenuItems: 0, activeRestaurants: 0, totalRevenue: 0, totalMembers: 0 });
   };
 
   const stats = calculateTotalStats();
+
+  const toggleActive = async (restaurant) => {
+    const action = restaurant.is_active ? 'suspend' : 'reactivate';
+    if (!window.confirm(`Are you sure you want to ${action} "${restaurant.name}"?`)) return;
+    try {
+      if (restaurant.is_active) {
+        await restaurantsAPI.updateRestaurant(restaurant.id, { is_active: false });
+      } else {
+        await restaurantsAPI.activateRestaurant(restaurant.id);
+      }
+      fetchRestaurants();
+    } catch (error) {
+      console.error(`Error trying to ${action} restaurant:`, error);
+      alert(`Failed to ${action} restaurant`);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900 p-6">
@@ -57,7 +75,18 @@ export default function OwnerDashboard() {
         </div>
 
         {/* Overall Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
+          <div className="bg-gradient-to-br from-emerald-600 to-emerald-800 rounded-2xl p-6 shadow-xl border border-emerald-400/20">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-emerald-200 text-sm font-medium mb-1">Total Revenue</p>
+                <p className="text-4xl font-bold text-white">{Math.round(stats.totalRevenue).toLocaleString()}</p>
+                <p className="text-emerald-300 text-xs mt-1">{stats.totalMembers} loyalty members</p>
+              </div>
+              <FaMoneyBillWave className="text-6xl text-emerald-300/30" />
+            </div>
+          </div>
+
           <div className="bg-gradient-to-br from-purple-600 to-purple-800 rounded-2xl p-6 shadow-xl border border-purple-400/20">
             <div className="flex items-center justify-between">
               <div>
@@ -115,6 +144,13 @@ export default function OwnerDashboard() {
             >
               <FaChartLine />
               <span>Activity Logs</span>
+            </button>
+            <button
+              onClick={() => navigate('/owner/plans')}
+              className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-xl hover:from-emerald-700 hover:to-teal-700 transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+            >
+              <FaMoneyBillWave />
+              <span>Plans</span>
             </button>
             <button
               onClick={() => navigate('/owner/restaurants/new')}
@@ -179,6 +215,16 @@ export default function OwnerDashboard() {
                   )}
                 </div>
 
+                {/* Revenue & Loyalty */}
+                <div className="flex items-center justify-between mb-4 px-3 py-2 bg-emerald-500/10 rounded-lg border border-emerald-500/20">
+                  <span className="text-emerald-300 text-sm font-semibold">
+                    {Math.round(restaurant.total_revenue || 0).toLocaleString()} MAD
+                  </span>
+                  <span className="text-emerald-300/70 text-xs">
+                    {restaurant.member_count || 0} members
+                  </span>
+                </div>
+
                 {/* Stats Grid */}
                 <div className="grid grid-cols-3 gap-3 mb-4">
                   <div className="bg-white/5 rounded-lg p-3 text-center">
@@ -213,6 +259,17 @@ export default function OwnerDashboard() {
                   >
                     <FaEdit />
                     <span className="text-sm">Edit</span>
+                  </button>
+                  <button
+                    onClick={() => toggleActive(restaurant)}
+                    title={restaurant.is_active ? 'Suspend restaurant' : 'Reactivate restaurant'}
+                    className={`flex items-center justify-center px-3 py-2 rounded-lg transition-colors ${
+                      restaurant.is_active
+                        ? 'bg-red-600/20 hover:bg-red-600/40 text-red-300'
+                        : 'bg-green-600/20 hover:bg-green-600/40 text-green-300'
+                    }`}
+                  >
+                    {restaurant.is_active ? <FaTimesCircle /> : <FaCheckCircle />}
                   </button>
                 </div>
               </div>

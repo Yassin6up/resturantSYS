@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
+import { restaurantsAPI } from '../../services/api'
 import { EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline'
 import toast from 'react-hot-toast'
 
@@ -49,9 +50,16 @@ function LoginPage() {
         const userStr = localStorage.getItem('user')
         if (userStr) {
           const user = JSON.parse(userStr)
-          // Redirect based on role
+          // Owners who run a single store land straight on that store's own
+          // admin dashboard - the multi-restaurant /owner portfolio console
+          // only makes sense once there's more than one store to manage.
           if (user.role === 'owner') {
-            navigate('/owner/dashboard', { replace: true })
+            try {
+              const { data } = await restaurantsAPI.getRestaurants()
+              navigate(data.length === 1 ? '/admin/dashboard' : '/owner/dashboard', { replace: true })
+            } catch (e) {
+              navigate('/owner/dashboard', { replace: true })
+            }
           } else {
             navigate(from, { replace: true })
           }
@@ -88,7 +96,7 @@ function LoginPage() {
             <span className="text-white font-bold text-2xl">P</span>
           </div>
           <h1 className="text-4xl font-bold gradient-text mb-4">POSQ Admin</h1>
-          <p className="text-lg text-gray-600">Restaurant POS Management</p>
+          <p className="text-lg text-gray-600">Manage your business, website and bookings</p>
         </div>
       </div>
 
@@ -209,7 +217,7 @@ function LoginPage() {
                 href="/menu"
                 className="font-medium text-primary-600 hover:text-primary-500"
               >
-                Browse Menu
+            Browse Website
               </a>
             </p>
           </div>

@@ -23,6 +23,7 @@ export default function RestaurantForm() {
     timezone: 'Africa/Casablanca',
     language: 'en',
     isActive: true,
+    business_type: 'restaurant',
     createAdmin: false,
     adminUsername: '',
     adminPassword: '',
@@ -46,6 +47,7 @@ export default function RestaurantForm() {
         : restaurant.settings || {};
 
       setFormData({
+        business_type: restaurant.business_type || 'restaurant',
         name: restaurant.name || '',
         code: restaurant.code || '',
         address: restaurant.address || '',
@@ -79,6 +81,7 @@ export default function RestaurantForm() {
         email: formData.email,
         website: formData.website,
         description: formData.description,
+        business_type: formData.business_type,
         settings: {
           currency: formData.currency,
           tax_rate: parseFloat(formData.taxRate),
@@ -145,6 +148,31 @@ export default function RestaurantForm() {
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-xl p-8 space-y-8">
+          {/* Business Type (only chosen at creation - drives which admin sections and storefront this store gets) */}
+          {!isEditMode && (
+            <div>
+              <h2 className="text-xl font-semibold text-slate-900 mb-4">What kind of business is this?</h2>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                {[
+                  { value: 'restaurant', label: 'Restaurant' },
+                  { value: 'ecommerce', label: 'Online Store' },
+                  { value: 'appointments', label: 'Appointments' },
+                  { value: 'hotel', label: 'Hotel' },
+                  { value: 'office', label: 'Office / Coworking' },
+                ].map(t => (
+                  <button
+                    key={t.value}
+                    type="button"
+                    onClick={() => setFormData({ ...formData, business_type: t.value })}
+                    className={`px-4 py-3 rounded-xl border-2 text-sm font-medium transition-all ${formData.business_type === t.value ? 'border-blue-600 bg-blue-50 text-blue-700' : 'border-slate-200 text-slate-600 hover:border-slate-300'}`}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Basic Information */}
           <div>
             <h2 className="text-xl font-semibold text-slate-900 mb-4 flex items-center gap-2">

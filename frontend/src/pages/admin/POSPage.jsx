@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
+import { useAdminBusiness } from '../../contexts/AdminBusinessContext'
 import { ordersAPI, menuAPI, tablesAPI, paymentsAPI } from '../../services/api'
 import toast from 'react-hot-toast'
 import { useReactToPrint } from 'react-to-print'
+import LoyaltyPayModal from '../../components/LoyaltyPayModal'
 import {
   ShoppingCartIcon,
   PrinterIcon,
@@ -14,7 +16,9 @@ import {
 } from '@heroicons/react/24/outline'
 
 function POSPage() {
-  const [orderType, setOrderType] = useState('DINE_IN')
+  const { businessType, branch } = useAdminBusiness()
+  const isRestaurant = businessType === 'restaurant'
+  const [orderType, setOrderType] = useState(isRestaurant ? 'DINE_IN' : 'TAKE_OUT')
   const [selectedTable, setSelectedTable] = useState(null)
   const [tables, setTables] = useState([])
   const [deliveryAddress, setDeliveryAddress] = useState('')
@@ -38,10 +42,14 @@ function POSPage() {
   const [note, setNote] = useState('')
   
   const [completedOrder, setCompletedOrder] = useState(null)
+
+  const [showLoyaltyModal, setShowLoyaltyModal] = useState(false)
+  const [loyaltyCustomer, setLoyaltyCustomer] = useState(null)
+  const [loyaltyReward, setLoyaltyReward] = useState(null)
   const receiptRef = useRef()
 
   useEffect(() => {
-    loadTables()
+    if (isRestaurant) loadTables()
     loadMenu()
   }, [])
 
@@ -56,7 +64,7 @@ function POSPage() {
 
   const loadMenu = async () => {
     try {
-      const branchId = 1
+      const branchId = branch.id
       const response = await menuAPI.getMenu({ branchId })
       console.log('Menu response:', response.data)
       setCategories(response.data.categories || [])
@@ -106,6 +114,25 @@ function POSPage() {
     }
   }
 
+
+    const playBeep = () => {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const oscillator = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    oscillator.type = "square";        // clicky sharp sound
+    oscillator.frequency.setValueAtTime(500, ctx.currentTime); // Hz
+    gain.gain.setValueAtTime(0.2, ctx.currentTime); // volume
+
+    oscillator.connect(gain);
+    gain.connect(ctx.destination);
+
+    oscillator.start();
+    oscillator.stop(ctx.currentTime + 0.05); // very short beep
+  };
+
+
+
   const addToCart = (item, variant = null, note = '') => {
     const price = variant ? parseFloat(item.price) + parseFloat(variant.price_adjustment) : parseFloat(item.price)
     const cartItem = {
@@ -119,7 +146,7 @@ function POSPage() {
       note: note,
       modifiers: [] // You can extend this to include modifiers if needed
     }
-
+  playBeep();
     setCart(prev => {
       const existing = prev.find(i => 
         i.menuItemId === cartItem.menuItemId && 
@@ -209,10 +236,23 @@ function POSPage() {
     return cart.reduce((sum, item) => sum + (item.price * item.quantity), 0)
   }
 
+  // Preview only - the server independently validates and computes the real
+  // discount when the order is created, so a stale/tampered value here can't
+  // actually change what the customer is charged.
+  const getLoyaltyDiscount = () => {
+    if (!loyaltyReward) return 0
+    const subtotal = getCartTotal()
+    if (loyaltyReward.type === 'percent_off') return subtotal * (loyaltyReward.value / 100)
+    if (loyaltyReward.type === 'amount_off') return Math.min(loyaltyReward.value, subtotal)
+    if (loyaltyReward.type === 'free_item') return 0 // item price varies; server applies it exactly
+    return 0
+  }
+
+  const getFinalTotal = () => Math.max(0, getCartTotal() - getLoyaltyDiscount())
+
   const getChange = () => {
     const paid = parseFloat(paymentAmount) || 0
-    const total = getCartTotal()
-    return paid - total
+    return paid - getFinalTotal()
   }
 
   const validateOrder = () => {
@@ -241,16 +281,17 @@ function POSPage() {
   const handleSubmitOrder = async () => {
     if (!validateOrder()) return
 
-    if (paymentMethod === 'cash' && (!paymentAmount || parseFloat(paymentAmount) < getCartTotal())) {
+    if (paymentMethod === 'cash' && (!paymentAmount || parseFloat(paymentAmount) < getFinalTotal())) {
       toast.error('Payment amount must be at least the order total')
       return
     }
 
     try {
       setLoading(true)
-      
+
       const orderData = {
-        branchId: 1,
+        // branchId intentionally omitted - the server derives it from the
+        // logged-in cashier's own branch, which can't be spoofed.
         orderType: orderType,
         tableId: orderType === 'DINE_IN' && selectedTable ? selectedTable.id : null,
         tableNumber: orderType === 'DINE_IN' && selectedTable ? selectedTable.table_number : null,
@@ -258,7 +299,11 @@ function POSPage() {
         customerPhone: customerPhone || null,
         deliveryAddress: deliveryAddress || null,
         paymentMethod: paymentMethod,
-        amountPaid: paymentMethod === 'cash' ? parseFloat(paymentAmount) : getCartTotal(),
+        paymentStatus:"PAID",
+        orderStatus: "PREPARING",
+        customerId: loyaltyCustomer?.id || null,
+        rewardId: loyaltyReward?.id || null,
+        amountPaid: paymentMethod === 'cash' ? parseFloat(paymentAmount) : getFinalTotal(),
         changeAmount: paymentMethod === 'cash' ? getChange() : 0,
         items: cart.map(item => ({
           menuItemId: item.menuItemId,
@@ -290,12 +335,12 @@ function POSPage() {
       setCompletedOrder({
         ...response.data.order,
         items: cart,
-        amountPaid: paymentMethod === 'cash' ? parseFloat(paymentAmount) : getCartTotal(),
+        amountPaid: paymentMethod === 'cash' ? parseFloat(paymentAmount) : getFinalTotal(),
         change: paymentMethod === 'cash' ? getChange() : 0
       })
-      
+
       toast.success(`Order completed successfully! ${paymentMethod === 'card' ? 'Card payment processed.' : ''}`)
-      
+
       // Reset form
       setCart([])
       setPaymentAmount('')
@@ -303,6 +348,8 @@ function POSPage() {
       setCustomerName('')
       setCustomerPhone('')
       setDeliveryAddress('')
+      setLoyaltyCustomer(null)
+      setLoyaltyReward(null)
       if (orderType === 'DINE_IN') {
         setSelectedTable(null)
       }
@@ -340,7 +387,7 @@ function POSPage() {
             <div className="bg-white rounded-lg shadow p-6">
               <h2 className="text-xl font-semibold mb-4">Order Type</h2>
               <div className="grid grid-cols-3 gap-3">
-                <button
+                {isRestaurant && <button
                   onClick={() => setOrderType('DINE_IN')}
                   className={`py-3 px-4 rounded-lg font-medium transition ${
                     orderType === 'DINE_IN'
@@ -349,7 +396,7 @@ function POSPage() {
                   }`}
                 >
                   Dine In
-                </button>
+                </button>}
                 <button
                   onClick={() => setOrderType('DELIVERY')}
                   className={`py-3 px-4 rounded-lg font-medium transition ${
@@ -368,7 +415,7 @@ function POSPage() {
                       : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                   }`}
                 >
-                  Take Out
+                  {isRestaurant ? 'Take Out' : 'In-store / Pickup'}
                 </button>
               </div>
 
@@ -590,10 +637,32 @@ function POSPage() {
               </div>
 
               <div className="border-t pt-4 space-y-2">
+                {loyaltyReward ? (
+                  <>
+                    <div className="flex justify-between text-sm text-gray-500">
+                      <span>Subtotal:</span>
+                      <span>${getCartTotal().toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm text-emerald-600">
+                      <span>🎁 {loyaltyReward.name}:</span>
+                      <span>-${getLoyaltyDiscount().toFixed(2)}</span>
+                    </div>
+                  </>
+                ) : null}
                 <div className="flex justify-between text-lg font-semibold">
                   <span>Total:</span>
-                  <span>${getCartTotal().toFixed(2)}</span>
+                  <span>${getFinalTotal().toFixed(2)}</span>
                 </div>
+
+                <button
+                  type="button"
+                  onClick={() => setShowLoyaltyModal(true)}
+                  className="w-full text-sm px-3 py-2 rounded-lg border border-dashed border-gray-300 text-gray-600 hover:bg-gray-50 flex items-center justify-center gap-1"
+                >
+                  {loyaltyCustomer
+                    ? `🎁 ${loyaltyCustomer.name || loyaltyCustomer.phone} • ${loyaltyCustomer.points_balance} pts${loyaltyReward ? ' • reward applied' : ''} (change)`
+                    : '+ Add loyalty customer'}
+                </button>
 
                 {showPayment && (
                   <div className="space-y-3 mt-4">
@@ -645,7 +714,7 @@ function POSPage() {
                       </div>
                     )}
                     
-                    {paymentMethod === 'cash' && paymentAmount && parseFloat(paymentAmount) >= getCartTotal() && (
+                    {paymentMethod === 'cash' && paymentAmount && parseFloat(paymentAmount) >= getFinalTotal() && (
                       <div className="bg-green-50 border border-green-200 rounded-lg p-3">
                         <div className="flex justify-between text-lg">
                           <span className="font-medium">Change:</span>
@@ -661,7 +730,7 @@ function POSPage() {
                 <button
                   onClick={() => {
                     if (!showPayment) {
-                      setShowPayment(true)
+                      setShowLoyaltyModal(true)
                     } else {
                       handleSubmitOrder()
                     }
@@ -817,6 +886,18 @@ function POSPage() {
           {completedOrder && <Receipt order={completedOrder} />}
         </div>
       </div>
+
+      {showLoyaltyModal && (
+        <LoyaltyPayModal
+          onClose={() => setShowLoyaltyModal(false)}
+          onDone={(result) => {
+            setLoyaltyCustomer(result?.customer || null)
+            setLoyaltyReward(result?.reward || null)
+            setShowLoyaltyModal(false)
+            setShowPayment(true)
+          }}
+        />
+      )}
     </div>
   )
 }

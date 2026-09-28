@@ -2,7 +2,75 @@
 
 This guide covers different deployment scenarios for the POSQ Restaurant POS system.
 
-## 🚀 Quick Start (Docker)
+## 🌐 Production: Multi-Restaurant with Automatic Subdomains
+
+This is the real production path: one server, one wildcard DNS record, and
+every restaurant gets `{slug}.yourdomain.com` automatically the moment it's
+created - no per-restaurant DNS or server config.
+
+### How it works
+- `docker-compose.prod.yml` runs Caddy in front of everything. Caddy handles
+  TLS automatically, including a **wildcard certificate** for `*.yourdomain.com`
+  (via a DNS-01 challenge - see `deploy/Caddy.Dockerfile`), and reverse-proxies
+  to the API and frontend containers based on the Host header.
+- The API's `resolveTenant` middleware (`server/src/middleware/tenant.js`)
+  reads that same Host header to figure out which restaurant a request
+  belongs to. Caddy preserves the original Host header by default, so no
+  extra config is needed for this to work.
+- New restaurants need zero infrastructure changes: their subdomain works
+  the instant their `branches.slug` row exists, because the wildcard DNS
+  record and wildcard cert already cover it.
+
+### One-time setup
+1. **DNS**: create an A (or AAAA) record for `yourdomain.com` and a second
+   one for `*.yourdomain.com`, both pointing at this server's IP. A single
+   wildcard record covers every current and future restaurant.
+2. **Cloudflare token** (or another DNS provider): the wildcard cert needs a
+   DNS-01 challenge, which needs API access to create a TXT record on your
+   zone. Create a Cloudflare API token scoped to `Zone:DNS:Edit` on your
+   zone. Using a different DNS provider? Swap the module in
+   `deploy/Caddy.Dockerfile` for the matching one from
+   [github.com/caddy-dns](https://github.com/caddy-dns), and the `dns
+   cloudflare` line in `deploy/Caddyfile`.
+3. **Environment**: `cp .env.production.example .env.production` and fill it
+   in - real secrets (`openssl rand -base64 48` for JWT secrets), your
+   domain, DB password, Stripe keys.
+4. **Launch**:
+   ```bash
+   docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
+   ```
+   First boot issues the wildcard cert, which can take a minute or two -
+   watch progress with `docker compose -f docker-compose.prod.yml logs -f caddy`.
+5. **Verify**: `https://yourdomain.com` (marketing), `https://admin.yourdomain.com`
+   (your super-admin console), and `https://anything.yourdomain.com` should
+   all resolve with valid HTTPS.
+
+### Scaling
+The API is stateless aside from Socket.IO, which uses the Redis adapter
+(`REDIS_URL` is already wired in `docker-compose.prod.yml`), so it's safe to
+run more than one instance:
+```bash
+docker compose -f docker-compose.prod.yml --env-file .env.production up -d --scale api=3
+```
+Caddy load-balances across all running `api` replicas automatically.
+
+### What's NOT automated here
+- **Backups**: `mysql_data` is a named Docker volume; set up your own
+  scheduled `mysqldump` (or your host's managed-MySQL backup feature if you
+  swap in one) - this compose file does not do it for you.
+- **Monitoring/alerting**: `/health` (liveness) and `/health/ready` (DB
+  connectivity) exist for a load balancer or uptime checker to poll, but
+  nothing here sends you an alert - wire that up in whatever
+  monitoring/uptime tool you use.
+- **Stripe webhooks**: point two webhook endpoints at
+  `https://admin.yourdomain.com/api/payments/webhook/stripe` (order
+  payments) and `https://admin.yourdomain.com/api/billing/webhook`
+  (subscription billing) in the Stripe dashboard, using the signing secrets
+  in `.env.production`.
+
+---
+
+## 🚀 Local Docker (single restaurant, no TLS, no subdomains)
 
 ### Prerequisites
 - Docker and Docker Compose
@@ -12,19 +80,17 @@ This guide covers different deployment scenarios for the POSQ Restaurant POS sys
 ```bash
 git clone <repository-url>
 cd posq-restaurant-pos
-chmod +x scripts/setup.sh
-./scripts/setup.sh
 ```
 
 ### 2. Start Services
 ```bash
-./start.sh
+docker compose up -d --build
 ```
 
 ### 3. Access Application
 - **Customer PWA**: http://localhost:5173
 - **Admin Dashboard**: http://localhost:5173/admin/login
-- **API Server**: http://localhost:3000
+- **API Server**: http://localhost:3001
 - **Printer Service**: http://localhost:4000
 
 ## 🏠 Local Development
@@ -124,13 +190,13 @@ server {
     }
 
     location /api {
-        proxy_pass http://localhost:3000;
+        proxy_pass http://localhost:3001;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
     }
 
     location /socket.io {
-        proxy_pass http://localhost:3000;
+        proxy_pass http://localhost:3001;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
@@ -241,7 +307,7 @@ curl -X POST http://localhost:4000/test \
 #### Required
 ```bash
 NODE_ENV=production
-PORT=3000
+PORT=3001
 FRONTEND_URL=https://your-domain.com
 DB_TYPE=mysql
 DB_HOST=localhost
@@ -284,13 +350,13 @@ sudo crontab -e
 ### Health Checks
 ```bash
 # API Health
-curl http://localhost:3000/health
+curl http://localhost:3001/health
 
 # Printer Service Health
 curl http://localhost:4000/health
 
 # Database Connection
-curl http://localhost:3000/api/settings/database/test
+curl http://localhost:3001/api/settings/database/test
 ```
 
 ### Logs

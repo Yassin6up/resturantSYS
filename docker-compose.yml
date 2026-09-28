@@ -1,30 +1,35 @@
-<<<<<<< HEAD
-<<<<<<< HEAD
 version: '3.8'
 
+# Local/dev Docker stack. For a real deployment with wildcard subdomains and
+# TLS, use docker-compose.prod.yml instead (see DEPLOYMENT.md).
+
 services:
-  # Backend API Server
   api:
     build:
       context: ./server
       dockerfile: Dockerfile
     ports:
-      - "3000:3000"
+      - "3001:3001"
     environment:
-      - NODE_ENV=production
-      - DB_TYPE=sqlite
-      - DB_PATH=/app/data/posq.db
-      - JWT_SECRET=your-super-secret-jwt-key-change-in-production
+      - NODE_ENV=development
+      - DB_TYPE=mysql
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_NAME=posq
+      - DB_USER=posq
+      - DB_PASSWORD=posqpassword
+      - JWT_SECRET=dev-secret-change-in-production
       - FRONTEND_URL=http://localhost:5173
+      - PORT=3001
     volumes:
-      - ./server/data:/app/data
       - ./server/uploads:/app/uploads
+      - ./server/logs:/app/logs
     depends_on:
-      - redis
+      mysql:
+        condition: service_healthy
     networks:
       - posq-network
 
-  # Frontend React App
   frontend:
     build:
       context: ./frontend
@@ -32,13 +37,25 @@ services:
     ports:
       - "5173:5173"
     environment:
-      - VITE_API_URL=http://localhost:3000
+      - VITE_API_URL=http://localhost:3001
     depends_on:
       - api
     networks:
       - posq-network
 
-  # Redis for caching and sessions
+  printer:
+    build:
+      context: ./printer-service
+      dockerfile: Dockerfile
+    ports:
+      - "4000:4000"
+    environment:
+      - API_URL=http://api:3001
+    depends_on:
+      - api
+    networks:
+      - posq-network
+
   redis:
     image: redis:7-alpine
     ports:
@@ -48,21 +65,6 @@ services:
     networks:
       - posq-network
 
-  # Printer Service
-  printer:
-    build:
-      context: ./printer-service
-      dockerfile: Dockerfile
-    ports:
-      - "4000:4000"
-    environment:
-      - API_URL=http://api:3000
-    depends_on:
-      - api
-    networks:
-      - posq-network
-
-  # MySQL for cloud mode (optional)
   mysql:
     image: mysql:8.0
     ports:
@@ -74,11 +76,13 @@ services:
       - MYSQL_PASSWORD=posqpassword
     volumes:
       - mysql_data:/var/lib/mysql
-      - ./server/sql/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-prootpassword"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
     networks:
       - posq-network
-    profiles:
-      - cloud
 
 volumes:
   redis_data:
@@ -87,48 +91,3 @@ volumes:
 networks:
   posq-network:
     driver: bridge
-=======
-=======
->>>>>>> origin/main
-version: '3.9'
-services:
-  server:
-    build: ./server
-    env_file:
-      - ./server/.env
-    ports:
-      - "3001:3001"
-    volumes:
-      - ./server:/app
-      - ./server/data:/app/data
-    depends_on:
-      - printer
-  frontend:
-    build: ./frontend
-    ports:
-      - "5173:5173"
-    environment:
-      - VITE_API_URL=http://localhost:3001
-  printer:
-    build: ./printer-service
-    ports:
-      - "4000:4000"
-
-  db:
-    image: mysql:8
-    environment:
-      MYSQL_DATABASE: posq
-      MYSQL_USER: posq
-      MYSQL_PASSWORD: posq
-      MYSQL_ROOT_PASSWORD: root
-    ports:
-      - "3306:3306"
-    volumes:
-      - db_data:/var/lib/mysql
-
-volumes:
-  db_data: {}
-<<<<<<< HEAD
->>>>>>> e0c392214cbb541e36508749d9336f9cc9e18c38
-=======
->>>>>>> origin/main

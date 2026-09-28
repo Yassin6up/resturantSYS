@@ -1,0 +1,12 @@
+import { useState } from 'react'
+import { ArrowUpRight, Clock, CalendarDays, Search } from 'lucide-react'
+import { useTheme } from '../contexts/ThemeContext'
+import { useTenant } from '../contexts/TenantContext'
+export default function ServiceCatalog({services,storeName,onSelectService,style='default'}) {
+ const [query,setQuery]=useState('')
+ const {getCurrency}=useTheme()
+ const tenant = useTenant()
+ const customTheme = tenant.settings?.custom_theme?.active === false ? null : tenant.settings?.custom_theme
+ const filtered=services.filter(s=>`${s.name} ${s.description||''}`.toLowerCase().includes(query.toLowerCase()))
+ return <div className={`service-catalog service-${style}`}><section className="service-hero"><div><p className="eyebrow">MAKE TIME FOR WHAT MATTERS</p><h1>{storeName || 'Your next appointment'}<span>{customTheme?.heroTitle || <>A little time.<br/>Just for you.</>}</span></h1><p>{customTheme?.heroSubtitle || 'Find your service, choose a time, and leave the rest to us.'}</p></div><div className="service-hero-card"><CalendarDays size={38}/><p>Your next visit,<br/><strong>beautifully simple.</strong></p><ol><li><span>01</span> Find your service</li><li><span>02</span> Choose an available time</li><li><span>03</span> Request your appointment</li></ol></div></section><div className="catalog-section-heading"><h2>How can we help?</h2><span>{services.length} services</span></div><div className="catalog-search mb-6"><Search size={18}/><input aria-label="Search services" placeholder="Find a service…" value={query} onChange={e=>setQuery(e.target.value)}/></div><div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">{filtered.map(s=><button key={s.id} onClick={()=>onSelectService(s)} className="service-card">{s.image_url&&<img loading="lazy" src={s.image_url} alt=""/>}<div className="p-6"><p className="eyebrow">{s.category||'BY APPOINTMENT'}</p><h3>{s.name}</h3><p className="text-slate-500 text-sm mt-3 leading-relaxed">{s.description}</p><div className="flex justify-between items-center mt-6"><span className="flex items-center gap-2 text-sm"><Clock size={16}/>{s.duration_minutes} min</span><strong>{Number(s.price).toFixed(2)} {getCurrency()}</strong></div><span className="flex justify-between items-center mt-6 pt-4 border-t text-sm font-semibold">Choose a time<ArrowUpRight size={20}/></span></div></button>)}</div>{!filtered.length&&<p className="catalog-empty">No services match your search. Try another name.</p>}</div>
+}

@@ -1,0 +1,141 @@
+# Production stack: wildcard-TLS reverse proxy + API + MySQL + Redis.
+#
+# One-time setup:
+#   1. Point DNS: an A/AAAA record for {APP_DOMAIN} and *.{APP_DOMAIN} at
+#      this server's IP (a single wildcard record covers every restaurant -
+#      no DNS work needed when a new restaurant signs up).
+#   2. Copy .env.production.example to .env.production and fill it in.
+#   3. docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
+#
+# Scale the API horizontally with, e.g.:
+#   docker compose -f docker-compose.prod.yml --env-file .env.production up -d --scale api=3
+# (Socket.IO uses the Redis adapter so real-time events still reach clients
+# connected to a different replica - see server/index.js.)
+
+version: '3.8'
+
+services:
+  caddy:
+    build:
+      context: ./deploy
+      dockerfile: Caddy.Dockerfile
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      - APP_DOMAIN=${APP_DOMAIN}
+      - CLOUDFLARE_API_TOKEN=${CLOUDFLARE_API_TOKEN}
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - api
+      - frontend
+    restart: unless-stopped
+    networks:
+      - posq-network
+
+  api:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - APP_DOMAIN=${APP_DOMAIN}
+      - FRONTEND_URL=https://admin.${APP_DOMAIN}
+      - JWT_SECRET=${JWT_SECRET}
+      - REFRESH_SECRET=${REFRESH_SECRET}
+      - DB_TYPE=mysql
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_NAME=${DB_NAME:-posq}
+      - DB_USER=${DB_USER:-posq}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - REDIS_URL=redis://redis:6379
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
+      - STRIPE_BILLING_WEBHOOK_SECRET=${STRIPE_BILLING_WEBHOOK_SECRET}
+      - DEFAULT_BRANCH_ID=${DEFAULT_BRANCH_ID:-}
+    volumes:
+      - api_uploads:/app/uploads
+      - api_logs:/app/logs
+      - whatsapp_sessions:/app/data/whatsapp_sessions
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3001/health/ready', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    networks:
+      - posq-network
+
+  frontend:
+    # VITE_API_URL is intentionally not set here: it's a Vite *build-time*
+    # variable baked into the static bundle, so a runtime `environment:`
+    # entry would have no effect on already-built files. Left unset, the
+    # frontend's api.js defaults to '' (relative requests), which is exactly
+    # right here since Caddy serves both the API and the static app under
+    # the same origin.
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    networks:
+      - posq-network
+
+  printer:
+    build:
+      context: ./printer-service
+      dockerfile: Dockerfile
+    environment:
+      - API_URL=http://api:3001
+    restart: unless-stopped
+    networks:
+      - posq-network
+
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    networks:
+      - posq-network
+
+  mysql:
+    image: mysql:8.0
+    environment:
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+      - MYSQL_DATABASE=${DB_NAME:-posq}
+      - MYSQL_USER=${DB_USER:-posq}
+      - MYSQL_PASSWORD=${DB_PASSWORD}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    networks:
+      - posq-network
+
+volumes:
+  caddy_data:
+  caddy_config:
+  api_uploads:
+  api_logs:
+  whatsapp_sessions:
+  redis_data:
+  mysql_data:
+
+networks:
+  posq-network:
+    driver: bridge

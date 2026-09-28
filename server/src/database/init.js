@@ -5,60 +5,26 @@ const db = knex(config[process.env.NODE_ENV || 'development']);
 
 async function applyMultiTenantSchema() {
   try {
-    // Check if multi-tenant columns exist, if not add them
-    const branchesInfo = await db.raw("PRAGMA table_info('branches')");
-    const branchesColumns = branchesInfo.map(col => col.name);
-    
-    if (!branchesColumns.includes('owner_id')) {
-      console.log('📦 Applying multi-tenant schema updates...');
-      
-      // Add columns to branches table
-      await db.schema.table('branches', table => {
-        table.integer('owner_id').unsigned();
-        table.string('phone');
-        table.string('email');
-        table.string('logo_url');
-        table.text('settings');
-        table.boolean('is_active').defaultTo(true);
-      });
-      
-      // Add columns to users table
-      const usersInfo = await db.raw("PRAGMA table_info('users')");
-      const usersColumns = usersInfo.map(col => col.name);
-      
-      if (!usersColumns.includes('branch_id')) {
-        await db.schema.table('users', table => {
-          table.integer('branch_id').unsigned();
-          table.string('email');
-          table.string('phone');
-          table.decimal('salary', 10, 2);
-          table.date('hire_date');
-        });
-      }
-      
-      console.log('✅ Multi-tenant schema applied');
-    }
-    
-    // Check for additional branch fields (website, description)
-    if (!branchesColumns.includes('website')) {
-      await db.schema.table('branches', table => {
-        table.string('website');
-        table.text('description');
-      });
-      console.log('✅ Branch extended fields applied');
-    }
+    const branchColumns = [
+      ['owner_id', table => table.integer('owner_id').unsigned()], ['phone', table => table.string('phone')],
+      ['email', table => table.string('email')], ['logo_url', table => table.string('logo_url')],
+      ['settings', table => table.text('settings')], ['is_active', table => table.boolean('is_active').defaultTo(true)],
+      ['website', table => table.string('website')], ['description', table => table.text('description')]
+    ];
+    for (const [name, add] of branchColumns) if (!(await db.schema.hasColumn('branches', name))) await db.schema.table('branches', add);
+    const userColumns = [
+      ['branch_id', table => table.integer('branch_id').unsigned()], ['email', table => table.string('email')],
+      ['phone', table => table.string('phone')], ['salary', table => table.decimal('salary', 10, 2)], ['hire_date', table => table.date('hire_date')]
+    ];
+    for (const [name, add] of userColumns) if (!(await db.schema.hasColumn('users', name))) await db.schema.table('users', add);
   } catch (error) {
-    console.log('⚠️ Multi-tenant schema check skipped or already applied');
+    console.log('⚠️ Multi-tenant schema check skipped:', error.message);
   }
 }
 
 async function applyCategorySchema() {
   try {
-    // Check if category columns exist, if not add them
-    const categoriesInfo = await db.raw("PRAGMA table_info('categories')");
-    const categoriesColumns = categoriesInfo.map(col => col.name);
-    
-    if (!categoriesColumns.includes('description')) {
+    if (!(await db.schema.hasColumn('categories', 'description'))) {
       console.log('📦 Applying category schema updates...');
       
       await db.schema.table('categories', table => {
@@ -69,23 +35,14 @@ async function applyCategorySchema() {
       console.log('✅ Category schema applied');
     }
   } catch (error) {
-    console.log('⚠️ Category schema check skipped or already applied:', error.message);
+    console.log('⚠️ Category schema check skipped:', error.message);
   }
 }
 
 async function initializeDatabase() {
   try {
-    // Check if migrations table exists (indicating migrations have run before)
-    const hasMigrationsTable = await db.schema.hasTable('knex_migrations');
-    
-    if (!hasMigrationsTable) {
-      // Run migrations only if they haven't run before
-      await db.migrate.latest();
-      console.log('✅ Database migrations completed');
-    } else {
-      console.log('✅ Database already initialized');
-    }
-    
+    // Apply pending migrations on both new and existing installations.
+    await db.migrate.latest();
     // Apply multi-tenant schema updates
     await applyMultiTenantSchema();
     

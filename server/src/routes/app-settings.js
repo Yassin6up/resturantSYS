@@ -1,272 +1,67 @@
-const express = require('express');
+const router = require('express').Router();
 const { db } = require('../database/init');
-const { authenticateToken, authorize } = require('../middleware/auth');
-const { logger } = require('../middleware/errorHandler');
+const { authenticateToken, optionalAuth, authorize } = require('../middleware/auth');
 
-const router = express.Router();
-
-// Get all settings (public settings only for non-authenticated users)
-router.get('/', async (req, res) => {
-  try {
-    const isAuthenticated = req.headers.authorization;
-    
-    let query = db('app_settings');
-    
-    // If not authenticated, only return public settings
-    if (!isAuthenticated) {
-      query = query.where({ is_public: true });
-    }
-    
-    const settings = await query.select('key', 'value', 'type', 'category', 'description', 'is_public');
-    
-    // Convert to object format
-    const settingsObj = {};
-    settings.forEach(setting => {
-      let value = setting.value;
-      
-      // Parse value based on type
-      switch (setting.type) {
-        case 'number':
-          value = parseFloat(value);
-          break;
-        case 'boolean':
-          value = value === 'true';
-          break;
-        case 'json':
-          try {
-            value = JSON.parse(value);
-          } catch (e) {
-            value = value;
-          }
-          break;
-        default:
-          value = value;
-      }
-      
-      settingsObj[setting.key] = {
-        value,
-        type: setting.type,
-        category: setting.category,
-        description: setting.description,
-        isPublic: setting.is_public
-      };
-    });
-    
-    res.json({ success: true, settings: settingsObj });
-  } catch (error) {
-    logger.error('Settings fetch error:', error);
-    res.status(500).json({ error: 'Failed to fetch settings' });
+function parse(value) { try { return JSON.parse(value || '{}'); } catch { return {}; } }
+const templateKeys = ['menu_template', 'store_template', 'booking_template'];
+async function readSettings(req, category) {
+  let query = db('app_settings');
+  if (!req.user) query = query.where({ is_public: true });
+  if (category) query = query.where({ category });
+  const rows = await query;
+  const branchId = req.user?.branch_id || req.branchId;
+  const branch = branchId ? await db('branches').where({ id: branchId }).first() : null;
+  const overrides = parse(branch?.settings);
+  const settings = {};
+  for (const row of rows) {
+    let value = row.value;
+    if (row.type === 'number') value = Number(value);
+    if (row.type === 'boolean') value = value === 'true';
+    if (row.type === 'json') value = parse(value);
+    settings[row.key] = { value: overrides[row.key] ?? value, type: row.type, category: row.category, description: row.description, isPublic: row.is_public };
   }
+  if (!category) for (const key of templateKeys) settings[key] = {value: overrides[key] || 'default',type:'string',category:'appearance',isPublic:true};
+  return settings;
+}
+router.get('/', optionalAuth, async (req,res) => {
+  try { res.json({success:true,settings:await readSettings(req)}); }
+  catch { res.status(500).json({error:'Failed to load settings'}); }
 });
-
-// Get settings by category
-router.get('/category/:category', async (req, res) => {
+router.get('/category/:category', optionalAuth, async (req,res) => {
+  try { res.json({success:true,settings:await readSettings(req,req.params.category)}); }
+  catch { res.status(500).json({error:'Failed to load settings'}); }
+});
+async function save(req,res,values) {
+  if (!req.user.branch_id) return res.status(400).json({error:'Select a store before updating its settings'});
+  if (!values || Array.isArray(values) || typeof values !== 'object') return res.status(400).json({error:'Invalid settings format'});
+  const definitions = await db('app_settings');
+  const allowed = new Set([...definitions.map(s=>s.key),...templateKeys]);
+  const accepted = Object.fromEntries(Object.entries(values).filter(([key])=>allowed.has(key)));
+  const choices = {menu_template:['default','modern','elegant','minimal','luxury','healthy','casual','cafe','steakhouse','sushi','bar'],store_template:['default','minimal','bold'],booking_template:['default','calm','professional']};
+  for (const key of templateKeys) if (accepted[key] !== undefined && !choices[key].includes(accepted[key])) return res.status(400).json({error:'Choose a valid template'});
+  await db.transaction(async trx => {
+    await trx('branches').where({id:req.user.branch_id}).update({updated_at:trx.fn.now()});
+    const branch=await trx('branches').where({id:req.user.branch_id}).first();
+    await trx('branches').where({id:branch.id}).update({settings:JSON.stringify({...parse(branch.settings),...accepted})});
+  });
+  res.json({success:true,updatedCount:Object.keys(accepted).length});
+}
+router.put('/',authenticateToken,authorize('admin','owner'),async(req,res)=>{
+  try { await save(req,res,req.body.settings); } catch {res.status(500).json({error:'Failed to save settings'});}
+});
+router.put('/:key',authenticateToken,authorize('admin','owner'),async(req,res)=>{
+  try { await save(req,res,{[req.params.key]:req.body.value}); } catch {res.status(500).json({error:'Failed to save setting'});}
+});
+router.post('/reset',authenticateToken,authorize('admin','owner'),async(req,res)=>{
   try {
-    const { category } = req.params;
-    const isAuthenticated = req.headers.authorization;
-    
-    let query = db('app_settings').where({ category });
-    
-    if (!isAuthenticated) {
-      query = query.where({ is_public: true });
-    }
-    
-    const settings = await query.select('key', 'value', 'type', 'category', 'description', 'is_public');
-    
-    const settingsObj = {};
-    settings.forEach(setting => {
-      let value = setting.value;
-      
-      switch (setting.type) {
-        case 'number':
-          value = parseFloat(value);
-          break;
-        case 'boolean':
-          value = value === 'true';
-          break;
-        case 'json':
-          try {
-            value = JSON.parse(value);
-          } catch (e) {
-            value = value;
-          }
-          break;
-        default:
-          value = value;
-      }
-      
-      settingsObj[setting.key] = {
-        value,
-        type: setting.type,
-        category: setting.category,
-        description: setting.description,
-        isPublic: setting.is_public
-      };
-    });
-    
-    res.json({ success: true, settings: settingsObj });
-  } catch (error) {
-    logger.error('Settings category fetch error:', error);
-    res.status(500).json({ error: 'Failed to fetch settings category' });
-  }
+    if(!req.user.branch_id) return res.status(400).json({error:'Select a store first'});
+    const rows=await db('app_settings').modify(q=>{if(req.body.category) q.where({category:req.body.category});});
+    const branch=await db('branches').where({id:req.user.branch_id}).first();
+    const settings=parse(branch.settings);
+    for(const row of rows) delete settings[row.key];
+    if(!req.body.category) for(const key of templateKeys) delete settings[key];
+    await db('branches').where({id:branch.id}).update({settings:JSON.stringify(settings)});
+    res.json({success:true});
+  } catch {res.status(500).json({error:'Failed to reset settings'});}
 });
-
-// Update single setting (admin only)
-router.put('/:key', authenticateToken, authorize('admin'), async (req, res) => {
-  try {
-    const { key } = req.params;
-    const { value } = req.body;
-    
-    // Get current setting to determine type
-    const currentSetting = await db('app_settings').where({ key }).first();
-    
-    if (!currentSetting) {
-      return res.status(404).json({ error: 'Setting not found' });
-    }
-    
-    // Convert value based on type
-    let processedValue = value;
-    switch (currentSetting.type) {
-      case 'number':
-        processedValue = parseFloat(value).toString();
-        break;
-      case 'boolean':
-        processedValue = Boolean(value).toString();
-        break;
-      case 'json':
-        processedValue = JSON.stringify(value);
-        break;
-      default:
-        processedValue = String(value);
-    }
-    
-    await db('app_settings')
-      .where({ key })
-      .update({ 
-        value: processedValue,
-        updated_at: db.raw('CURRENT_TIMESTAMP')
-      });
-    
-    // Log setting update
-    await db('audit_logs').insert({
-      user_id: req.user.id,
-      action: 'SETTING_UPDATE',
-      meta: JSON.stringify({ 
-        key, 
-        oldValue: currentSetting.value, 
-        newValue: processedValue,
-        userId: req.user.id
-      })
-    });
-    
-    logger.info(`Setting updated: ${key} by ${req.user.username}`);
-    
-    res.json({ success: true, message: 'Setting updated successfully' });
-  } catch (error) {
-    logger.error('Setting update error:', error);
-    res.status(500).json({ error: 'Failed to update setting' });
-  }
-});
-
-// Update multiple settings (admin only)
-router.put('/', authenticateToken, authorize('admin'), async (req, res) => {
-  try {
-    const { settings } = req.body;
-    
-    if (!settings || typeof settings !== 'object') {
-      return res.status(400).json({ error: 'Invalid settings format' });
-    }
-    
-    const updates = [];
-    
-    for (const [key, value] of Object.entries(settings)) {
-      // Get current setting to determine type
-      const currentSetting = await db('app_settings').where({ key }).first();
-      
-      if (!currentSetting) {
-        continue; // Skip unknown settings
-      }
-      
-      // Convert value based on type
-      let processedValue = value;
-      switch (currentSetting.type) {
-        case 'number':
-          processedValue = parseFloat(value).toString();
-          break;
-        case 'boolean':
-          processedValue = Boolean(value).toString();
-          break;
-        case 'json':
-          processedValue = JSON.stringify(value);
-          break;
-        default:
-          processedValue = String(value);
-      }
-      
-      updates.push({
-        key,
-        value: processedValue,
-        oldValue: currentSetting.value
-      });
-    }
-    
-    // Update all settings
-    for (const update of updates) {
-      await db('app_settings')
-        .where({ key: update.key })
-        .update({ 
-          value: update.value,
-          updated_at: db.raw('CURRENT_TIMESTAMP')
-        });
-      
-      // Log setting update
-      await db('audit_logs').insert({
-        user_id: req.user.id,
-        action: 'SETTING_UPDATE',
-        meta: JSON.stringify({ 
-          key: update.key, 
-          oldValue: update.oldValue, 
-          newValue: update.value,
-          userId: req.user.id
-        })
-      });
-    }
-    
-    logger.info(`Multiple settings updated by ${req.user.username}`);
-    
-    res.json({ success: true, message: 'Settings updated successfully', updatedCount: updates.length });
-  } catch (error) {
-    logger.error('Settings update error:', error);
-    res.status(500).json({ error: 'Failed to update settings' });
-  }
-});
-
-// Reset settings to default (admin only)
-router.post('/reset', authenticateToken, authorize('admin'), async (req, res) => {
-  try {
-    const { category } = req.body;
-    
-    // Delete existing settings
-    if (category) {
-      await db('app_settings').where({ category }).del();
-    } else {
-      await db('app_settings').del();
-    }
-    
-    // Re-run seeds for the category or all
-    if (category) {
-      // This would require importing the seed data and filtering by category
-      // For now, we'll just return success
-      logger.info(`Settings reset for category: ${category} by ${req.user.username}`);
-    } else {
-      logger.info(`All settings reset by ${req.user.username}`);
-    }
-    
-    res.json({ success: true, message: 'Settings reset successfully' });
-  } catch (error) {
-    logger.error('Settings reset error:', error);
-    res.status(500).json({ error: 'Failed to reset settings' });
-  }
-});
-
-module.exports = router;
+module.exports=router;

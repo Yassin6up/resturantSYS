@@ -9,8 +9,13 @@ printer-service/node_modules/
 .env.local
 .env.production
 .env.development
+.env.backup
 server/.env
+server/.env.backup
 frontend/.env
+
+# Real login credentials for seeded/demo accounts - never commit
+RESTAURANT_CREDENTIALS.md
 
 # Build outputs
 frontend/dist/
@@ -32,6 +37,9 @@ pnpm-debug.log*
 *.sqlite3
 server/data/*.db
 server/data/*.sqlite
+
+# WhatsApp session credentials - never commit, these ARE the login session
+server/data/whatsapp_sessions/
 
 # IDE
 .vscode/

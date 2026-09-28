@@ -1,4 +1,4 @@
-import { createContext, useContext, useReducer, useEffect } from 'react'
+import { createContext, useContext, useReducer, useEffect, useCallback } from 'react'
 
 const CartContext = createContext()
 
@@ -16,7 +16,7 @@ function cartReducer(state, action) {
       const existingItem = state.items.find(
         item => item.menuItemId === action.payload.menuItemId && 
         JSON.stringify(item.modifiers) === JSON.stringify(action.payload.modifiers) &&
-        item.variantId === action.payload.variantId
+        item.variantId === action.payload.variantId && item.note === action.payload.note
       )
 
       if (existingItem) {
@@ -91,8 +91,9 @@ function cartReducer(state, action) {
       return action.payload
     
     case 'SET_BRANCH_INFO':
+      if (state.branchId === action.payload.branchId && state.tableNumber === action.payload.tableNumber) return state
       return {
-        ...state,
+        ...(state.branchId && state.branchId !== action.payload.branchId ? initialState : state),
         branchId: action.payload.branchId,
         tableNumber: action.payload.tableNumber
       }
@@ -155,12 +156,12 @@ export function CartProvider({ children }) {
     });
   };
   
-  const setBranchInfo = (branchId, tableNumber) => {
+  const setBranchInfo = useCallback((branchId, tableNumber) => {
     dispatch({ 
       type: 'SET_BRANCH_INFO', 
       payload: { branchId, tableNumber } 
     })
-  }
+  }, [])
 
   const removeItem = (itemId) => {
     dispatch({ type: 'REMOVE_ITEM', payload: itemId })

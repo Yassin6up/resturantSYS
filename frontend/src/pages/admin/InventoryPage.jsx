@@ -5,15 +5,16 @@ import {
   PencilIcon, 
   TrashIcon,
   ExclamationTriangleIcon,
-  
-  
 } from '@heroicons/react/24/outline'
 import StockItemForm from '../../components/StockItemForm'
 import RecipesManagementTab from './RecipesManagementTab'
 import InventoryHistoryTab from './InventoryHistoryTab'
 import toast from 'react-hot-toast'
+import { useAdminBusiness } from '../../contexts/AdminBusinessContext'
 
 function InventoryPage() {
+  const { businessType } = useAdminBusiness()
+  const isRestaurant = businessType === 'restaurant'
   const [activeTab, setActiveTab] = useState('stock')
   const [stockItems, setStockItems] = useState([])
   const [recipes, setRecipes] = useState([])
@@ -31,18 +32,18 @@ function InventoryPage() {
       setLoading(true)
       const [stockRes, recipesRes, lowStockRes] = await Promise.all([
         inventoryAPI.getStockItems(),
-        inventoryAPI.getRecipes(),
+        isRestaurant ? inventoryAPI.getRecipes() : Promise.resolve({ data: { success: true, recipes: [] } }),
         inventoryAPI.getLowStockItems()
       ])
       
       if (stockRes.data.success) {
-        setStockItems(stockRes.data.items)
+        setStockItems(stockRes.data.items || stockRes.data.data || [])
       }
       if (recipesRes.data.success) {
-        setRecipes(recipesRes.data.recipes)
+        setRecipes(recipesRes.data.recipes || recipesRes.data.data || [])
       }
       if (lowStockRes.data.success) {
-        setLowStockItems(lowStockRes.data.items)
+        setLowStockItems(lowStockRes.data.items || lowStockRes.data.data || [])
       }
     } catch (error) {
       toast.error('Failed to load inventory data')
@@ -62,18 +63,36 @@ function InventoryPage() {
     setShowStockForm(true)
   }
 
-  const handleSaveStockItem = (savedItem) => {
-    if (editingItem) {
-      // Update existing item
-      setStockItems(prev => prev.map(item => 
-        item.id === savedItem.id ? savedItem : item
-      ))
-    } else {
-      // Add new item
-      setStockItems(prev => [savedItem, ...prev])
+  const handleSaveStockItem = async (formData) => {
+    try {
+      let response;
+      
+      if (editingItem) {
+        // Update existing item
+        response = await inventoryAPI.updateStockItem(editingItem.id, formData)
+        if (response.data.success) {
+          const updatedItem = response.data.item || response.data.data
+          setStockItems(prev => prev.map(item => 
+            item.id === updatedItem.id ? updatedItem : item
+          ))
+          toast.success('Stock item updated successfully')
+        }
+      } else {
+        // Create new item
+        response = await inventoryAPI.createStockItem(formData)
+        if (response.data.success) {
+          const newItem = response.data.item || response.data.data
+          setStockItems(prev => [newItem, ...prev])
+          toast.success('Stock item created successfully')
+        }
+      }
+      
+      setShowStockForm(false)
+      setEditingItem(null)
+    } catch (error) {
+      console.error('Save stock item error:', error)
+      toast.error(error.response?.data?.error || `Failed to ${editingItem ? 'update' : 'create'} stock item`)
     }
-    setShowStockForm(false)
-    setEditingItem(null)
   }
 
   const handleCancelStockForm = () => {
@@ -87,9 +106,11 @@ function InventoryPage() {
     }
 
     try {
-      await inventoryAPI.deleteStockItem(itemId)
-      setStockItems(prev => prev.filter(item => item.id !== itemId))
-      toast.success('Stock item deleted successfully')
+      const response = await inventoryAPI.deleteStockItem(itemId)
+      if (response.data.success) {
+        setStockItems(prev => prev.filter(item => item.id !== itemId))
+        toast.success('Stock item deleted successfully')
+      }
     } catch (error) {
       console.error('Stock item deletion error:', error)
       toast.error(error.response?.data?.error || 'Failed to delete stock item')
@@ -116,9 +137,14 @@ function InventoryPage() {
   }
 
   const getStockStatus = (item) => {
-    if (item.current_stock <= item.min_stock) {
+    // Use the correct property names based on your API response
+    const currentStock = item.current_stock || item.quantity || 0
+    const minStock = item.min_stock || item.min_threshold || 0
+    const maxStock = item.max_stock || item.max_threshold || Infinity
+    
+    if (currentStock <= minStock) {
       return { status: 'low', color: 'text-red-600', bgColor: 'bg-red-50' }
-    } else if (item.current_stock >= item.max_stock) {
+    } else if (currentStock >= maxStock) {
       return { status: 'high', color: 'text-green-600', bgColor: 'bg-green-50' }
     } else {
       return { status: 'normal', color: 'text-gray-600', bgColor: 'bg-gray-50' }
@@ -142,7 +168,7 @@ function InventoryPage() {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold gradient-text">Inventory Management</h1>
-          <p className="text-gray-600 mt-2">Manage stock items, recipes, and inventory levels</p>
+          <p className="text-gray-600 mt-2">{isRestaurant ? 'Manage stock items, recipes, and inventory levels' : 'Manage stock items and inventory levels'}</p>
         </div>
         <button
           onClick={handleAddStockItem}
@@ -167,19 +193,25 @@ function InventoryPage() {
               </div>
             </div>
             <div className="mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-              {lowStockItems.slice(0, 6).map((item) => (
-                <div key={item.id} className="bg-white rounded-lg p-3 border border-red-200">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm font-medium text-gray-900">{item.name}</span>
-                    <span className="text-sm text-red-600 font-semibold">
-                      {item.current_stock} {item.unit}
-                    </span>
+              {lowStockItems.slice(0, 6).map((item) => {
+                const currentStock = item.current_stock || item.quantity || 0
+                const minStock = item.min_stock || item.min_threshold || 0
+                const unit = item.unit || ''
+                
+                return (
+                  <div key={item.id} className="bg-white rounded-lg p-3 border border-red-200">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm font-medium text-gray-900">{item.name}</span>
+                      <span className="text-sm text-red-600 font-semibold">
+                        {currentStock} {unit}
+                      </span>
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      Min: {minStock} {unit}
+                    </div>
                   </div>
-                  <div className="text-xs text-gray-500">
-                    Min: {item.min_stock} {item.unit}
-                  </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </div>
         </div>
@@ -198,7 +230,7 @@ function InventoryPage() {
           >
             Stock Items ({stockItems.length})
           </button>
-          <button
+          {isRestaurant && <button
             onClick={() => setActiveTab('recipes')}
             className={`py-2 px-1 border-b-2 font-medium text-sm ${
               activeTab === 'recipes'
@@ -206,8 +238,8 @@ function InventoryPage() {
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
             }`}
           >
-            Recipes
-          </button>
+            Recipes ({recipes.length})
+          </button>}
           <button
             onClick={() => setActiveTab('history')}
             className={`py-2 px-1 border-b-2 font-medium text-sm ${
@@ -259,10 +291,7 @@ function InventoryPage() {
                         Current Stock
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Min/Max
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Cost Price
+                        Min Stock
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Status
@@ -275,6 +304,10 @@ function InventoryPage() {
                   <tbody className="bg-white divide-y divide-gray-200">
                     {stockItems.map((item) => {
                       const stockStatus = getStockStatus(item)
+                      const currentStock = item.current_stock || item.quantity || 0
+                      const minStock = item.min_stock || item.min_threshold || 0
+                      const unit = item.unit || ''
+                      
                       return (
                         <tr key={item.id}>
                           <td className="px-6 py-4 whitespace-nowrap">
@@ -286,21 +319,15 @@ function InventoryPage() {
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="flex items-center">
                               <span className={`text-sm font-semibold ${stockStatus.color}`}>
-                                {item.current_stock} {item.unit}
+                                {currentStock} {unit}
                               </span>
                               {stockStatus.status === 'low' && (
-                                <PlusIcon className="h-4 w-4 text-red-500 ml-1" />
-                              )}
-                              {stockStatus.status === 'high' && (
-                                <PlusIcon className="h-4 w-4 text-green-500 ml-1" />
+                                <ExclamationTriangleIcon className="h-4 w-4 text-red-500 ml-1" />
                               )}
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {item.min_stock} / {item.max_stock} {item.unit}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {item.cost_price?.toFixed(2) || '0.00'} MAD
+                            {minStock} {unit}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <span className={`badge ${stockStatus.bgColor} ${stockStatus.color}`}>
@@ -334,7 +361,12 @@ function InventoryPage() {
       )}
 
       {/* Recipes Tab */}
-      {activeTab === 'recipes' && <RecipesManagementTab />}
+      {isRestaurant && activeTab === 'recipes' && (
+        <RecipesManagementTab 
+          recipes={recipes} 
+          onRecipesUpdate={setRecipes}
+        />
+      )}
 
       {/* History Tab */}
       {activeTab === 'history' && <InventoryHistoryTab />}

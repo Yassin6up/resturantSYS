@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useAdminBusiness } from '../../contexts/AdminBusinessContext'
 import { useSocket } from '../../contexts/SocketContext'
 import { ordersAPI, appSettingsAPI , settingsAPI } from '../../services/api'
 import { 
@@ -15,6 +16,8 @@ import { useSearchParams } from 'react-router-dom'
 import InvoiceRenderer from '../../components/InvoiceRender'
 
 function OrdersPage() {
+  const { businessType } = useAdminBusiness()
+  const isRestaurant = businessType === 'restaurant'
   const { socket, updateOrderStatus: socketUpdateOrderStatus } = useSocket()
   const [orders, setOrders] = useState([])
   const [filteredOrders, setFilteredOrders] = useState([])
@@ -121,8 +124,8 @@ const loadBusinessInfo = async () => {
     ]);
 
     let businessData = {
-      name: 'Restaurant',
-      description: 'Modern Restaurant Management System',
+      name: 'Your Business',
+      description: 'Powered by POSQ',
       currency: 'MAD',
       taxRate: 0,
       serviceCharge: 0,
@@ -188,8 +191,8 @@ console.log('🟠 App settings fetched:', appSettings);
     console.error('Failed to load business info:', error);
     // Set default business info if API fails
     setBusinessInfo({
-      name: 'Restaurant',
-      description: 'Modern Restaurant Management System',
+      name: 'Your Business',
+      description: 'Powered by POSQ',
       currency: 'MAD',
       taxRate: 0,
       serviceCharge: 0,
@@ -494,12 +497,12 @@ console.log('🟠 App settings fetched:', appSettings);
             </div>
 
             <div>
-              <label className="form-label">Table</label>
+              <label className="form-label">{isRestaurant ? 'Table' : 'Order reference'}</label>
               <input
                 type="text"
-                value={filters.table}
-                onChange={(e) => setFilters(prev => ({ ...prev, table: e.target.value }))}
-                placeholder="Table number"
+                value={isRestaurant ? filters.table : filters.search}
+                onChange={(e) => setFilters(prev => ({ ...prev, [isRestaurant ? 'table' : 'search']: e.target.value }))}
+                placeholder={isRestaurant ? 'Table number' : 'Search orders'}
                 className="form-input"
               />
             </div>
@@ -532,7 +535,7 @@ console.log('🟠 App settings fetched:', appSettings);
                       Order
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Table
+                      {isRestaurant ? 'Table' : 'Fulfilment'}
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Customer
@@ -562,7 +565,7 @@ console.log('🟠 App settings fetched:', appSettings);
                         <div className="text-sm text-gray-500">PIN: {order.pin}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {order.table_number || '-'}
+                        {isRestaurant ? order.table_number || '-' : order.order_type === 'DELIVERY' ? 'Delivery' : 'Pickup'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {order.customer_name || '-'}
@@ -659,8 +662,8 @@ console.log('🟠 App settings fetched:', appSettings);
                 </div>
                 
                 <div className="bg-gray-50 rounded-xl p-4">
-                  <p className="text-sm text-gray-600">Table Number</p>
-                  <p className="font-semibold text-lg">{selectedOrder.table_number || 'No Table'}</p>
+                  <p className="text-sm text-gray-600">{isRestaurant ? 'Table Number' : 'Fulfilment'}</p>
+                  <p className="font-semibold text-lg">{isRestaurant ? selectedOrder.table_number || 'No Table' : selectedOrder.order_type === 'DELIVERY' ? 'Delivery' : 'Pickup'}</p>
                 </div>
                 
                 <div className="bg-gray-50 rounded-xl p-4">

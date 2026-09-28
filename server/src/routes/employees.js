@@ -7,28 +7,43 @@ const { logger } = require('../middleware/errorHandler');
 
 router.get('/', authenticateToken, authorize('admin', 'manager'), async (req, res) => {
   try {
-    // Use authenticated user's branch_id for security
     const branchId = req.user.branch_id;
     
     if (!branchId) {
       return res.status(400).json({ error: 'User is not assigned to a branch' });
     }
 
+    // Define base columns that exist in your table
+    const baseColumns = [
+      'id',
+      'username',
+      'full_name',
+      'role',
+      'pin',
+      'is_active',
+      'branch_id',
+      'created_at'
+    ];
+
+    // Check if additional columns exist (you might want to cache this)
+    const tableInfo = await db.raw(`
+      SELECT COLUMN_NAME 
+      FROM INFORMATION_SCHEMA.COLUMNS 
+      WHERE TABLE_NAME = 'users' 
+      AND TABLE_SCHEMA = DATABASE()
+    `);
+    
+    const existingColumns = tableInfo[0].map(col => col.COLUMN_NAME);
+    const additionalColumns = ['salary', 'phone', 'email', 'hire_date'];
+    
+    // Only include columns that actually exist
+    const columnsToSelect = [
+      ...baseColumns,
+      ...additionalColumns.filter(col => existingColumns.includes(col))
+    ];
+
     const employees = await db('users')
-      .select(
-        'id',
-        'username',
-        'full_name',
-        'role',
-        'pin',
-        'salary',
-        'phone',
-        'email',
-        'hire_date',
-        'is_active',
-        'branch_id',
-        'created_at'
-      )
+      .select(columnsToSelect)
       .where({ branch_id: branchId })
       .orderBy('created_at', 'desc');
 
@@ -41,7 +56,6 @@ router.get('/', authenticateToken, authorize('admin', 'manager'), async (req, re
     res.status(500).json({ error: 'Failed to fetch employees' });
   }
 });
-
 router.get('/:id', authenticateToken, authorize('admin', 'manager'), async (req, res) => {
   try {
     const { id } = req.params;

@@ -1,148 +1,37 @@
-import { Outlet, useLocation, useNavigate } from "react-router-dom";
-import { useCart } from "../../contexts/CartContext";
-import { useTheme } from "../../contexts/ThemeContext";
-import { ShoppingCartIcon } from "@heroicons/react/24/outline";
-import CartBottomBar from "../CartBottomBar";
-import { useSearchParams } from "react-router-dom";
-function CustomerLayout() {
-  const location = useLocation();
-  const navigate = useNavigate();
-  const { itemCount, total } = useCart();
-  const { getAppName, getSetting, getWelcomeMessage } = useTheme();
-  const [searchParams] = useSearchParams();
-   const table = searchParams.get("table");
-   const branch = searchParams.get("branch") || "1";
-
-  const isCartPage = location.pathname === "/cart";
-  const isCheckoutPage = location.pathname === "/checkout";
-  const isOrderPage = location.pathname.startsWith("/order/");
-
-  return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow-lg border-b border-gray-200 sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-20">
-            <div className="flex items-center space-x-3">
-              {getSetting("logo_url") ? (
-                <img
-                  src={getSetting("logo_url")}
-                  alt="Logo"
-                  className="w-12 h-12 rounded-xl object-contain"
-                  onError={(e) => {
-                    e.target.style.display = "none";
-                    e.target.nextSibling.style.display = "flex";
-                  }}
-                />
-              ) : null}
-              <div
-                className="w-12 h-12 rounded-lg flex items-center justify-center shadow-md"
-                style={{
-                  background: `linear-gradient(135deg, ${getSetting("primary_color") || "#3B82F6"} 0%, ${getSetting("secondary_color") || "#1E40AF"} 100%)`,
-                  display: getSetting("logo_url") ? "none" : "flex",
-                }}
-              >
-                <span className="text-white font-bold text-xl">
-                  {getAppName().charAt(0)}
-                </span>
-              </div>
-              <h1 className="text-2xl font-bold text-gray-900">
-                {getAppName()}
-              </h1>
-            </div>
-
-            {/* Cart Button */}
-            {!isCartPage && !isCheckoutPage && !isOrderPage && (
-              <div className="flex items-center">
-                <button
-                  onClick={() => navigate(`/cart?table=${table}&branch=${branch}`)}
-                  className="relative btn-primary group rounded-lg px-4 py-2 flex items-center shadow-lg hover:shadow-xl transition"
-                >
-                  <ShoppingCartIcon className="h-5 w-5 mr-2 group-hover:animate-bounce" />
-                  Cart
-                  {itemCount > 0 && (
-                    <span className="absolute -top-2 -right-2 bg-gradient-to-r from-red-500 to-pink-500 text-white text-xs rounded-full h-6 w-6 flex items-center justify-center font-semibold shadow-lg animate-bounce">
-                      {itemCount}
-                    </span>
-                  )}
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      </header>
-
-      {/* Welcome Section */}
-      {location.pathname === "/" || location.pathname === "/menu" ? (
-        <div className="bg-white border-b border-gray-200 py-8">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">
-              {getSetting("header_text") || getWelcomeMessage()}
-            </h2>
-            <p className="text-gray-600">
-              {getSetting("order_instructions") ||
-                "Scan QR code to order • Pay at cashier"}
-            </p>
-          </div>
-        </div>
-      ) : null}
-
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="animate-fadeInUp">
-          <Outlet />
-        </div>
-      </main>
-
-      {/* Footer */}
-      <footer className="bg-white border-t border-gray-200 mt-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <div className="text-center">
-            <div className="flex justify-center items-center space-x-3 mb-6">
-              {getSetting("logo_url") ? (
-                <img
-                  src={getSetting("logo_url")}
-                  alt="Logo"
-                  className="w-10 h-10 rounded-lg object-contain"
-                  onError={(e) => {
-                    e.target.style.display = "none";
-                    e.target.nextSibling.style.display = "flex";
-                  }}
-                />
-              ) : null}
-              <div
-                className="w-10 h-10 rounded-lg flex items-center justify-center shadow-md"
-                style={{
-                  background: `linear-gradient(135deg, ${getSetting("primary_color") || "#3B82F6"} 0%, ${getSetting("secondary_color") || "#1E40AF"} 100%)`,
-                  display: getSetting("logo_url") ? "none" : "flex",
-                }}
-              >
-                <span className="text-white font-bold text-lg">
-                  {getAppName().charAt(0)}
-                </span>
-              </div>
-              <span className="text-xl font-bold text-gray-900">
-                {getAppName()}
-              </span>
-            </div>
-            <p className="text-gray-600 mb-2">
-              &copy; 2024 {getAppName()}. All rights reserved.
-            </p>
-            <p className="text-sm text-gray-500">
-              {getSetting("order_instructions") ||
-                "Scan QR code to order • Pay at cashier"}
-            </p>
-            <p className="text-xs text-gray-400 mt-2">
-              {getSetting("footer_text") || "Powered by modern technology"}
-            </p>
-          </div>
-        </div>
-      </footer>
-
-      {/* Mobile Cart Bottom Bar */}
-      <CartBottomBar />
-    </div>
-  );
+import { Link, Outlet, useLocation } from 'react-router-dom'
+import { ShoppingBag, CalendarDays, UserRound } from 'lucide-react'
+import { useTenant } from '../../contexts/TenantContext'
+import { useCart } from '../../contexts/CartContext'
+import { useTheme } from '../../contexts/ThemeContext'
+import CartBottomBar from '../CartBottomBar'
+export default function CustomerLayout() {
+ const tenant = useTenant()
+ const { itemCount } = useCart()
+ const { getAppName } = useTheme()
+ const location = useLocation()
+ const booking = ['appointments','hotel','office'].includes(tenant.businessType)
+ const name = tenant.name || getAppName()
+ const customTheme = tenant.settings?.custom_theme?.active ? tenant.settings.custom_theme : null
+ const themeStyle = customTheme?.active === false ? {} : {
+  '--theme-primary': customTheme?.colors?.primary || '#263f32',
+  '--theme-secondary': customTheme?.colors?.secondary || '#eaece4',
+  '--theme-accent': customTheme?.colors?.accent || '#9b6b32',
+  '--theme-background': customTheme?.colors?.background || '#faf9f6',
+  '--theme-text': customTheme?.colors?.text || '#202925'
+ }
+ const query = location.search
+ if (location.pathname === '/' && !tenant.loading && !tenant.found) return <Outlet />
+ return <div className="customer-site" style={themeStyle} data-uploaded-theme={customTheme?.active !== false ? customTheme?.id : undefined}>
+  <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 bg-white p-3">Skip to content</a>
+  <header className="store-header"><div className="store-header-inner"><Link to={`/${query}`} className="store-brand">{(customTheme?.logoUrl || tenant.logoUrl) ? <img src={customTheme?.logoUrl || tenant.logoUrl} alt=""/> : <span className="store-monogram">{name.charAt(0)}</span>}<span>{name}</span></Link>
+    <nav aria-label="Main navigation" className="flex items-center gap-2 sm:gap-5">
+     {!booking && <Link to={`/${query}`} className="hidden sm:block text-sm">{tenant.businessType === 'ecommerce' ? 'Collection' : 'Menu'}</Link>}
+     {tenant.businessType === 'restaurant' && <Link to={`/reservations${query}`} className="store-nav-action"><CalendarDays size={18}/><span className="hidden sm:inline">Reserve a table</span></Link>}
+     <Link aria-label="Your account" to={`/account${query}`} className="store-nav-action"><UserRound size={19}/></Link>
+     {!booking && <Link to={`/cart${query}`} className="store-nav-action"><ShoppingBag size={19}/><span>({itemCount})</span></Link>}
+    </nav></div></header>
+  <main id="main-content" className="store-main"><Outlet /></main>
+  <footer className="store-footer"><Link to={`/${query}`} className="font-semibold">{name}</Link><p>© {new Date().getFullYear()} {name}</p><Link to={`/order-status${query}`}>{booking ? '' : 'Track an order'}</Link></footer>
+  <CartBottomBar />
+ </div>
 }
-
-export default CustomerLayout;

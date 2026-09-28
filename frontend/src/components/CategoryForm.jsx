@@ -91,7 +91,7 @@ function CategoryForm({
         </div>
       </div>
 
-      <div>
+      {/* <div>
         <label className="form-label">Description</label>
         <textarea
           {...register('description')}
@@ -99,18 +99,18 @@ function CategoryForm({
           className="form-input"
           placeholder="Enter category description"
         />
-      </div>
+      </div> */}
 
       {/* Status */}
       <div>
-        <label className="flex items-center">
+        {/* <label className="flex items-center">
           <input
             type="checkbox"
             {...register('isActive')}
             className="form-checkbox"
           />
           <span className="ml-2 text-sm text-gray-700">Active (visible to customers)</span>
-        </label>
+        </label> */}
       </div>
 
       {/* Actions */}

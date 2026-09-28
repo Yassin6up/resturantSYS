@@ -4,8 +4,13 @@ const { db } = require('../database/init');
 const { authenticateToken, authorize } = require('../middleware/auth');
 const logger = require('winston');
 
-// Get all variants for a menu item
-router.get('/menu-item/:menuItemId', authenticateToken, async (req, res) => {
+// Get all variants for a menu item. Public and read-only - the customer
+// storefront needs this before adding an item to cart, and anonymous
+// customers have no token. Was previously gated by authenticateToken, which
+// meant any customer viewing an item with variants got hard-redirected to
+// /admin/login by the global 401 interceptor - a real bug, not a security
+// concern, since variant names/prices aren't sensitive.
+router.get('/menu-item/:menuItemId', async (req, res) => {
   try {
     const { menuItemId } = req.params;
 

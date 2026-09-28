@@ -11,7 +11,6 @@ const router = express.Router();
 router.get('/image/:filename', async (req, res) => {
   try {
     const filename = req.params.filename;
-    console.log('Requested filename:', filename);
     const uploadsDir = path.join(__dirname, '../../uploads');
     const filePath = path.join(uploadsDir, filename);
 

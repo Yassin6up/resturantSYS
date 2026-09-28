@@ -7,8 +7,7 @@ describe('Orders API', () => {
 
   beforeAll(async () => {
     // Setup test database
-    await db.migrate.latest();
-    await db.seed.run();
+    await require('./fixture')();
 
     // Get auth token
     const loginResponse = await request(app)
@@ -29,7 +28,7 @@ describe('Orders API', () => {
     it('should create a new order', async () => {
       const orderData = {
         branchId: 1,
-        tableId: 1,
+        tableNumber: 'T1',
         customerName: 'Test Customer',
         items: [
           {
@@ -49,7 +48,7 @@ describe('Orders API', () => {
       expect(response.status).toBe(201);
       expect(response.body).toHaveProperty('orderId');
       expect(response.body).toHaveProperty('orderCode');
-      expect(response.body).toHaveProperty('qr');
+      expect(response.body).toHaveProperty('trackingQrCode');
       expect(response.body.status).toBe('PENDING');
     });
 
@@ -95,7 +94,7 @@ describe('Orders API', () => {
       // Create a test order
       const orderData = {
         branchId: 1,
-        tableId: 1,
+        tableNumber: 'T1',
         customerName: 'Test Customer',
         items: [
           {

@@ -13,6 +13,7 @@ exports.seed = async function(knex) {
     {
       name: 'Marrakech Medina',
       code: 'MRK',
+      slug: 'marrakech-medina',
       address: '789 Jemaa el-Fnaa, Marrakech, Morocco',
       phone: '+212-524-123789',
       email: 'marrakech@posq.com',
@@ -31,6 +32,7 @@ exports.seed = async function(knex) {
     {
       name: 'Tangier Seaside',
       code: 'TNG',
+      slug: 'tangier-seaside',
       address: '321 Boulevard Pasteur, Tangier, Morocco',
       phone: '+212-539-987654',
       email: 'tangier@posq.com',
@@ -49,6 +51,7 @@ exports.seed = async function(knex) {
     {
       name: 'Fes Heritage',
       code: 'FES',
+      slug: 'fes-heritage',
       address: '555 Bab Boujloud, Fes, Morocco',
       phone: '+212-535-456789',
       email: 'fes@posq.com',

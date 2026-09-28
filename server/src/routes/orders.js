@@ -1,32 +1,53 @@
 const express = require('express');
 const QRCode = require('qrcode');
+const { randomBytes, randomInt } = require('crypto');
 const { db } = require('../database/init');
-const { authenticateToken, authorize } = require('../middleware/auth');
+const { authenticateToken, authorize, optionalAuth, requireActiveBranch } = require('../middleware/auth');
 const { validateOrder } = require('../middleware/validation');
 const { orderRateLimiter } = require('../middleware/rateLimiter');
 const { logger } = require('../middleware/errorHandler');
+const { TRANSITIONS, canTransition, isConfirmedOrLater } = require('../utils/orderStateMachine');
+const { previewReward, applyRedemption, earnPointsForOrder, reverseLoyaltyForOrder } = require('../utils/loyalty');
+const { syncMenuItemAvailability } = require('../utils/menuAvailability');
 
 const router = express.Router();
 
 // Updated order creation API - using existing variant fields in order_items
-router.post('/', orderRateLimiter, validateOrder, async (req, res) => {
+router.post('/', orderRateLimiter, optionalAuth, validateOrder, async (req, res) => {
   const trx = await db.transaction();
   
   try {
-    const { 
-      branchId, 
-      tableNumber, 
+    let {
+      tableNumber,
       customerName, 
       items, 
       paymentMethod, 
       amountPaid,
       changeAmount,
       deliveryAddress,
-      customerPhone
+      customerPhone ,
+      paymentStatus ,
+      orderStatus,
+      customerId,
+      rewardId
     } = req.body;
+    // A logged-in staff member's own branch is authoritative and can't be
+    // spoofed by the client; only fall back to tenant/body resolution for
+    // the anonymous customer QR-ordering flow.
+    const branchId = req.user?.branch_id || req.branchId || req.body.branchId;
+    if (!branchId) {
+      await trx.rollback();
+      return res.status(400).json({ error: 'Could not determine which restaurant this order is for' });
+    }
 
-    console.log('🔵 BACKEND - Received order data:', { 
-      branchId, 
+    const branchCheck = await trx('branches').where({ id: branchId }).first();
+    if (!branchCheck || branchCheck.is_active === false || branchCheck.is_active === 0) {
+      await trx.rollback();
+      return res.status(403).json({ error: 'This restaurant is not currently accepting orders' });
+    }
+
+    console.log('🔵 BACKEND - Received order data:', {
+      branchId,
       tableNumber, 
       customerName,
       items: items.map(item => ({
@@ -36,15 +57,31 @@ router.post('/', orderRateLimiter, validateOrder, async (req, res) => {
       }))
     });
 
-    // Validate table
-    const table = await trx('tables')
-      .where({ 
-        table_number: tableNumber.toString(),
-        branch_id: branchId 
-      })
-      .first();
-    
-    if (!table) {
+    const isStaff = req.user && ['admin', 'manager', 'cashier', 'waiter', 'owner'].includes(req.user.role);
+    if (!isStaff) {
+      paymentStatus = 'UNPAID';
+      orderStatus = 'PENDING';
+      amountPaid = 0;
+      changeAmount = 0;
+      customerId = null;
+      rewardId = null;
+      if (paymentMethod && paymentMethod.toLowerCase() !== 'cash') {
+        await trx.rollback();
+        return res.status(400).json({ error: 'Online payment is not available in this checkout. Choose pay on collection or delivery.' });
+      }
+    }
+    paymentMethod = (paymentMethod || 'cash').toLowerCase();
+    const requestedType = req.body.orderType === 'TAKE_OUT' ? 'TAKEAWAY' : req.body.orderType;
+    const orderType = deliveryAddress ? 'DELIVERY' : (requestedType || (tableNumber && tableNumber !== 'null' ? 'DINE_IN' : 'TAKEAWAY'));
+    if (!['DINE_IN', 'TAKEAWAY', 'DELIVERY'].includes(orderType) || (orderType === 'DELIVERY' && !deliveryAddress?.trim())) {
+      await trx.rollback();
+      return res.status(400).json({ error: 'Choose a valid fulfillment method and delivery address' });
+    }
+    let table = null;
+    if (orderType === 'DINE_IN') {
+      table = await trx('tables').where({ table_number: String(tableNumber || ''), branch_id: branchId }).first();
+    }
+    if (orderType === 'DINE_IN' && !table) {
       await trx.rollback();
       return res.status(400).json({ 
         error: `Table "${tableNumber}" not found in branch ${branchId}.`
@@ -65,7 +102,7 @@ router.post('/', orderRateLimiter, validateOrder, async (req, res) => {
       .count('id as count')
       .first();
     
-    const orderCode = `${branch.code}-${timestamp}-${String(parseInt(orderCount.count) + 1).padStart(4, '0')}`;
+    const orderCode = `${branch.code}-${timestamp}-${randomBytes(5).toString('hex').toUpperCase()}`;
 
     // Generate unique PIN
     let pin;
@@ -74,7 +111,7 @@ router.post('/', orderRateLimiter, validateOrder, async (req, res) => {
     const maxAttempts = 10;
 
     while (!isUnique && attempts < maxAttempts) {
-      pin = Math.floor(10000000 + Math.random() * 90000000).toString();
+      pin = randomInt(10000000, 100000000).toString();
       const existingOrder = await trx('orders').where({ pin }).first();
       if (!existingOrder) {
         isUnique = true;
@@ -92,7 +129,7 @@ router.post('/', orderRateLimiter, validateOrder, async (req, res) => {
     const orderItems = [];
 
     for (const item of items) {
-      const menuItem = await trx('menu_items').where({ id: item.menuItemId }).first();
+      const menuItem = await trx('menu_items').where({ id: item.menuItemId, branch_id: branchId }).first();
       if (!menuItem) {
         await trx.rollback();
         return res.status(400).json({ error: `Menu item ${item.menuItemId} not found` });
@@ -116,6 +153,10 @@ router.post('/', orderRateLimiter, validateOrder, async (req, res) => {
           })
           .first();
         
+        if (!variant) {
+          await trx.rollback();
+          return res.status(400).json({ error: 'The selected product option is no longer available' });
+        }
         if (variant) {
           variantData = variant;
           basePrice += parseFloat(variant.price_adjustment || 0);
@@ -128,8 +169,12 @@ router.post('/', orderRateLimiter, validateOrder, async (req, res) => {
 
       // Add modifier costs
       if (item.modifiers && item.modifiers.length > 0) {
-        for (const modifierId of item.modifiers) {
-          const modifier = await trx('modifiers').where({ id: modifierId }).first();
+        for (const modifierId of new Set(item.modifiers)) {
+          const modifier = await trx('modifiers').where({ id: modifierId, menu_item_id: item.menuItemId }).first();
+          if (!modifier) {
+            await trx.rollback();
+            return res.status(400).json({ error: 'An add-on is not available for this item' });
+          }
           if (modifier) {
             itemTotal += parseFloat(modifier.extra_price || 0) * item.quantity;
             modifiers.push(modifier);
@@ -155,38 +200,54 @@ router.post('/', orderRateLimiter, validateOrder, async (req, res) => {
     const serviceChargeRate = await trx('settings').where({ key: 'service_charge_rate' }).first();
     
     const taxRateValue = parseFloat(taxRate?.value || 10);
-    const serviceChargeRateValue = parseFloat(serviceChargeRate?.value || 5);
+    const serviceChargeRateValue = orderType === 'DINE_IN' ? parseFloat(serviceChargeRate?.value ?? 5) : 0;
     
     const tax = subtotal * (taxRateValue / 100);
     const serviceCharge = subtotal * (serviceChargeRateValue / 100);
-    const total = subtotal + tax + serviceCharge;
+
+    let loyaltyDiscount = 0;
+    let previewedReward = null;
+    if (customerId && rewardId) {
+      try {
+        const { reward, discount } = await previewReward({ branchId, customerId, rewardId, itemsSubtotal: subtotal }, trx);
+        previewedReward = reward;
+        loyaltyDiscount = discount;
+      } catch (loyaltyError) {
+        await trx.rollback();
+        return res.status(400).json({ error: loyaltyError.message });
+      }
+    }
+
+    const total = Math.max(0, subtotal + tax + serviceCharge - loyaltyDiscount);
 
     // Determine payment status
-    let paymentStatus = 'UNPAID';
-    if (amountPaid && parseFloat(amountPaid) >= total) {
-      paymentStatus = 'PAID';
-    } else if (amountPaid && parseFloat(amountPaid) > 0) {
-      paymentStatus = 'PARTIALLY_PAID';
-    }
+    // if (amountPaid && parseFloat(amountPaid) >= total) {
+    //   paymentStatus = 'PAID';
+    // } else if (amountPaid && parseFloat(amountPaid) > 0) {
+    //   paymentStatus = 'PARTIALLY_PAID';
+    // }
 
     // Create order
     const [orderId] = await trx('orders').insert({
       branch_id: branchId,
       order_code: orderCode,
       pin: pin,
-      table_id: table.id,
+      table_id: table?.id || null,
       customer_name: customerName,
       customer_phone: customerPhone,
       total: parseFloat(total.toFixed(2)),
       tax: parseFloat(tax.toFixed(2)),
       service_charge: parseFloat(serviceCharge.toFixed(2)),
-      status: 'PENDING',
-      payment_status: paymentStatus,
+      status: orderStatus || 'PENDING',
+      payment_status: paymentStatus || 'UNPAID',
       payment_method: paymentMethod || 'cash',
       amount_paid: amountPaid ? parseFloat(amountPaid) : 0,
       change_amount: changeAmount ? parseFloat(changeAmount) : 0,
+      customer_id: customerId || null,
+      redeemed_reward_id: previewedReward ? previewedReward.id : null,
+      loyalty_discount: parseFloat(loyaltyDiscount.toFixed(2)),
       delivery_address: deliveryAddress,
-      order_type: deliveryAddress ? 'DELIVERY' : 'DINE_IN'
+      order_type: orderType
     });
 
     // Create order items using existing variant fields
@@ -214,8 +275,29 @@ router.post('/', orderRateLimiter, validateOrder, async (req, res) => {
 
     await trx.commit();
 
+    // POS can create orders already past PENDING (orderStatus body param) -
+    // those need inventory consumed immediately since they'll never pass
+    // through /confirm.
+    if (isConfirmedOrLater(orderStatus || 'PENDING')) {
+      await consumeInventoryForOrder(orderId).catch(err =>
+        logger.error(`Inventory consumption error for new order ${orderId}:`, err)
+      );
+    }
+
+    if (previewedReward) {
+      await applyRedemption({
+        branchId, customerId, reward: previewedReward, orderId, staffUserId: req.user?.id
+      }).catch(err => logger.error(`Loyalty redemption error for order ${orderId}:`, err));
+    }
+    // POS can also create an already-PAID cash sale in one shot.
+    if ((paymentStatus || 'UNPAID') === 'PAID') {
+      await earnPointsForOrder(orderId).catch(err =>
+        logger.error(`Loyalty earn error for order ${orderId}:`, err)
+      );
+    }
+
     // Generate QR codes
-    const orderTrackingUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/order-status/${orderId}?pin=${pin}`;
+    const orderTrackingUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/order-status?pin=${pin}`;
     const trackingQrCode = await QRCode.toDataURL(orderTrackingUrl);
 
     let paymentQrCode = null;
@@ -224,32 +306,60 @@ router.post('/', orderRateLimiter, validateOrder, async (req, res) => {
         orderCode,
         orderId,
         total: total.toFixed(2),
-        tableNumber: table.table_number
+        tableNumber: table?.table_number || null
       });
-      paymentQrCode = await QRCode.toDataURL(paymentData);
+      paymentQrCode = await QRCode.toDataURL(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/admin/orders?orderSearchQuery=${pin}`);
     }
+// Emit real-time event
+const io = req.app.get('io');
+if (io) {
+  const order = await db('orders')
+    .select('orders.*', 'tables.table_number', 'branches.name as branch_name')
+    .leftJoin('tables', 'orders.table_id', 'tables.id')
+    .leftJoin('branches', 'orders.branch_id', 'branches.id')
+    .where({ 'orders.id': orderId })
+    .first();
 
-    // Emit real-time event
-    const io = req.app.get('io');
-    if (io) {
-      const order = await db('orders')
-        .select('orders.*', 'tables.table_number', 'branches.name as branch_name')
-        .leftJoin('tables', 'orders.table_id', 'tables.id')
-        .leftJoin('branches', 'orders.branch_id', 'branches.id')
-        .where({ 'orders.id': orderId })
-        .first();
+  // Get order items with the exact field names your frontend expects
+  const items = await db('order_items')
+    .select(
+      'order_items.*',
+      'menu_items.name as item_name', // This matches your frontend
+      'menu_items.image as image' // For item.menu_item?.image
+    )
+    .leftJoin('menu_items', 'order_items.menu_item_id', 'menu_items.id')
+    .where({ 'order_items.order_id': orderId });
 
-      io.to(`branch:${branchId}:kitchen`).emit('order.created', order);
-      io.to(`branch:${branchId}:cashier`).emit('order.created', order);
-    }
+  // Get modifiers for each item
+  for (let item of items) {
+    const modifiers = await db('order_item_modifiers')
+      .select('modifiers.name')
+      .leftJoin('modifiers', 'order_item_modifiers.modifier_id', 'modifiers.id')
+      .where({ 'order_item_modifiers.order_item_id': item.id });
 
-    logger.info(`Order created: ${orderCode} for table ${table.table_number}`);
+    item.modifiers = modifiers;
+    
+    // Create menu_item object for image access
+    item.menu_item = {
+      image: item.image
+    };
+  }
+
+  // Add items to order
+  order.items = items;
+
+  // Emit with correct data structure
+  io.to(`branch:${branchId}:kitchen`).emit('order.created', order);
+  io.to(`branch:${branchId}:cashier`).emit('order.created', order);
+  io.to(`branch:${branchId}`).emit('order.updated', order);
+}
+    logger.info(`Order created: ${orderCode} (${orderType})`);
 
     res.status(201).json({
       orderId,
       orderCode,
       pin: pin,
-      tableNumber: table.table_number,
+      tableNumber: table?.table_number || null,
       trackingUrl: orderTrackingUrl,
       trackingQrCode: trackingQrCode,
       paymentQrCode: paymentQrCode,
@@ -572,7 +682,7 @@ router.get('/code/:code', authenticateToken, authorize('admin', 'manager', 'cash
 });
 
 // Confirm payment (cashier endpoint)
-router.patch('/:id/payment', authenticateToken, authorize('admin', 'manager', 'cashier'), async (req, res) => {
+router.patch('/:id/payment', authenticateToken, requireActiveBranch, authorize('admin', 'manager', 'cashier'), async (req, res) => {
   try {
     const { id } = req.params;
     const { paymentStatus, paymentMethod } = req.body;
@@ -598,14 +708,28 @@ router.patch('/:id/payment', authenticateToken, authorize('admin', 'manager', 'c
     }
 
     // Update payment status
+    const nextStatus = paymentStatus === 'PAID' ? 'PREPARING' : currentOrder.status;
     await db('orders')
       .where({ id })
       .update({
         payment_status: paymentStatus,
         payment_method: paymentMethod || currentOrder.payment_method,
-        status: paymentStatus === 'PAID' ? 'PREPARING' : currentOrder.status,
+        status: nextStatus,
         updated_at: db.raw('CURRENT_TIMESTAMP')
       });
+
+    // This can be the first transition past PENDING for some flows (payment
+    // confirmed before /confirm was ever called) - consumeInventoryForOrder
+    // is idempotent, so this is a no-op if inventory was already deducted.
+    if (isConfirmedOrLater(nextStatus)) {
+      await consumeInventoryForOrder(id);
+    }
+    if (paymentStatus === 'PAID') {
+      await earnPointsForOrder(id);
+    }
+    if (nextStatus !== currentOrder.status) {
+      await recordOrderEvent(id, currentOrder.status, nextStatus, req.user.id, { via: 'payment' });
+    }
 
     // Get updated order with details
     const order = await db('orders')
@@ -736,21 +860,25 @@ router.get('/:id', async (req, res) => {
 });
 
 // Update order status (admin/cashier/kitchen)
-router.patch('/:id/status', authenticateToken, authorize('admin', 'manager', 'cashier', 'kitchen'), async (req, res) => {
+router.patch('/:id/status', authenticateToken, requireActiveBranch, authorize('admin', 'manager', 'cashier', 'kitchen'), async (req, res) => {
   try {
     const { id } = req.params;
     const { status } = req.body;
 
-    const validStatuses = ['PENDING', 'CONFIRMED', 'PREPARING', 'READY', 'SERVED', 'COMPLETED', 'CANCELLED'];
+    const validStatuses = Object.keys(TRANSITIONS);
     if (!validStatuses.includes(status)) {
       return res.status(400).json({ error: 'Invalid status' });
     }
 
-    // Get current order status before updating
-    const currentOrder = await db('orders').where({ id }).first();
-    
+    const currentOrder = await db('orders').where({ id, branch_id: req.user.branch_id }).first();
     if (!currentOrder) {
       return res.status(404).json({ error: 'Order not found' });
+    }
+
+    if (!canTransition(currentOrder.status, status)) {
+      return res.status(409).json({
+        error: `Cannot move order from ${currentOrder.status} to ${status}`
+      });
     }
 
     await db('orders')
@@ -760,58 +888,26 @@ router.patch('/:id/status', authenticateToken, authorize('admin', 'manager', 'ca
         updated_at: db.raw('CURRENT_TIMESTAMP')
       });
 
+    if (status === 'CANCELLED') {
+      await restoreInventoryForOrder(id, 'cancelled');
+      await reverseLoyaltyForOrder(id);
+    } else if (isConfirmedOrLater(status)) {
+      await consumeInventoryForOrder(id);
+    }
+
+    await recordOrderEvent(id, currentOrder.status, status, req.user.id);
+
     const order = await db('orders')
       .select('orders.*', 'tables.table_number')
       .leftJoin('tables', 'orders.table_id', 'tables.id')
       .where({ 'orders.id': id })
       .first();
 
-    // Automatic inventory deduction when order is completed
-    if (status === 'COMPLETED' && currentOrder.status !== 'COMPLETED') {
-      try {
-        // Get all order items
-        const orderItems = await db('order_items')
-          .select('menu_item_id', 'quantity')
-          .where({ order_id: id });
-
-        for (const item of orderItems) {
-          // Get recipes for this menu item
-          const recipes = await db('recipes')
-            .select('stock_item_id', 'qty_per_serving')
-            .where({ menu_item_id: item.menu_item_id });
-
-          for (const recipe of recipes) {
-            const deductionQty = recipe.qty_per_serving * item.quantity;
-            
-            // Update stock quantity
-            await db('stock_items')
-              .where({ id: recipe.stock_item_id })
-              .decrement('quantity', deductionQty);
-
-            // Record the movement
-            await db('stock_movements').insert({
-              stock_item_id: recipe.stock_item_id,
-              movement_type: 'OUT',
-              quantity: deductionQty,
-              reference_type: 'ORDER',
-              reference_id: id,
-              notes: `Auto-deduction for order ${order.order_code}`,
-              created_by: req.user.id
-            });
-          }
-        }
-
-        logger.info(`Inventory deducted for completed order ${order.order_code}`);
-      } catch (invError) {
-        logger.error(`Inventory deduction error for order ${id}:`, invError);
-        // Don't fail the entire request if inventory deduction fails
-      }
-    }
-
     // Emit real-time event
     const io = req.app.get('io');
     io.to(`branch:${order.branch_id}:kitchen`).emit('order.updated', order);
     io.to(`branch:${order.branch_id}:cashier`).emit('order.updated', order);
+    io.to(`order:${order.id}`).emit('order.updated', order);
 
     // Log status change
     await db('audit_logs').insert({
@@ -830,11 +926,11 @@ router.patch('/:id/status', authenticateToken, authorize('admin', 'manager', 'ca
 });
 
 // Confirm order (cashier)
-router.post('/:id/confirm', authenticateToken, authorize('admin', 'manager', 'cashier'), async (req, res) => {
+router.post('/:id/confirm', authenticateToken, requireActiveBranch, authorize('admin', 'manager', 'cashier'), async (req, res) => {
   try {
     const { id } = req.params;
 
-    const order = await db('orders').where({ id }).first();
+    const order = await db('orders').where({ id, branch_id: req.user.branch_id }).first();
     if (!order) {
       return res.status(404).json({ error: 'Order not found' });
     }
@@ -852,6 +948,7 @@ router.post('/:id/confirm', authenticateToken, authorize('admin', 'manager', 'ca
 
     // Consume inventory
     await consumeInventoryForOrder(id);
+    await recordOrderEvent(id, order.status, 'CONFIRMED', req.user.id);
 
     // Emit real-time event
     const io = req.app.get('io');
@@ -862,6 +959,7 @@ router.post('/:id/confirm', authenticateToken, authorize('admin', 'manager', 'ca
       .first();
 
     io.to(`branch:${order.branch_id}:kitchen`).emit('order.confirmed', updatedOrder);
+    io.to(`order:${order.id}`).emit('order.updated', updatedOrder);
 
     // Log confirmation
     await db('audit_logs').insert({
@@ -885,7 +983,7 @@ router.post('/:id/cancel', authenticateToken, authorize('admin', 'manager', 'cas
     const { id } = req.params;
     const { reason } = req.body;
 
-    const order = await db('orders').where({ id }).first();
+    const order = await db('orders').where({ id, branch_id: req.user.branch_id }).first();
     if (!order) {
       return res.status(404).json({ error: 'Order not found' });
     }
@@ -901,6 +999,10 @@ router.post('/:id/cancel', authenticateToken, authorize('admin', 'manager', 'cas
         updated_at: db.raw('CURRENT_TIMESTAMP')
       });
 
+    await restoreInventoryForOrder(id, 'cancelled');
+    await reverseLoyaltyForOrder(id);
+    await recordOrderEvent(id, order.status, 'CANCELLED', req.user.id, { reason });
+
     // Emit real-time event
     const io = req.app.get('io');
     const updatedOrder = await db('orders')
@@ -911,6 +1013,7 @@ router.post('/:id/cancel', authenticateToken, authorize('admin', 'manager', 'cas
 
     io.to(`branch:${order.branch_id}:kitchen`).emit('order.cancelled', updatedOrder);
     io.to(`branch:${order.branch_id}:cashier`).emit('order.cancelled', updatedOrder);
+    io.to(`order:${order.id}`).emit('order.updated', updatedOrder);
 
     // Log cancellation
     await db('audit_logs').insert({
@@ -928,25 +1031,31 @@ router.post('/:id/cancel', authenticateToken, authorize('admin', 'manager', 'cas
   }
 });
 
-// Helper function to consume inventory
+// Consumes inventory for an order exactly once, no matter which code path
+// (creation, /confirm, /status, /payment) triggers it. Guarded by the
+// inventory_consumed flag with an atomic conditional update so concurrent
+// callers can't double-deduct.
 async function consumeInventoryForOrder(orderId) {
+  const claimed = await db('orders')
+    .where({ id: orderId, inventory_consumed: false })
+    .update({ inventory_consumed: true });
+  if (!claimed) return; // already consumed (or order missing) - nothing to do
+
   try {
     const order = await db('orders').where({ id: orderId }).first();
     const orderItems = await db('order_items').where({ order_id: orderId });
-    
+
     for (const item of orderItems) {
       const recipes = await db('recipes').where({ menu_item_id: item.menu_item_id });
       const menuItem = await db('menu_items').where({ id: item.menu_item_id }).first();
-      
+
       for (const recipe of recipes) {
         const quantityToConsume = recipe.qty_per_serving * item.quantity;
-        
-        // Update stock quantity
+
         await db('stock_items')
           .where({ id: recipe.stock_item_id })
           .decrement('quantity', quantityToConsume);
 
-        // Log stock movement with order tracking
         await db('stock_movements').insert({
           stock_item_id: recipe.stock_item_id,
           change: -quantityToConsume,
@@ -955,10 +1064,8 @@ async function consumeInventoryForOrder(orderId) {
           type: 'order'
         });
 
-        // Check for low stock and create alert
         const stockItem = await db('stock_items').where({ id: recipe.stock_item_id }).first();
         if (stockItem && stockItem.quantity <= stockItem.min_threshold) {
-          // Check if there's already an unresolved alert for this item
           const existingAlert = await db('low_stock_alerts')
             .where({ stock_item_id: stockItem.id, is_resolved: false })
             .first();
@@ -973,12 +1080,59 @@ async function consumeInventoryForOrder(orderId) {
             logger.warn(`⚠️ Low stock alert: ${stockItem.name} (${stockItem.quantity} ${stockItem.unit} remaining, min: ${stockItem.min_threshold})`);
           }
         }
+        await syncMenuItemAvailability(recipe.stock_item_id);
       }
     }
   } catch (error) {
+    // Roll the claim back so a retry (or manual fix) can still consume inventory.
+    await db('orders').where({ id: orderId }).update({ inventory_consumed: false });
     logger.error('Inventory consumption error:', error);
     throw error;
   }
+}
+
+// Reverses a prior consumeInventoryForOrder call, e.g. on cancellation.
+// No-ops if inventory was never consumed for this order.
+async function restoreInventoryForOrder(orderId, reasonSuffix = 'cancelled') {
+  const claimed = await db('orders')
+    .where({ id: orderId, inventory_consumed: true })
+    .update({ inventory_consumed: false });
+  if (!claimed) return;
+
+  const order = await db('orders').where({ id: orderId }).first();
+  const orderItems = await db('order_items').where({ order_id: orderId });
+
+  for (const item of orderItems) {
+    const recipes = await db('recipes').where({ menu_item_id: item.menu_item_id });
+    const menuItem = await db('menu_items').where({ id: item.menu_item_id }).first();
+
+    for (const recipe of recipes) {
+      const quantityToRestore = recipe.qty_per_serving * item.quantity;
+
+      await db('stock_items')
+        .where({ id: recipe.stock_item_id })
+        .increment('quantity', quantityToRestore);
+
+      await db('stock_movements').insert({
+        stock_item_id: recipe.stock_item_id,
+        change: quantityToRestore,
+        reason: `Order ${order.order_code} - ${item.quantity}x ${menuItem?.name || 'item'} (${reasonSuffix})`,
+        order_id: orderId,
+        type: 'order_reversal'
+      });
+      await syncMenuItemAvailability(recipe.stock_item_id);
+    }
+  }
+}
+
+async function recordOrderEvent(orderId, fromStatus, toStatus, userId, meta) {
+  await db('order_events').insert({
+    order_id: orderId,
+    from_status: fromStatus,
+    to_status: toStatus,
+    user_id: userId || null,
+    meta: meta ? JSON.stringify(meta) : null
+  });
 }
 
 module.exports = router;

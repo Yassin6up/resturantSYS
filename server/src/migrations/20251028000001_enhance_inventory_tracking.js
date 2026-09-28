@@ -1,13 +1,8 @@
-exports.up = function(knex) {
-  return knex.schema
-    .table('stock_movements', table => {
-      table.integer('user_id').unsigned();
-      table.integer('order_id').unsigned();
-      table.string('type').defaultTo('manual');
-      table.foreign('user_id').references('id').inTable('users');
-      table.foreign('order_id').references('id').inTable('orders');
-    })
-    .createTable('low_stock_alerts', table => {
+exports.up = async function(knex) {
+  for (const [name, add] of Object.entries({ user_id: t => t.integer('user_id').unsigned(), order_id: t => t.integer('order_id').unsigned(), type: t => t.string('type').defaultTo('manual') })) {
+    if (!(await knex.schema.hasColumn('stock_movements', name))) await knex.schema.table('stock_movements', add);
+  }
+  if (!(await knex.schema.hasTable('low_stock_alerts'))) await knex.schema.createTable('low_stock_alerts', table => {
       table.increments('id').primary();
       table.integer('stock_item_id').unsigned();
       table.integer('branch_id').unsigned();

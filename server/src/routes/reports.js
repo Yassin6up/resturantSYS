@@ -9,10 +9,15 @@ const router = express.Router();
 // Get daily sales report
 router.get('/sales/daily', authenticateToken, authorize('admin', 'manager'), async (req, res) => {
   try {
-    const { date, branchId } = req.query;
+    // Always scope by the caller's own store - a client-supplied branchId
+    // must never be trusted here, or any admin could read another tenant's
+    // revenue by passing a different id (or see everyone's by omitting it).
+    const branchId = req.user.branch_id;
+    if (!branchId) return res.status(400).json({ error: 'No store associated with this account' });
+    const { date } = req.query;
     const targetDate = date || new Date().toISOString().split('T')[0];
 
-    let query = db('orders')
+    const summary = await db('orders')
       .select(
         db.raw('COUNT(*) as total_orders'),
         db.raw('SUM(total) as total_revenue'),
@@ -20,31 +25,29 @@ router.get('/sales/daily', authenticateToken, authorize('admin', 'manager'), asy
         db.raw('SUM(service_charge) as total_service_charge'),
         db.raw('AVG(total) as average_order_value')
       )
-      .where(db.raw('DATE(created_at) = ?', [targetDate]));
-
-    if (branchId) {
-      query = query.where({ branch_id: branchId });
-    }
-
-    const summary = await query.first();
+      .where(db.raw('DATE(created_at) = ?', [targetDate]))
+      .where({ branch_id: branchId })
+      .first();
 
     // Get orders by status
     const statusBreakdown = await db('orders')
       .select('status')
       .count('id as count')
       .where(db.raw('DATE(created_at) = ?', [targetDate]))
+      .where({ branch_id: branchId })
       .groupBy('status');
 
     // Get hourly breakdown (Database agnostic)
     const dbType = process.env.DB_TYPE || 'sqlite3';
     let hourlyBreakdown;
-    
+
     if (dbType === 'sqlite3') {
       hourlyBreakdown = await db('orders')
         .select(db.raw('CAST(strftime("%H", created_at) AS INTEGER) as hour'))
         .count('id as count')
         .sum('total as revenue')
         .where(db.raw('DATE(created_at) = ?', [targetDate]))
+        .where({ branch_id: branchId })
         .groupBy(db.raw('strftime("%H", created_at)'))
         .orderBy('hour');
     } else {
@@ -54,6 +57,7 @@ router.get('/sales/daily', authenticateToken, authorize('admin', 'manager'), asy
         .count('id as count')
         .sum('total as revenue')
         .where(db.raw('DATE(created_at) = ?', [targetDate]))
+        .where({ branch_id: branchId })
         .groupBy(db.raw('HOUR(created_at)'))
         .orderBy('hour');
     }
@@ -73,13 +77,15 @@ router.get('/sales/daily', authenticateToken, authorize('admin', 'manager'), asy
 // Get sales report by date range
 router.get('/sales/range', authenticateToken, authorize('admin', 'manager'), async (req, res) => {
   try {
-    const { startDate, endDate, branchId } = req.query;
+    const branchId = req.user.branch_id;
+    if (!branchId) return res.status(400).json({ error: 'No store associated with this account' });
+    const { startDate, endDate } = req.query;
 
     if (!startDate || !endDate) {
       return res.status(400).json({ error: 'Start date and end date are required' });
     }
 
-    let query = db('orders')
+    const dailyData = await db('orders')
       .select(
         db.raw('DATE(created_at) as date'),
         db.raw('COUNT(*) as total_orders'),
@@ -89,14 +95,9 @@ router.get('/sales/range', authenticateToken, authorize('admin', 'manager'), asy
         db.raw('AVG(total) as average_order_value')
       )
       .whereBetween('created_at', [startDate, endDate])
+      .where({ branch_id: branchId })
       .groupBy(db.raw('DATE(created_at)'))
       .orderBy('date');
-
-    if (branchId) {
-      query = query.where({ branch_id: branchId });
-    }
-
-    const dailyData = await query;
 
     // Calculate totals
     const totals = dailyData.reduce((acc, day) => ({
@@ -128,7 +129,9 @@ router.get('/sales/range', authenticateToken, authorize('admin', 'manager'), asy
 // Get top selling items report
 router.get('/items/top', authenticateToken, authorize('admin', 'manager'), async (req, res) => {
   try {
-    const { startDate, endDate, branchId, limit = 20 } = req.query;
+    const branchId = req.user.branch_id;
+    if (!branchId) return res.status(400).json({ error: 'No store associated with this account' });
+    const { startDate, endDate, limit = 20 } = req.query;
 
     let query = db('order_items')
       .select(
@@ -143,16 +146,13 @@ router.get('/items/top', authenticateToken, authorize('admin', 'manager'), async
       .leftJoin('categories', 'menu_items.category_id', 'categories.id')
       .leftJoin('orders', 'order_items.order_id', 'orders.id')
       .where('orders.status', '!=', 'CANCELLED')
+      .where('orders.branch_id', branchId)
       .groupBy('menu_items.id', 'menu_items.name', 'menu_items.sku', 'categories.name')
       .orderBy('total_quantity', 'desc')
       .limit(parseInt(limit));
 
     if (startDate && endDate) {
       query = query.whereBetween('orders.created_at', [startDate, endDate]);
-    }
-
-    if (branchId) {
-      query = query.where({ 'orders.branch_id': branchId });
     }
 
     const topItems = await query;
@@ -167,7 +167,9 @@ router.get('/items/top', authenticateToken, authorize('admin', 'manager'), async
 // Get table turnover report
 router.get('/tables/turnover', authenticateToken, authorize('admin', 'manager'), async (req, res) => {
   try {
-    const { startDate, endDate, branchId } = req.query;
+    const branchId = req.user.branch_id;
+    if (!branchId) return res.status(400).json({ error: 'No store associated with this account' });
+    const { startDate, endDate } = req.query;
 
     const dbType = process.env.DB_TYPE || 'sqlite3';
     let query = db('orders')
@@ -179,6 +181,7 @@ router.get('/tables/turnover', authenticateToken, authorize('admin', 'manager'),
       )
       .leftJoin('tables', 'orders.table_id', 'tables.id')
       .where('orders.status', '!=', 'CANCELLED')
+      .where('orders.branch_id', branchId)
       .groupBy('tables.id', 'tables.table_number')
       .orderBy('total_orders', 'desc');
 
@@ -194,10 +197,6 @@ router.get('/tables/turnover', authenticateToken, authorize('admin', 'manager'),
       query = query.whereBetween('orders.created_at', [startDate, endDate]);
     }
 
-    if (branchId) {
-      query = query.where({ 'orders.branch_id': branchId });
-    }
-
     const tableTurnover = await query;
 
     res.json({ tableTurnover });
@@ -210,7 +209,9 @@ router.get('/tables/turnover', authenticateToken, authorize('admin', 'manager'),
 // Get inventory usage report
 router.get('/inventory/usage', authenticateToken, authorize('admin', 'manager'), async (req, res) => {
   try {
-    const { startDate, endDate, branchId } = req.query;
+    const branchId = req.user.branch_id;
+    if (!branchId) return res.status(400).json({ error: 'No store associated with this account' });
+    const { startDate, endDate } = req.query;
 
     let query = db('stock_movements')
       .select(
@@ -223,15 +224,12 @@ router.get('/inventory/usage', authenticateToken, authorize('admin', 'manager'),
         db.raw('COUNT(CASE WHEN stock_movements.change > 0 THEN 1 END) as receipt_count')
       )
       .leftJoin('stock_items', 'stock_movements.stock_item_id', 'stock_items.id')
+      .where('stock_items.branch_id', branchId)
       .groupBy('stock_items.id', 'stock_items.name', 'stock_items.sku', 'stock_items.unit')
       .orderBy('total_consumed', 'desc');
 
     if (startDate && endDate) {
       query = query.whereBetween('stock_movements.created_at', [startDate, endDate]);
-    }
-
-    if (branchId) {
-      query = query.where({ 'stock_items.branch_id': branchId });
     }
 
     const inventoryUsage = await query;
@@ -246,7 +244,9 @@ router.get('/inventory/usage', authenticateToken, authorize('admin', 'manager'),
 // Get payment method report
 router.get('/payments/methods', authenticateToken, authorize('admin', 'manager'), async (req, res) => {
   try {
-    const { startDate, endDate, branchId } = req.query;
+    const branchId = req.user.branch_id;
+    if (!branchId) return res.status(400).json({ error: 'No store associated with this account' });
+    const { startDate, endDate } = req.query;
 
     let query = db('payments')
       .select(
@@ -256,15 +256,12 @@ router.get('/payments/methods', authenticateToken, authorize('admin', 'manager')
         db.raw('AVG(amount) as average_amount')
       )
       .leftJoin('orders', 'payments.order_id', 'orders.id')
+      .where('orders.branch_id', branchId)
       .groupBy('payments.payment_type')
       .orderBy('total_amount', 'desc');
 
     if (startDate && endDate) {
       query = query.whereBetween('payments.paid_at', [startDate, endDate]);
-    }
-
-    if (branchId) {
-      query = query.where({ 'orders.branch_id': branchId });
     }
 
     const paymentMethods = await query;
@@ -279,40 +276,34 @@ router.get('/payments/methods', authenticateToken, authorize('admin', 'manager')
 // Get cash reconciliation report
 router.get('/cash/reconciliation', authenticateToken, authorize('admin', 'manager', 'cashier'), async (req, res) => {
   try {
-    const { date, branchId } = req.query;
+    const branchId = req.user.branch_id;
+    if (!branchId) return res.status(400).json({ error: 'No store associated with this account' });
+    const { date } = req.query;
     const targetDate = date || new Date().toISOString().split('T')[0];
 
     // Get cash payments for the day
-    let cashQuery = db('payments')
+    const cashSummary = await db('payments')
       .select(
         db.raw('SUM(amount) as total_cash_received'),
         db.raw('COUNT(*) as cash_transaction_count')
       )
       .leftJoin('orders', 'payments.order_id', 'orders.id')
       .where('payments.payment_type', 'CASH')
-      .where(db.raw('DATE(payments.paid_at) = ?', [targetDate]));
-
-    if (branchId) {
-      cashQuery = cashQuery.where({ 'orders.branch_id': branchId });
-    }
-
-    const cashSummary = await cashQuery.first();
+      .where(db.raw('DATE(payments.paid_at) = ?', [targetDate]))
+      .where('orders.branch_id', branchId)
+      .first();
 
     // Get refunds
-    let refundQuery = db('payments')
+    const refundSummary = await db('payments')
       .select(
         db.raw('SUM(ABS(amount)) as total_refunds'),
         db.raw('COUNT(*) as refund_count')
       )
       .leftJoin('orders', 'payments.order_id', 'orders.id')
       .where('payments.payment_type', 'REFUND')
-      .where(db.raw('DATE(payments.paid_at) = ?', [targetDate]));
-
-    if (branchId) {
-      refundQuery = refundQuery.where({ 'orders.branch_id': branchId });
-    }
-
-    const refundSummary = await refundQuery.first();
+      .where(db.raw('DATE(payments.paid_at) = ?', [targetDate]))
+      .where('orders.branch_id', branchId)
+      .first();
 
     res.json({
       date: targetDate,
@@ -329,8 +320,10 @@ router.get('/cash/reconciliation', authenticateToken, authorize('admin', 'manage
 // Export report data as CSV
 router.get('/export/:reportType', authenticateToken, authorize('admin', 'manager'), async (req, res) => {
   try {
+    const branchId = req.user.branch_id;
+    if (!branchId) return res.status(400).json({ error: 'No store associated with this account' });
     const { reportType } = req.params;
-    const { startDate, endDate, branchId } = req.query;
+    const { startDate, endDate } = req.query;
 
     let data = [];
     let filename = '';
@@ -464,10 +457,16 @@ function convertToCSV(data) {
 }
 
 // Export report as Excel
+// NOTE: this duplicates the '/export/:reportType' path registered above -
+// Express only ever dispatches to the first match, so this handler is
+// currently unreachable dead code. Pre-existing, left as-is (out of scope
+// for this pass) but still scoped by branch_id below for when it's fixed.
 router.get('/export/:reportType', authenticateToken, authorize('admin', 'manager'), async (req, res) => {
   try {
+    const branchId = req.user.branch_id;
+    if (!branchId) return res.status(400).json({ error: 'No store associated with this account' });
     const { reportType } = req.params;
-    const { startDate, endDate, branchId } = req.query;
+    const { startDate, endDate } = req.query;
 
     let data = [];
     let filename = '';

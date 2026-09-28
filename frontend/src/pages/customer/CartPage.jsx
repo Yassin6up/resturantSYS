@@ -25,7 +25,7 @@ function CartPage() {
       toast.error('Your cart is empty')
       return
     }
-    navigate(`/checkout?table=${table}&branch=${branch}`)
+    navigate(`/checkout?${searchParams}`)
   }
 
   const handleClearCart = () => {
@@ -46,13 +46,13 @@ function CartPage() {
           </div>
           <h2 className="text-4xl font-bold text-gray-900 mb-4">Your Cart is Empty</h2>
           <p className="text-lg text-gray-600 mb-8">
-            Discover our delicious menu and add your favorite items!
+            Explore the collection and add your favorite items.
           </p>
           <button
-            onClick={() => navigate(`/menu?table=${table}&branch=${branch}`)}
+            onClick={() => navigate(`/?${searchParams}`)}
             className="px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold rounded-xl shadow-lg hover:shadow-xl transition-all active:scale-95 flex items-center justify-center gap-2 mx-auto"
           >
-            <span>Browse Menu</span>
+            <span>Continue shopping</span>
             <ArrowRightIcon className="h-5 w-5" />
           </button>
         </div>
@@ -220,7 +220,7 @@ function CartPage() {
                   </button>
                   
                   <button
-                    onClick={() => navigate(`/menu?table=${table}&branch=${branch}`)}
+                    onClick={() => navigate(`/?${searchParams}`)}
                     className="w-full py-4 px-6 bg-white hover:bg-gray-50 text-gray-700 font-semibold rounded-xl border-2 border-gray-200 transition-all active:scale-95"
                   >
                     Continue Shopping

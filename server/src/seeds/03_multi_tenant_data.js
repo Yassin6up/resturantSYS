@@ -60,6 +60,7 @@ exports.seed = async function(knex) {
         id: 2,
         name: 'Rabat Downtown',
         code: 'RBT',
+        slug: 'rabat-downtown',
         address: '456 Avenue Hassan II, Rabat, Morocco',
         owner_id: 100,
         phone: '+212-537-654321',
